@@ -29,7 +29,7 @@ function readSession() {
   try {
     const session = JSON.parse(localStorage.getItem('ej_user'))
     if (!session?.id) return null
-    const current = db.get('usuarios').find(item => idsEqual(item.id, session.id))
+    const current = db.get('usuarios').find(item => sameUserIdentity(item, session))
     if (!current || current.status !== 'ativo') return null
     const safe = safeUser(current)
     localStorage.setItem('ej_user', JSON.stringify(safe))
@@ -45,6 +45,12 @@ function matchesEmail(user, email) {
     (user.emailAliases || []).some(alias => alias.toLowerCase() === normalized)
 }
 
+function sameUserIdentity(a, b) {
+  if (!a || !b) return false
+  return idsEqual(a.id, b.id) ||
+    (a.email && b.email && a.email.toLowerCase() === b.email.toLowerCase())
+}
+
 function validateLogin(currentUsers, email, password) {
   return currentUsers.find(item => matchesEmail(item, email) && item.senha === password)
 }
@@ -57,7 +63,7 @@ export function AuthProvider({ children }) {
     setUsers(nextUsers.map(safeUser))
     setUser(current => {
       if (!current) return null
-      const fresh = nextUsers.find(item => idsEqual(item.id, current.id))
+      const fresh = nextUsers.find(item => sameUserIdentity(item, current))
       if (!fresh || fresh.status !== 'ativo') {
         localStorage.removeItem('ej_user')
         return null
@@ -76,18 +82,14 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     let currentUsers = db.get('usuarios')
-    let found = validateLogin(currentUsers, email, password)
-
-    if (!found) {
-      try {
-        currentUsers = await pullUsersFromSupabase(db)
-        found = validateLogin(currentUsers, email, password)
-      } catch (error) {
-        console.warn('[Supabase] Não foi possível sincronizar usuários antes do login:', error.message || error)
-      }
+    try {
+      currentUsers = await pullUsersFromSupabase(db)
+    } catch (error) {
+      console.warn('[Supabase] Nao foi possivel sincronizar usuarios antes do login:', error.message || error)
     }
+    const found = validateLogin(currentUsers, email, password)
 
-    if (!found) return { success: false, error: 'Email ou senha inválidos' }
+    if (!found) return { success: false, error: 'Email ou senha invalidos' }
     if (found.status === 'pendente') return { success: false, status: 'pendente', user: found }
     if (found.status === 'rejeitado') return { success: false, error: 'Cadastro reprovado pela diretoria. Contate o RH.' }
     if (found.status !== 'ativo') return { success: false, error: 'Conta inativa. Contate o administrador.' }

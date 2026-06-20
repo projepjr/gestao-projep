@@ -106,7 +106,7 @@ function userFromProfile(profile, currentUsers = []) {
     user.email?.toLowerCase() === profile.email?.toLowerCase()
   )
   const sector = resolveSetor(profile.sector_id)
-  const id = existing?.id || localId || profile.id
+  const id = localId || profile.id
   return {
     ...existing,
     id,
@@ -448,14 +448,14 @@ export async function syncNotificationToSupabase(notification) {
 async function syncLocalCommunicationToSupabase(db) {
   if (!isSupabaseConfigured || !supabase) return
   const users = db.get('usuarios')
+  const hasUser = id => users.some(user => idsEqual(user.id, id))
   const communication = db.get('comunicacao')
 
   for (const message of communication.mensagens || []) {
+    const isChannel = message.tipo === 'aviso_geral' || message.destinatarioId === 'avisos'
+    if (!hasUser(message.remetenteId)) continue
+    if (!isChannel && !hasUser(message.destinatarioId)) continue
     await syncMessageToSupabase(message, users)
-  }
-
-  for (const notification of communication.notificacoes || []) {
-    await syncNotificationToSupabase(notification)
   }
 }
 
