@@ -48,6 +48,16 @@ const userUuid = userId => appIdToUuid(userId, NS.user)
 const meetingUuid = meetingId => appIdToUuid(meetingId, NS.meeting)
 const messageUuid = messageId => appIdToUuid(messageId, NS.message)
 const notificationUuid = notificationId => appIdToUuid(notificationId, NS.notification)
+const defaultEmailFromName = name => {
+  const slug = `${name || 'membro'}`
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+    .slice(0, 32) || 'membro'
+  return `${slug}@projep.com`
+}
+const isLegacyTemporaryEmail = email => `${email || ''}`.toLowerCase().endsWith('@temporario.projep')
 
 function profileFromUser(user) {
   const sector = resolveSetor(user.setorId || user.setor)
@@ -78,7 +88,7 @@ function userFromProfile(profile, currentUsers = []) {
     ...existing,
     id,
     nome: profile.name,
-    email: profile.email,
+    email: isLegacyTemporaryEmail(profile.email) ? defaultEmailFromName(profile.name) : profile.email,
     cargo: profile.position || existing?.cargo || '',
     setorId: sector?.id || profile.sector_id || existing?.setorId || null,
     setor: sector?.nome || existing?.setor || '',
@@ -87,7 +97,7 @@ function userFromProfile(profile, currentUsers = []) {
     avatar: profile.initials || existing?.avatar || profile.name?.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase(),
     status: profile.status === 'active' ? 'ativo' : profile.status === 'pending' ? 'pendente' : profile.status || existing?.status || 'ativo',
     role: profile.role || existing?.role || 'membro',
-    senha: existing?.senha || '',
+    senha: existing?.senha && !isLegacyTemporaryEmail(existing.email) ? existing.senha : '123456',
     dataCadastro: existing?.dataCadastro || dateOnly(profile.created_at) || new Date().toISOString().split('T')[0],
     preferenciasNotificacao: existing?.preferenciasNotificacao || {
       email: true,
@@ -95,6 +105,8 @@ function userFromProfile(profile, currentUsers = []) {
       whatsapp: false,
       weekly_report: true,
     },
+    precisaAtualizarDados: existing?.precisaAtualizarDados ?? isLegacyTemporaryEmail(profile.email),
+    emailTemporario: existing?.emailTemporario ?? isLegacyTemporaryEmail(profile.email),
     permissoes: existing?.permissoes || normalizePermissions({}, profile.role || 'membro'),
   }
 }
@@ -271,6 +283,7 @@ export async function bootstrapSupabase(db) {
     const remoteUsers = profiles.map(profile => userFromProfile(profile, localUsers))
     mergedUsers = applyRemotePermissions(mergeById(localUsers, remoteUsers), permissions || [])
     db.set('usuarios', mergedUsers)
+    await syncUsersToSupabase(mergedUsers)
   }
 
   const profileIdToUserId = new Map(mergedUsers.map(user => [userUuid(user.id), user.id]))

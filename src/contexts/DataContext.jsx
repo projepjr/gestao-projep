@@ -46,13 +46,11 @@ function createTemporaryCredentials(name = 'membro') {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '.')
-    .replace(/(^\.|\.$)/g, '')
+    .replace(/[^a-z0-9]+/g, '')
     .slice(0, 32) || 'membro'
-  const suffix = Math.floor(1000 + Math.random() * 9000)
   return {
-    email: `${slug}.${suffix}@temporario.projep`,
-    senha: `projep${suffix}`,
+    email: `${slug}@projep.com`,
+    senha: '123456',
   }
 }
 
