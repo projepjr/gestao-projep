@@ -96,7 +96,7 @@ export default function Login() {
     e.preventDefault()
     setError(''); setLoading(true)
     await new Promise(r => setTimeout(r, 450))
-    const result = login(loginEmail, loginPassword)
+    const result = await login(loginEmail, loginPassword)
     setLoading(false)
     if (result.success) {
       navigate(getDefaultPath(result.user))

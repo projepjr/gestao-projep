@@ -271,6 +271,19 @@ export async function bootstrapSupabase(db) {
     .in('email', REMOVED_DEMO_EMAILS)
   logRemoteError('delete demo profiles', demoDeleteError)
 
+  const mergedUsers = await pullUsersFromSupabase(db)
+
+  const profileIdToUserId = new Map(mergedUsers.map(user => [userUuid(user.id), user.id]))
+  await pullCommunication(db, profileIdToUserId)
+  await pullMeetings(db, profileIdToUserId)
+
+  return { enabled: true }
+}
+
+export async function pullUsersFromSupabase(db) {
+  if (!isSupabaseConfigured || !supabase) return db.get('usuarios')
+
+  const localUsers = db.get('usuarios')
   const [{ data: profiles, error: profilesError }, { data: permissions, error: permissionsError }] = await Promise.all([
     supabase.from('profiles').select('*'),
     supabase.from('permissions').select('*'),
@@ -278,19 +291,13 @@ export async function bootstrapSupabase(db) {
   logRemoteError('fetch profiles', profilesError)
   logRemoteError('fetch permissions', permissionsError)
 
-  let mergedUsers = localUsers
-  if (profiles?.length) {
-    const remoteUsers = profiles.map(profile => userFromProfile(profile, localUsers))
-    mergedUsers = applyRemotePermissions(mergeById(localUsers, remoteUsers), permissions || [])
-    db.set('usuarios', mergedUsers)
-    await syncUsersToSupabase(mergedUsers)
-  }
+  if (!profiles?.length) return localUsers
 
-  const profileIdToUserId = new Map(mergedUsers.map(user => [userUuid(user.id), user.id]))
-  await pullCommunication(db, profileIdToUserId)
-  await pullMeetings(db, profileIdToUserId)
-
-  return { enabled: true }
+  const remoteUsers = profiles.map(profile => userFromProfile(profile, localUsers))
+  const mergedUsers = applyRemotePermissions(mergeById(localUsers, remoteUsers), permissions || [])
+  db.set('usuarios', mergedUsers)
+  await syncUsersToSupabase(mergedUsers)
+  return mergedUsers
 }
 
 export async function syncUsersToSupabase(users = []) {

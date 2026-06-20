@@ -9,6 +9,7 @@ import {
 } from '../config/authorization'
 import {
   deleteUserFromSupabase,
+  pullUsersFromSupabase,
   syncNotificationToSupabase,
   syncUsersToSupabase,
 } from '../services/supabaseBridge'
@@ -39,8 +40,12 @@ function readSession() {
 
 function matchesEmail(user, email) {
   const normalized = email.trim().toLowerCase()
-  return user.email.toLowerCase() === normalized ||
+  return user.email?.toLowerCase() === normalized ||
     (user.emailAliases || []).some(alias => alias.toLowerCase() === normalized)
+}
+
+function validateLogin(currentUsers, email, password) {
+  return currentUsers.find(item => matchesEmail(item, email) && item.senha === password)
 }
 
 export function AuthProvider({ children }) {
@@ -64,9 +69,18 @@ export function AuthProvider({ children }) {
 
   const persistUsers = nextUsers => db.set('usuarios', nextUsers)
 
-  const login = (email, password) => {
-    const currentUsers = db.get('usuarios')
-    const found = currentUsers.find(item => matchesEmail(item, email) && item.senha === password)
+  const login = async (email, password) => {
+    let currentUsers = db.get('usuarios')
+    let found = validateLogin(currentUsers, email, password)
+
+    if (!found) {
+      try {
+        currentUsers = await pullUsersFromSupabase(db)
+        found = validateLogin(currentUsers, email, password)
+      } catch (error) {
+        console.warn('[Supabase] Não foi possível sincronizar usuários antes do login:', error.message || error)
+      }
+    }
 
     if (!found) return { success: false, error: 'Email ou senha inválidos' }
     if (found.status === 'pendente') return { success: false, status: 'pendente', user: found }
