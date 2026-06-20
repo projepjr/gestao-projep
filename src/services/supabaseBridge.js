@@ -375,6 +375,59 @@ const mergeMessages = (local = [], remote = []) => {
   return items.sort((a, b) => normalizeTimestamp(a.timestamp) - normalizeTimestamp(b.timestamp))
 }
 
+const notificationMergeKey = notification => [
+  notification.tipo || 'sistema',
+  notification.usuarioId ?? 'global',
+  notification.audiencia || '',
+  notification.modulo || '',
+  notification.titulo || '',
+  notification.descricao || '',
+  notification.link || '',
+  normalizeTimestamp(notification.timestamp),
+].join('|')
+
+const mergeReadLists = (a = [], b = []) => [...new Set([...a, ...b].filter(Boolean))]
+
+const mergeNotifications = (local = [], remote = []) => {
+  const items = []
+  const indexById = new Map()
+  const indexByIdentity = new Map()
+
+  const upsert = (notification, preferIncoming = false) => {
+    const idKey = String(notification.id)
+    const identityKey = notificationMergeKey(notification)
+    const existingIndex = indexById.has(idKey)
+      ? indexById.get(idKey)
+      : indexByIdentity.get(identityKey)
+
+    if (existingIndex != null) {
+      const current = items[existingIndex]
+      const merged = preferIncoming
+        ? { ...current, ...notification }
+        : { ...notification, ...current }
+
+      // Preserve local read state while Supabase catches up, otherwise a pull can
+      // resurrect an already-read notification as unread.
+      merged.lida = Boolean(current.lida || notification.lida)
+      merged.lidosPor = mergeReadLists(current.lidosPor, notification.lidosPor)
+
+      items[existingIndex] = merged
+      indexById.set(String(merged.id), existingIndex)
+      indexByIdentity.set(notificationMergeKey(merged), existingIndex)
+      return
+    }
+
+    const nextIndex = items.length
+    items.push(notification)
+    indexById.set(idKey, nextIndex)
+    indexByIdentity.set(identityKey, nextIndex)
+  }
+
+  local.forEach(notification => upsert(notification, false))
+  remote.forEach(notification => upsert(notification, true))
+  return items.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+}
+
 export async function bootstrapSupabase(db) {
   if (!isSupabaseConfigured || !supabase) return { enabled: false, reason: 'missing-env' }
 
@@ -587,7 +640,7 @@ export async function pullCommunication(db, profileIdToUserId) {
   db.mutate('comunicacao', current => ({
     ...current,
     mensagens: mergeMessages(current.mensagens || [], (remoteMessages || []).map(row => messageFromRemote(row, profileIdToUserId))),
-    notificacoes: mergeById(current.notificacoes || [], (remoteNotifications || []).map(row => notificationFromRemote(row, profileIdToUserId))),
+    notificacoes: mergeNotifications(current.notificacoes || [], (remoteNotifications || []).map(row => notificationFromRemote(row, profileIdToUserId))),
   }))
 }
 
