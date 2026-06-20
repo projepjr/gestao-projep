@@ -62,6 +62,8 @@ const SECTORS = ACCESS_MODULES.map(module => ({
   })),
 }))
 
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+
 // ── Tooltip ───────────────────────────────────────────────────
 function Tooltip({ label, children }) {
   return (
@@ -112,7 +114,7 @@ export default function Layout({ children }) {
 
   const notifications = storedNotifications
     .filter(notification => {
-      const isRecipient = notification.usuarioId == null || notification.usuarioId === user?.id
+      const isRecipient = notification.usuarioId == null || idsEqual(notification.usuarioId, user?.id)
       const matchesAudience = notification.audiencia !== 'diretoria' || ['presidente', 'diretor'].includes(user?.role)
       const matchesModule = !notification.modulo || hasModuleAccess(user, notification.modulo)
       const systemEnabled = user?.preferenciasNotificacao?.system !== false
@@ -124,7 +126,7 @@ export default function Layout({ children }) {
       id: notification.id,
       type: notification.tipo,
       read: notification.usuarioId == null
-        ? (notification.lidosPor || []).includes(user?.id)
+        ? (notification.lidosPor || []).some(id => idsEqual(id, user?.id))
         : notification.lida,
       title: notification.titulo,
       desc: notification.descricao,
@@ -143,14 +145,14 @@ export default function Layout({ children }) {
   }
   const unreadCount = notifications.filter(n => !n.read).length
   const chatUnreadCount = (storedMessages || []).filter(message => {
-    if (!user?.id || message.remetenteId === user.id) return false
+    if (!user?.id || idsEqual(message.remetenteId, user.id)) return false
 
-    if (message.destinatarioId === user.id) {
+    if (idsEqual(message.destinatarioId, user.id)) {
       return !message.lida
     }
 
     if (message.destinatarioId === 'avisos') {
-      return !(message.lidosPor || []).includes(user.id)
+      return !(message.lidosPor || []).some(id => idsEqual(id, user.id))
     }
 
     return false

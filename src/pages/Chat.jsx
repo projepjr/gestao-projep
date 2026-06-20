@@ -8,7 +8,13 @@ import { canPostAnnouncements } from '../config/authorization'
 
 // ── Colors ────────────────────────────────────────────────────
 const AVATAR_COLORS = ['#3D5A80','#2A6B69','#7B2D8B','#1A3A5C','#5C3A1A','#1A4A5C','#4A1A5C']
-const memberColor = (id) => AVATAR_COLORS[(Number(id) - 1) % AVATAR_COLORS.length]
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const memberColor = (id) => {
+  const hash = String(id ?? '')
+    .split('')
+    .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length]
+}
 
 // ── Fixed channel ─────────────────────────────────────────────
 const AVISOS_CONV = {
@@ -34,7 +40,7 @@ function presentMessage(message, members) {
   const timestamp = message.timestamp || new Date().toISOString()
   const sender = message.remetenteId === 'system'
     ? null
-    : members.find(member => member.id === message.remetenteId)
+    : members.find(member => idsEqual(member.id, message.remetenteId))
   return {
     id: message.id,
     senderId: message.remetenteId,
@@ -189,9 +195,9 @@ export default function Chat() {
   const { user } = useAuth()
   const { members, messages: storedMessages, sendMessage: persistMessage, markConversationRead } = useData()
   const [searchParams, setSearchParams] = useSearchParams()
-  const requestedUserId = Number(searchParams.get('user'))
+  const requestedUserId = searchParams.get('user')
   const requestedConversation = members.some(member =>
-    member.id === requestedUserId && member.id !== user?.id && member.status === 'ativo'
+    idsEqual(member.id, requestedUserId) && !idsEqual(member.id, user?.id) && member.status === 'ativo'
   ) ? `dm-${requestedUserId}` : 'avisos'
 
   const [activeTab,    setActiveTab]    = useState('comunicacao')
@@ -207,7 +213,7 @@ export default function Chat() {
   // Build conversations from DataContext members (mesma fonte: db.get('usuarios'))
   const allConversations = [
     AVISOS_CONV,
-    ...members.filter(member => member.id !== user?.id && member.status === 'ativo').map(m => ({
+    ...members.filter(member => !idsEqual(member.id, user?.id) && member.status === 'ativo').map(m => ({
       id:       `dm-${m.id}`,
       name:     m.nome,
       type:     'dm',
@@ -233,8 +239,8 @@ export default function Chat() {
       .filter(message => {
         if (selectedConv === 'avisos') return message.destinatarioId === 'avisos'
         return (
-          (message.remetenteId === user?.id && message.destinatarioId === selectedMemberId) ||
-          (message.remetenteId === selectedMemberId && message.destinatarioId === user?.id)
+          (idsEqual(message.remetenteId, user?.id) && idsEqual(message.destinatarioId, selectedMemberId)) ||
+          (idsEqual(message.remetenteId, selectedMemberId) && idsEqual(message.destinatarioId, user?.id))
         )
       })
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
@@ -296,8 +302,8 @@ export default function Chat() {
       .filter(message => id === 'avisos'
         ? message.destinatarioId === 'avisos'
         : (
-          (message.remetenteId === user?.id && message.destinatarioId === target?.memberId) ||
-          (message.remetenteId === target?.memberId && message.destinatarioId === user?.id)
+          (idsEqual(message.remetenteId, user?.id) && idsEqual(message.destinatarioId, target?.memberId)) ||
+          (idsEqual(message.remetenteId, target?.memberId) && idsEqual(message.destinatarioId, user?.id))
         ))
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     return matches.length ? presentMessage(matches[matches.length - 1], members) : null
@@ -315,9 +321,9 @@ export default function Chat() {
 
   const getUnreadCount = conversation => storedMessages.filter(message => {
     if (conversation.id === 'avisos') {
-      return message.destinatarioId === 'avisos' && !(message.lidosPor || []).includes(user?.id)
+      return message.destinatarioId === 'avisos' && !(message.lidosPor || []).some(id => idsEqual(id, user?.id))
     }
-    return message.remetenteId === conversation.memberId && message.destinatarioId === user?.id && !message.lida
+    return idsEqual(message.remetenteId, conversation.memberId) && idsEqual(message.destinatarioId, user?.id) && !message.lida
   }).length
 
   const filteredMembers = members.filter(m =>
@@ -378,7 +384,7 @@ export default function Chat() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredMembers.map(m => (
-                <MemberCard key={m.id} member={m} onChat={goToChat} isCurrentUser={m.id === user?.id} />
+                <MemberCard key={m.id} member={m} onChat={goToChat} isCurrentUser={idsEqual(m.id, user?.id)} />
               ))}
             </div>
           )}
@@ -466,7 +472,7 @@ export default function Chat() {
 
                   {groupedMessages[date].map((msg, idx) => {
                     // Right side = message sent by current logged-in user
-                    const isMe = msg.senderId === user?.id
+                    const isMe = idsEqual(msg.senderId, user?.id)
                     const prevMsg = idx > 0 ? groupedMessages[date][idx - 1] : null
                     const showSender = !isMe && (idx === 0 || prevMsg?.senderId !== msg.senderId)
 

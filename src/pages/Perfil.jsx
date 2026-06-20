@@ -11,6 +11,8 @@ import {
 
 // ─── Line Chart ────────────────────────────────────────────
 
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+
 function LineChart({ data }) {
   const W = 400, H = 80, PX = 24, PY = 10
   const maxG = 10
@@ -383,7 +385,7 @@ export default function Perfil() {
   const settings = user?.preferenciasNotificacao || {
     email: true, system: true, whatsapp: false, weekly_report: true,
   }
-  const evaluation = evaluations.find(item => item.membroId === user?.id)
+  const evaluation = evaluations.find(item => idsEqual(item.membroId, user?.id))
   const performance = {
     grade: evaluation?.nota ?? ((user?.performance || 0) / 10),
     gradeHistory: (evaluation?.historico || []).map(item => ({ month: item.mes, grade: item.nota })),
@@ -395,7 +397,7 @@ export default function Perfil() {
   }
 
   const feedbacks = (evaluation?.feedbacks || []).map(feedback => {
-    const author = members.find(member => member.id === feedback.avaliadorId)
+    const author = members.find(member => idsEqual(member.id, feedback.avaliadorId))
     return {
       id: feedback.id || `${feedback.avaliadorId}-${feedback.data}`,
       from: author?.nome || 'Membro removido',
@@ -408,18 +410,21 @@ export default function Perfil() {
   })
 
   const projects = storedProjects
-    .filter(project => project.responsavelId === user?.id || project.membros?.includes(user?.id))
+    .filter(project =>
+      idsEqual(project.responsavelId, user?.id) ||
+      project.membros?.some(memberId => idsEqual(memberId, user?.id))
+    )
     .map(project => ({
       id: project.id,
       name: project.nome,
       company: project.clienteNome,
       status: project.status,
-      role: project.responsavelId === user?.id ? 'Responsável' : 'Membro do projeto',
+      role: idsEqual(project.responsavelId, user?.id) ? 'Responsável' : 'Membro do projeto',
     }))
 
   const tasks = storedProjects.flatMap(project =>
     (project.tarefas || [])
-      .filter(task => task.responsavelId === user?.id)
+      .filter(task => idsEqual(task.responsavelId, user?.id))
       .map(task => ({
         id: `${project.id}-${task.id}`,
         title: task.titulo,
@@ -429,7 +434,7 @@ export default function Perfil() {
   )
 
   const pinnedComms = storedNotices.filter(notice => notice.fixado).map(notice => {
-    const author = members.find(member => member.id === notice.autorId)
+    const author = members.find(member => idsEqual(member.id, notice.autorId))
     return {
       id: notice.id,
       from: author?.nome || 'Diretoria',
@@ -440,7 +445,7 @@ export default function Perfil() {
     }
   })
   const notices = notifications
-    .filter(notification => notification.usuarioId == null || notification.usuarioId === user?.id)
+    .filter(notification => notification.usuarioId == null || idsEqual(notification.usuarioId, user?.id))
     .slice(0, 3)
     .map(notification => ({
       id: notification.id,

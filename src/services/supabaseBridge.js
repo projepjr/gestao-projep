@@ -39,6 +39,7 @@ const uuidToAppId = (uuid, namespace) => {
 
 const dateOnly = value => value ? String(value).split('T')[0] : null
 const timeOnly = value => value ? String(value).slice(0, 5) : null
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 
 const logRemoteError = (action, error) => {
   if (error) console.warn(`[Supabase] ${action}:`, error.message || error)
@@ -79,7 +80,8 @@ function profileFromUser(user) {
 function userFromProfile(profile, currentUsers = []) {
   const localId = uuidToAppId(profile.id, NS.user)
   const existing = currentUsers.find(user =>
-    (localId && user.id === localId) ||
+    (localId && idsEqual(user.id, localId)) ||
+    idsEqual(userUuid(user.id), profile.id) ||
     user.email?.toLowerCase() === profile.email?.toLowerCase()
   )
   const sector = resolveSetor(profile.sector_id)
@@ -107,8 +109,16 @@ function userFromProfile(profile, currentUsers = []) {
     },
     precisaAtualizarDados: existing?.precisaAtualizarDados ?? isLegacyTemporaryEmail(profile.email),
     emailTemporario: existing?.emailTemporario ?? isLegacyTemporaryEmail(profile.email),
+    precisaSincronizarFoto: Boolean(existing?.fotoPerfil && !profile.avatar_url),
     permissoes: existing?.permissoes || normalizePermissions({}, profile.role || 'membro'),
   }
+}
+
+const sameUserIdentity = (a, b) => {
+  if (!a || !b) return false
+  return idsEqual(a.id, b.id) ||
+    userUuid(a.id) === userUuid(b.id) ||
+    (a.email && b.email && a.email.toLowerCase() === b.email.toLowerCase())
 }
 
 function permissionRowsFromUser(user) {
@@ -198,7 +208,7 @@ function meetingToRemote(meeting, currentUserId = null) {
 }
 
 function messageToRemote(message) {
-  const isChannel = typeof message.destinatarioId === 'string'
+  const isChannel = message.tipo === 'aviso_geral' || message.destinatarioId === 'avisos'
   return {
     id: messageUuid(message.id),
     sender_id: message.remetenteId ? userUuid(message.remetenteId) : null,
@@ -263,17 +273,26 @@ export async function bootstrapSupabase(db) {
   const { error: sectorError } = await supabase.from('sectors').upsert(sectorsPayload, { onConflict: 'id' })
   logRemoteError('sync sectors', sectorError)
 
-  const localUsers = db.get('usuarios')
-  await syncUsersToSupabase(localUsers)
   const { error: demoDeleteError } = await supabase
     .from('profiles')
     .delete()
     .in('email', REMOVED_DEMO_EMAILS)
   logRemoteError('delete demo profiles', demoDeleteError)
 
+  const localUsers = db.get('usuarios')
+  const { data: existingProfiles, error: existingProfilesError } = await supabase
+    .from('profiles')
+    .select('id')
+    .limit(1)
+  logRemoteError('check existing profiles', existingProfilesError)
+  if (!existingProfiles?.length) {
+    await syncUsersToSupabase(localUsers)
+  }
+
   const mergedUsers = await pullUsersFromSupabase(db)
 
   const profileIdToUserId = new Map(mergedUsers.map(user => [userUuid(user.id), user.id]))
+  await syncLocalCommunicationToSupabase(db)
   await pullCommunication(db, profileIdToUserId)
   await pullMeetings(db, profileIdToUserId)
 
@@ -294,9 +313,20 @@ export async function pullUsersFromSupabase(db) {
   if (!profiles?.length) return localUsers
 
   const remoteUsers = profiles.map(profile => userFromProfile(profile, localUsers))
-  const mergedUsers = applyRemotePermissions(mergeById(localUsers, remoteUsers), permissions || [])
+  const missingLocalUsers = localUsers.filter(localUser =>
+    localUser.email &&
+    !remoteUsers.some(remoteUser => sameUserIdentity(localUser, remoteUser))
+  )
+  const mergedUsers = applyRemotePermissions([...remoteUsers, ...missingLocalUsers], permissions || [])
   db.set('usuarios', mergedUsers)
-  await syncUsersToSupabase(mergedUsers)
+  const usersNeedingRemoteUpdate = remoteUsers.filter(user =>
+    user.emailTemporario ||
+    user.precisaAtualizarDados ||
+    user.precisaSincronizarFoto
+  )
+  if (missingLocalUsers.length || usersNeedingRemoteUpdate.length) {
+    await syncUsersToSupabase([...missingLocalUsers, ...usersNeedingRemoteUpdate])
+  }
   return mergedUsers
 }
 
@@ -351,16 +381,58 @@ export async function deleteMeetingFromSupabase(meetingId) {
   logRemoteError('delete meeting', error)
 }
 
-export async function syncMessageToSupabase(message) {
+export async function syncMessageToSupabase(message, users = []) {
   if (!isSupabaseConfigured || !supabase || !message) return
+  const relatedUsers = users.filter(user =>
+    user?.email &&
+    (
+      userUuid(user.id) === userUuid(message.remetenteId) ||
+      userUuid(user.id) === userUuid(message.destinatarioId)
+    )
+  )
+  if (relatedUsers.length) await syncUsersToSupabase(relatedUsers)
   const { error } = await supabase.from('chat_messages').upsert(messageToRemote(message), { onConflict: 'id' })
   logRemoteError('upsert message', error)
+}
+
+export async function markRemoteMessageRead(messageId, userId) {
+  if (!isSupabaseConfigured || !supabase || !messageId || !userId) return
+  const id = messageUuid(messageId)
+  const profileId = userUuid(userId)
+  const { data, error: fetchError } = await supabase
+    .from('chat_messages')
+    .select('read_by')
+    .eq('id', id)
+    .maybeSingle()
+  logRemoteError('fetch message read state', fetchError)
+  if (fetchError) return
+
+  const readBy = [...new Set([...(data?.read_by || []), profileId])]
+  const { error } = await supabase
+    .from('chat_messages')
+    .update({ read_by: readBy })
+    .eq('id', id)
+  logRemoteError('mark message read', error)
 }
 
 export async function syncNotificationToSupabase(notification) {
   if (!isSupabaseConfigured || !supabase || !notification) return
   const { error } = await supabase.from('notifications').upsert(notificationToRemote(notification), { onConflict: 'id' })
   logRemoteError('upsert notification', error)
+}
+
+async function syncLocalCommunicationToSupabase(db) {
+  if (!isSupabaseConfigured || !supabase) return
+  const users = db.get('usuarios')
+  const communication = db.get('comunicacao')
+
+  for (const message of communication.mensagens || []) {
+    await syncMessageToSupabase(message, users)
+  }
+
+  for (const notification of communication.notificacoes || []) {
+    await syncNotificationToSupabase(notification)
+  }
 }
 
 export async function markRemoteNotificationRead(notificationId, read = true) {
@@ -373,6 +445,7 @@ export async function markRemoteNotificationRead(notificationId, read = true) {
 }
 
 export async function pullCommunication(db, profileIdToUserId) {
+  if (!isSupabaseConfigured || !supabase) return
   const [{ data: remoteMessages, error: messageError }, { data: remoteNotifications, error: notificationError }] = await Promise.all([
     supabase.from('chat_messages').select('*').order('created_at', { ascending: true }),
     supabase.from('notifications').select('*').order('created_at', { ascending: false }),
@@ -388,6 +461,7 @@ export async function pullCommunication(db, profileIdToUserId) {
 }
 
 export async function pullMeetings(db, profileIdToUserId) {
+  if (!isSupabaseConfigured || !supabase) return
   const [{ data: meetings, error: meetingError }, { data: responsibles, error: responsibleError }] = await Promise.all([
     supabase.from('meetings').select('*').order('meeting_date', { ascending: true }),
     supabase.from('meeting_responsibles').select('*'),
@@ -403,4 +477,43 @@ export async function pullMeetings(db, profileIdToUserId) {
       meetings.map(row => meetingFromRemote(row, responsibles || [], profileIdToUserId)),
     ),
   }))
+}
+
+export async function pullRemoteState(db) {
+  if (!isSupabaseConfigured || !supabase) return { enabled: false, reason: 'missing-env' }
+  const mergedUsers = await pullUsersFromSupabase(db)
+  const profileIdToUserId = new Map(mergedUsers.map(user => [userUuid(user.id), user.id]))
+  await Promise.all([
+    pullCommunication(db, profileIdToUserId),
+    pullMeetings(db, profileIdToUserId),
+  ])
+  return { enabled: true }
+}
+
+export function subscribeToSupabaseChanges(db, onChange) {
+  if (!isSupabaseConfigured || !supabase) return () => {}
+
+  let syncTimer = null
+  const scheduleSync = () => {
+    window.clearTimeout(syncTimer)
+    syncTimer = window.setTimeout(() => {
+      Promise.resolve(onChange ? onChange() : pullRemoteState(db))
+        .catch(error => console.warn('[Supabase] Falha ao atualizar dados remotos:', error.message || error))
+    }, 250)
+  }
+
+  const channel = supabase
+    .channel('projep-app-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, scheduleSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'permissions' }, scheduleSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, scheduleSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, scheduleSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, scheduleSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_responsibles' }, scheduleSync)
+    .subscribe()
+
+  return () => {
+    window.clearTimeout(syncTimer)
+    supabase.removeChannel(channel)
+  }
 }

@@ -9,6 +9,7 @@ import { Plus, X, Search, Users, Briefcase, Mail, Phone, Trash2, Edit2, MessageS
 const EMPTY = { nome: '', cargo: '', setor: '', email: '', senha: '', telefone: '', status: 'ativo', dataCadastro: '', skills: [], avatar: '', projects: 0, performance: 80, usarDadosTemporarios: true }
 const INPUT_CLS = "w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors placeholder-gray-700"
 const LABEL_CLS = "text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block"
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 
 function Modal({ member, onClose, onSave }) {
   const [form, setForm] = useState(member || EMPTY)
@@ -298,7 +299,7 @@ export default function Membros() {
                 </div>
               </div>
               <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                {canFeedback && member.id !== user.id && (
+                {canFeedback && !idsEqual(member.id, user.id) && (
                   <button onClick={() => setFeedbackMember(member)} className="p-1.5 rounded text-gray-600 hover:text-blue-400 hover:bg-blue-500/10 transition-all" title="Enviar feedback">
                     <MessageSquare className="w-3.5 h-3.5" />
                   </button>

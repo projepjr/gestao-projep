@@ -61,6 +61,8 @@ const EMPTY_PIPELINE = {
 
 const isRecord = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 const asArray = (value, fallback = []) => Array.isArray(value) ? value : fallback
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const idsInclude = (items = [], id) => items.some(item => idsEqual(item, id))
 
 function normalizeCommercialPeriod(period, fallback = {}) {
   const current = isRecord(period) ? period : {}
@@ -303,10 +305,10 @@ const db = {
     if (arrayKey) {
       updated = {
         ...dados,
-        [arrayKey]: dados[arrayKey].map(r => r.id === id ? { ...r, ...campos } : r),
+        [arrayKey]: dados[arrayKey].map(r => idsEqual(r.id, id) ? { ...r, ...campos } : r),
       }
     } else {
-      updated = dados.map(r => r.id === id ? { ...r, ...campos } : r)
+      updated = dados.map(r => idsEqual(r.id, id) ? { ...r, ...campos } : r)
     }
     return db.set(tabela, updated)
   },
@@ -316,9 +318,9 @@ const db = {
     const dados = db.get(tabela)
     let updated
     if (arrayKey) {
-      updated = { ...dados, [arrayKey]: dados[arrayKey].filter(r => r.id !== id) }
+      updated = { ...dados, [arrayKey]: dados[arrayKey].filter(r => !idsEqual(r.id, id)) }
     } else {
-      updated = dados.filter(r => r.id !== id)
+      updated = dados.filter(r => !idsEqual(r.id, id))
     }
     return db.set(tabela, updated)
   },
@@ -345,20 +347,20 @@ const db = {
     db.set('comunicacao', {
       ...comunicacao,
       mensagens: (comunicacao.mensagens || []).filter(message =>
-        message.remetenteId !== userId && message.destinatarioId !== userId
+        !idsEqual(message.remetenteId, userId) && !idsEqual(message.destinatarioId, userId)
       ),
-      notificacoes: (comunicacao.notificacoes || []).filter(notification => notification.usuarioId !== userId),
-      avisos: (comunicacao.avisos || []).filter(notice => notice.autorId !== userId),
+      notificacoes: (comunicacao.notificacoes || []).filter(notification => !idsEqual(notification.usuarioId, userId)),
+      avisos: (comunicacao.avisos || []).filter(notice => !idsEqual(notice.autorId, userId)),
     })
 
     const gestaoPessoas = db.get('gestaoPessoas')
     db.set('gestaoPessoas', {
       ...gestaoPessoas,
       avaliacoes: (gestaoPessoas.avaliacoes || [])
-        .filter(evaluation => evaluation.membroId !== userId)
+        .filter(evaluation => !idsEqual(evaluation.membroId, userId))
         .map(evaluation => ({
           ...evaluation,
-          feedbacks: (evaluation.feedbacks || []).filter(feedback => feedback.avaliadorId !== userId),
+          feedbacks: (evaluation.feedbacks || []).filter(feedback => !idsEqual(feedback.avaliadorId, userId)),
         })),
     })
 
@@ -367,44 +369,44 @@ const db = {
       ...projetos,
       projetos: (projetos.projetos || []).map(project => ({
         ...project,
-        responsavelId: project.responsavelId === userId ? null : project.responsavelId,
-        membros: (project.membros || []).filter(memberId => memberId !== userId),
+        responsavelId: idsEqual(project.responsavelId, userId) ? null : project.responsavelId,
+        membros: (project.membros || []).filter(memberId => !idsEqual(memberId, userId)),
         tarefas: (project.tarefas || []).map(task => ({
           ...task,
-          responsavelId: task.responsavelId === userId ? null : task.responsavelId,
+          responsavelId: idsEqual(task.responsavelId, userId) ? null : task.responsavelId,
         })),
       })),
     })
 
     const comercial = db.get('comercial')
     const removedHunterIds = (comercial.hunters || [])
-      .filter(hunter => hunter.userId === userId)
+      .filter(hunter => idsEqual(hunter.userId, userId))
       .map(hunter => hunter.id)
     const removedCloserIds = (comercial.closers || [])
-      .filter(closer => closer.userId === userId)
+      .filter(closer => idsEqual(closer.userId, userId))
       .map(closer => closer.id)
     db.set('comercial', {
       ...comercial,
-      hunters: (comercial.hunters || []).filter(hunter => hunter.userId !== userId),
-      closers: (comercial.closers || []).filter(closer => closer.userId !== userId),
+      hunters: (comercial.hunters || []).filter(hunter => !idsEqual(hunter.userId, userId)),
+      closers: (comercial.closers || []).filter(closer => !idsEqual(closer.userId, userId)),
       leads: (comercial.leads || []).map(lead => ({
         ...lead,
-        hunterId: removedHunterIds.includes(lead.hunterId) ? null : lead.hunterId,
-        hunter: removedHunterIds.includes(lead.hunterId) ? '' : lead.hunter,
-        closerId: removedCloserIds.includes(lead.closerId) ? null : lead.closerId,
-        closer: removedCloserIds.includes(lead.closerId) ? '' : lead.closer,
+        hunterId: idsInclude(removedHunterIds, lead.hunterId) ? null : lead.hunterId,
+        hunter: idsInclude(removedHunterIds, lead.hunterId) ? '' : lead.hunter,
+        closerId: idsInclude(removedCloserIds, lead.closerId) ? null : lead.closerId,
+        closer: idsInclude(removedCloserIds, lead.closerId) ? '' : lead.closer,
       })),
       reunioes: (comercial.reunioes || []).map(meeting => ({
         ...meeting,
-        responsavelId: meeting.responsavelId === userId ? null : meeting.responsavelId,
+        responsavelId: idsEqual(meeting.responsavelId, userId) ? null : meeting.responsavelId,
         responsavelIds: (meeting.responsavelIds || (meeting.responsavelId ? [meeting.responsavelId] : []))
-          .filter(memberId => memberId !== userId),
+          .filter(memberId => !idsEqual(memberId, userId)),
       })),
       contratos: (comercial.contratos || []).map(contract => ({
         ...contract,
-        responsavelId: contract.responsavelId === userId ? null : contract.responsavelId,
-        responsible: contract.responsavelId === userId ? '' : contract.responsible,
-        closerId: removedCloserIds.includes(contract.closerId) ? null : contract.closerId,
+        responsavelId: idsEqual(contract.responsavelId, userId) ? null : contract.responsavelId,
+        responsible: idsEqual(contract.responsavelId, userId) ? '' : contract.responsible,
+        closerId: idsInclude(removedCloserIds, contract.closerId) ? null : contract.closerId,
       })),
     })
   },

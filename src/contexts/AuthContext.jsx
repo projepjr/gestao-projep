@@ -16,6 +16,7 @@ import {
 
 const AuthContext = createContext(null)
 const RESET_KEY = 'ej_reset_code'
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 
 function safeUser(user) {
   if (!user) return null
@@ -28,7 +29,7 @@ function readSession() {
   try {
     const session = JSON.parse(localStorage.getItem('ej_user'))
     if (!session?.id) return null
-    const current = db.get('usuarios').find(item => item.id === session.id)
+    const current = db.get('usuarios').find(item => idsEqual(item.id, session.id))
     if (!current || current.status !== 'ativo') return null
     const safe = safeUser(current)
     localStorage.setItem('ej_user', JSON.stringify(safe))
@@ -56,7 +57,7 @@ export function AuthProvider({ children }) {
     setUsers(nextUsers.map(safeUser))
     setUser(current => {
       if (!current) return null
-      const fresh = nextUsers.find(item => item.id === current.id)
+      const fresh = nextUsers.find(item => idsEqual(item.id, current.id))
       if (!fresh || fresh.status !== 'ativo') {
         localStorage.removeItem('ej_user')
         return null
@@ -68,6 +69,10 @@ export function AuthProvider({ children }) {
   }), [])
 
   const persistUsers = nextUsers => db.set('usuarios', nextUsers)
+  const syncUserById = userId => {
+    const target = db.get('usuarios').find(item => idsEqual(item.id, userId))
+    if (target) void syncUsersToSupabase([target])
+  }
 
   const login = async (email, password) => {
     let currentUsers = db.get('usuarios')
@@ -138,7 +143,7 @@ export function AuthProvider({ children }) {
     }
 
     persistUsers([...currentUsers, newUser])
-    void syncUsersToSupabase(db.get('usuarios'))
+    void syncUsersToSupabase([newUser])
 
     const comunicacao = db.get('comunicacao')
     const notification = {
@@ -174,7 +179,7 @@ export function AuthProvider({ children }) {
 
     let approved = null
     const updated = db.get('usuarios').map(item => {
-      if (item.id !== userId) return item
+      if (!idsEqual(item.id, userId)) return item
       const nextRole = role || item.role || 'membro'
       approved = {
         ...item,
@@ -186,7 +191,7 @@ export function AuthProvider({ children }) {
     })
     if (!approved) return { success: false, error: 'Usuário não encontrado.' }
     persistUsers(updated)
-    void syncUsersToSupabase(db.get('usuarios'))
+    void syncUsersToSupabase([approved])
     db.mutate('comunicacao', current => ({
       ...current,
       notificacoes: [{
@@ -209,7 +214,7 @@ export function AuthProvider({ children }) {
       return { success: false, error: 'Você não tem permissão para reprovar usuários.' }
     }
     db.update('usuarios', null, userId, { status: 'rejeitado' })
-    void syncUsersToSupabase(db.get('usuarios'))
+    syncUserById(userId)
     return { success: true }
   }
 
@@ -217,17 +222,17 @@ export function AuthProvider({ children }) {
     if (!canManagePermissions(user)) {
       return { success: false, error: 'Somente a presidência pode alterar permissões.' }
     }
-    const target = db.get('usuarios').find(item => item.id === userId)
+    const target = db.get('usuarios').find(item => idsEqual(item.id, userId))
     if (!target) return { success: false, error: 'Usuário não encontrado.' }
     db.update('usuarios', null, userId, {
       permissoes: normalizePermissions(permissions, target.role),
     })
-    void syncUsersToSupabase(db.get('usuarios'))
+    syncUserById(userId)
     return { success: true }
   }
 
   const deleteUser = userId => {
-    const target = db.get('usuarios').find(item => item.id === userId)
+    const target = db.get('usuarios').find(item => idsEqual(item.id, userId))
     if (!canDeleteMember(user, target)) {
       return { success: false, error: 'Você não pode remover este membro.' }
     }
@@ -256,13 +261,13 @@ export function AuthProvider({ children }) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitized.email)) {
         return { success: false, error: 'Informe um email válido.' }
       }
-      const duplicate = db.get('usuarios').some(item => item.id !== user.id && matchesEmail(item, sanitized.email))
+      const duplicate = db.get('usuarios').some(item => !idsEqual(item.id, user.id) && matchesEmail(item, sanitized.email))
       if (duplicate) return { success: false, error: 'Este email já está sendo usado por outro membro.' }
     }
     if (typeof sanitized.telefone === 'string') sanitized.telefone = sanitized.telefone.trim()
 
     db.update('usuarios', null, user.id, sanitized)
-    void syncUsersToSupabase(db.get('usuarios'))
+    syncUserById(user.id)
     return { success: true }
   }
 
@@ -303,21 +308,19 @@ export function AuthProvider({ children }) {
     if (!target) return { success: false, error: 'Não foi possível redefinir a senha.' }
     if (newPassword.length < 6) return { success: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' }
     db.update('usuarios', null, target.id, { senha: newPassword })
-    void syncUsersToSupabase(db.get('usuarios'))
     localStorage.removeItem(RESET_KEY)
     return { success: true }
   }
 
   const changePassword = (currentPassword, newPassword) => {
     if (!user) return { success: false, error: 'Usuário não autenticado' }
-    const stored = db.get('usuarios').find(item => item.id === user.id)
+    const stored = db.get('usuarios').find(item => idsEqual(item.id, user.id))
     if (!stored || stored.senha !== currentPassword) {
       return { success: false, error: 'Senha atual incorreta' }
     }
     if (newPassword.length < 6) return { success: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' }
     if (newPassword === currentPassword) return { success: false, error: 'A nova senha deve ser diferente da senha atual.' }
     db.update('usuarios', null, user.id, { senha: newPassword })
-    void syncUsersToSupabase(db.get('usuarios'))
     return { success: true }
   }
 

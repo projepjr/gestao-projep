@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 
 const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 
 const STATUS = {
   agendada: {
@@ -94,7 +95,7 @@ function getResponsibleIds(meeting) {
     ? meeting.responsavelIds
     : meeting?.responsavelId ? [meeting.responsavelId] : []
 
-  return [...new Set(ids.map(id => Number(id)).filter(Boolean))]
+  return [...new Set(ids.map(id => String(id)).filter(Boolean))]
 }
 
 function monthLabel(date) {
@@ -119,16 +120,16 @@ function buildCalendarDays(monthDate) {
 }
 
 function normalizeMeeting(meeting, leads, members, commercial) {
-  const lead = leads.find(item => item.id === meeting.leadId)
+  const lead = leads.find(item => idsEqual(item.id, meeting.leadId))
   const responsibleIds = getResponsibleIds(meeting)
   const responsibleMembers = responsibleIds
-    .map(id => members.find(member => member.id === id))
+    .map(id => members.find(member => idsEqual(member.id, id)))
     .filter(Boolean)
   const responsibleMember = responsibleMembers.length
     ? { nome: responsibleMembers.map(member => member.nome).join(', ') }
     : null
   const responsibleCommercial = [...(commercial.hunters || []), ...(commercial.closers || [])]
-    .find(item => item.id === meeting.responsavelId)
+    .find(item => idsEqual(item.id, meeting.responsavelId))
 
   return {
     ...meeting,
@@ -270,7 +271,7 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
   const responsibleIds = getResponsibleIds(form)
   const selectedResponsibles = responsibleIds
-    .map(id => members.find(member => member.id === id))
+    .map(id => members.find(member => idsEqual(member.id, id)))
     .filter(Boolean)
   const filteredResponsibles = members.filter(member => {
     const term = responsibleSearch.trim().toLowerCase()
@@ -279,10 +280,10 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
 
   const toggleResponsible = memberId => {
     setForm(prev => {
-      const id = Number(memberId)
+      const id = String(memberId)
       const current = getResponsibleIds(prev)
-      const next = current.includes(id)
-        ? current.filter(item => item !== id)
+      const next = current.some(item => idsEqual(item, id))
+        ? current.filter(item => !idsEqual(item, id))
         : [...current, id]
       return { ...prev, responsavelIds: next }
     })
@@ -303,7 +304,7 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
     event.preventDefault()
     const result = onSave({
       ...form,
-      leadId: form.leadId ? Number(form.leadId) : null,
+      leadId: form.leadId || null,
       responsavelIds: getResponsibleIds(form),
       responsavelId: getResponsibleIds(form)[0] || null,
       valorEstimado: Number(form.valorEstimado || 0),
@@ -370,7 +371,7 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
                     </div>
                     <div className="max-h-[190px] overflow-y-auto p-1">
                       {filteredResponsibles.map(member => {
-                        const checked = responsibleIds.includes(member.id)
+                        const checked = responsibleIds.some(id => idsEqual(id, member.id))
                         return (
                           <button
                             type="button"

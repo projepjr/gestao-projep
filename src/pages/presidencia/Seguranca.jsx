@@ -14,7 +14,13 @@ import UserAvatar from '../../components/UserAvatar'
 import { getSuggestedRolePreset, ROLE_PRESETS } from '../../config/rolePresets'
 
 const PALETTE = ['#CE7028', '#B5611F', '#3D5A80', '#2A6B69', '#7B2D8B', '#044947', '#1565C0', '#2E7D32']
-const avatarBg = id => PALETTE[Number(id) % PALETTE.length]
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const avatarBg = id => {
+  const hash = String(id ?? '')
+    .split('')
+    .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  return PALETTE[hash % PALETTE.length]
+}
 
 function Toggle({ checked, onChange, disabled, title }) {
   return (
@@ -54,7 +60,7 @@ export default function Seguranca() {
   }
 
   const handleModuleToggle = (member, moduleKey, enabled) => {
-    const protectedSelf = member.id === user?.id && moduleKey === 'presidencia'
+    const protectedSelf = idsEqual(member.id, user?.id) && moduleKey === 'presidencia'
     if (protectedSelf) return
     updateUserPermissoes(
       member.id,
@@ -63,7 +69,7 @@ export default function Seguranca() {
   }
 
   const handleSubareaToggle = (member, subareaKey, enabled) => {
-    const protectedSelf = member.id === user?.id && subareaKey === 'presidencia.seguranca'
+    const protectedSelf = idsEqual(member.id, user?.id) && subareaKey === 'presidencia.seguranca'
     if (protectedSelf) return
     updateUserPermissoes(
       member.id,
@@ -186,7 +192,7 @@ export default function Seguranca() {
               {activeUsers.map(member => {
                 const permissions = normalizePermissions(member.permissoes, member.role)
                 const isExpanded = expanded.has(member.id)
-                const isSelf = member.id === user?.id
+                const isSelf = idsEqual(member.id, user?.id)
 
                 return (
                   <Fragment key={member.id}>

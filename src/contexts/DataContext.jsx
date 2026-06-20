@@ -13,7 +13,10 @@ import {
   bootstrapSupabase,
   deleteMeetingFromSupabase,
   deleteUserFromSupabase,
+  markRemoteMessageRead,
   markRemoteNotificationRead,
+  pullRemoteState,
+  subscribeToSupabaseChanges,
   syncMeetingToSupabase,
   syncMessageToSupabase,
   syncNotificationToSupabase,
@@ -21,12 +24,14 @@ import {
 } from '../services/supabaseBridge'
 
 const DataContext = createContext(null)
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 
 function publicUsers(users) {
   return users.map(user => {
     const safe = { ...user }
     delete safe.senha
     delete safe.emailAliases
+    delete safe.precisaSincronizarFoto
     return safe
   })
 }
@@ -34,7 +39,7 @@ function publicUsers(users) {
 function emailInUse(email, excludedUserId = null) {
   const normalized = email.toLowerCase()
   return db.get('usuarios').some(member =>
-    member.id !== excludedUserId && (
+    !idsEqual(member.id, excludedUserId) && (
       member.email?.toLowerCase() === normalized ||
       (member.emailAliases || []).some(alias => alias.toLowerCase() === normalized)
     )
@@ -55,14 +60,14 @@ function createTemporaryCredentials(name = 'membro') {
 }
 
 function resolveCommercialUsers(commercial, members) {
-  const memberMap = new Map(members.map(member => [member.id, member]))
+  const findMember = id => members.find(member => idsEqual(member.id, id))
   const hunters = (commercial.hunters || []).map(hunter => ({
     ...hunter,
-    nome: memberMap.get(hunter.userId)?.nome || hunter.nome,
+    nome: findMember(hunter.userId)?.nome || hunter.nome,
   }))
   const closers = (commercial.closers || []).map(closer => ({
     ...closer,
-    nome: memberMap.get(closer.userId)?.nome || closer.nome,
+    nome: findMember(closer.userId)?.nome || closer.nome,
   }))
   const hunterMap = new Map(hunters.map(hunter => [hunter.id, hunter.nome]))
   const closerMap = new Map(closers.map(closer => [closer.id, closer.nome]))
@@ -86,7 +91,7 @@ function resolveCommercialUsers(commercial, members) {
     })),
     contratos: (commercial.contratos || []).map(contract => ({
       ...contract,
-      responsible: memberMap.get(contract.responsavelId)?.nome || contract.responsible,
+      responsible: findMember(contract.responsavelId)?.nome || contract.responsible,
     })),
   }
 }
@@ -169,19 +174,21 @@ function syncTaskDeadlineNotifications(projectData) {
 }
 
 function markConversationReadInDb({ userId, memberId = null, channelId = null }) {
+  const changedMessageIds = []
   db.mutate('comunicacao', current => {
     let changed = false
     const mensagens = (current.mensagens || []).map(message => {
-      const isDirect = memberId && message.remetenteId === memberId && message.destinatarioId === userId && !message.lida
-      const isChannel = channelId && message.destinatarioId === channelId && !(message.lidosPor || []).includes(userId)
+      const isDirect = memberId && idsEqual(message.remetenteId, memberId) && idsEqual(message.destinatarioId, userId) && !message.lida
+      const isChannel = channelId && message.destinatarioId === channelId && !(message.lidosPor || []).some(id => idsEqual(id, userId))
       if (!isDirect && !isChannel) return message
       changed = true
+      changedMessageIds.push(message.id)
       return channelId
         ? { ...message, lidosPor: [...new Set([...(message.lidosPor || []), userId])] }
         : { ...message, lida: true }
     })
     const notificacoes = (current.notificacoes || []).map(notification => {
-      if (memberId && notification.usuarioId === userId && !notification.lida && notification.tipo === 'mensagem' && notification.link === `/chat?user=${memberId}`) {
+      if (memberId && idsEqual(notification.usuarioId, userId) && !notification.lida && notification.tipo === 'mensagem' && notification.link === `/chat?user=${memberId}`) {
         changed = true
         return { ...notification, lida: true }
       }
@@ -189,6 +196,7 @@ function markConversationReadInDb({ userId, memberId = null, channelId = null })
     })
     return changed ? { ...current, mensagens, notificacoes } : current
   })
+  changedMessageIds.forEach(messageId => { void markRemoteMessageRead(messageId, userId) })
 }
 
 export function DataProvider({ children }) {
@@ -216,16 +224,49 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     let mounted = true
+    let realtimeCleanup = () => {}
+    let syncInFlight = false
+    const syncRemote = async () => {
+      if (syncInFlight) return
+      syncInFlight = true
+      try {
+        await pullRemoteState(db)
+      } catch (error) {
+        console.warn('[Supabase] Falha ao buscar atualizações remotas:', error.message || error)
+      } finally {
+        syncInFlight = false
+      }
+    }
     bootstrapSupabase(db)
       .then(result => {
+        if (!mounted || !result?.enabled) return
+        realtimeCleanup = subscribeToSupabaseChanges(db, syncRemote)
         if (mounted && result?.enabled) console.info('[Supabase] Sincronização inicial concluída.')
       })
       .catch(error => console.warn('[Supabase] Falha na sincronização inicial:', error.message || error))
-    return () => { mounted = false }
+    const intervalId = window.setInterval(syncRemote, 5000)
+    const handleFocus = () => { void syncRemote() }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void syncRemote()
+    }
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      mounted = false
+      realtimeCleanup()
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
 
   const resolvedCommercial = resolveCommercialUsers(commercial, members)
   const canUse = subareaKey => hasSubareaAccess(user, subareaKey)
+  const syncUserById = userId => {
+    const target = db.get('usuarios').find(member => idsEqual(member.id, userId))
+    if (target) void syncUsersToSupabase([target])
+  }
 
   const addMember = member => {
     if (!canManageMembers(user)) return { success: false, error: 'Você não pode cadastrar membros.' }
@@ -277,7 +318,7 @@ export function DataProvider({ children }) {
       emailTemporario: Boolean(member.usarDadosTemporarios),
       permissoes: normalizePermissions(member.permissoes || basePermissions, role),
     }).novoRegistro
-    void syncUsersToSupabase(db.get('usuarios'))
+    void syncUsersToSupabase([created])
     return {
       success: true,
       user: publicUsers([created])[0],
@@ -288,7 +329,7 @@ export function DataProvider({ children }) {
   }
   const updateMember = (id, data) => {
     if (!canManageMembers(user)) return { success: false, error: 'Você não pode editar membros.' }
-    const target = db.get('usuarios').find(member => member.id === id)
+    const target = db.get('usuarios').find(member => idsEqual(member.id, id))
     if (!target) return { success: false, error: 'Membro não encontrado.' }
     if (user?.role !== 'presidente' && ['presidente', 'diretor'].includes(target.role)) {
       return { success: false, error: 'Você não pode editar este membro.' }
@@ -309,11 +350,11 @@ export function DataProvider({ children }) {
     fields.setorId = canonicalSector?.id || target.setorId
     fields.setor = canonicalSector?.nome || target.setor
     db.update('usuarios', null, id, fields)
-    void syncUsersToSupabase(db.get('usuarios'))
+    syncUserById(id)
     return { success: true }
   }
   const deleteMember = id => {
-    const target = db.get('usuarios').find(member => member.id === id)
+    const target = db.get('usuarios').find(member => idsEqual(member.id, id))
     if (!canDeleteMember(user, target)) return { success: false, error: 'Você não pode remover este membro.' }
     db.removeUser(id)
     void deleteUserFromSupabase(id)
@@ -334,9 +375,9 @@ export function DataProvider({ children }) {
   }
   const updateLead = (id, data) => {
     if (!canUse('comercial.pipeline')) return { success: false, error: 'Você não pode alterar o pipeline.' }
-    const target = db.get('comercial').leads?.find(lead => lead.id === id)
+    const target = db.get('comercial').leads?.find(lead => idsEqual(lead.id, id))
     if (!target) return { success: false, error: 'Lead não encontrado.' }
-    updateCommercialList('leads', current => current.map(lead => lead.id === id ? { ...lead, ...data } : lead))
+    updateCommercialList('leads', current => current.map(lead => idsEqual(lead.id, id) ? { ...lead, ...data } : lead))
     if (data.stage === 'fechado' && target.stage !== 'fechado') {
       addNotification({
         usuarioId: null,
@@ -352,7 +393,7 @@ export function DataProvider({ children }) {
   }
   const deleteLead = id => {
     if (!canUse('comercial.pipeline')) return { success: false, error: 'Você não pode alterar o pipeline.' }
-    updateCommercialList('leads', current => current.filter(lead => lead.id !== id))
+    updateCommercialList('leads', current => current.filter(lead => !idsEqual(lead.id, id)))
     return { success: true }
   }
   const moveLead = (id, stage) => updateLead(id, { stage })
@@ -361,7 +402,7 @@ export function DataProvider({ children }) {
     const ids = Array.isArray(meeting?.responsavelIds)
       ? meeting.responsavelIds
       : meeting?.responsavelId ? [meeting.responsavelId] : []
-    return [...new Set(ids.map(id => Number(id)).filter(Boolean))]
+    return [...new Set(ids.map(id => String(id)).filter(Boolean))]
   }
 
   const notifyMeetingAssignees = (meeting, responsibleIds) => {
@@ -414,12 +455,14 @@ export function DataProvider({ children }) {
     let updatedMeeting = null
     let addedResponsibleIds = []
     updateCommercialList('reunioes', current => current.map(meeting => {
-      if (meeting.id !== id) return meeting
+      if (!idsEqual(meeting.id, id)) return meeting
       const previousResponsibleIds = getMeetingResponsibleIds(meeting)
       const nextResponsibleIds = data.responsavelIds != null || data.responsavelId != null
         ? getMeetingResponsibleIds(data)
         : previousResponsibleIds
-      addedResponsibleIds = nextResponsibleIds.filter(memberId => !previousResponsibleIds.includes(memberId))
+      addedResponsibleIds = nextResponsibleIds.filter(memberId =>
+        !previousResponsibleIds.some(previousId => idsEqual(previousId, memberId))
+      )
       updatedMeeting = {
         ...meeting,
         ...data,
@@ -441,14 +484,14 @@ export function DataProvider({ children }) {
   }
   const deleteMeeting = id => {
     if (!canUse('comercial.calendario')) return { success: false, error: 'Voce nao pode remover reunioes.' }
-    updateCommercialList('reunioes', current => current.filter(meeting => meeting.id !== id))
+    updateCommercialList('reunioes', current => current.filter(meeting => !idsEqual(meeting.id, id)))
     void deleteMeetingFromSupabase(id)
     return { success: true }
   }
 
   const syncProjectFromContract = contract => db.mutate('projetos', current => {
     const projects = current.projetos || []
-    const index = projects.findIndex(project => project.contractId === contract.id)
+    const index = projects.findIndex(project => idsEqual(project.contractId, contract.id))
     const projectFields = {
       contractId: contract.id,
       nome: contract.company,
@@ -496,7 +539,7 @@ export function DataProvider({ children }) {
     if (!canUse('comercial.contratos')) return { success: false, error: 'Você não pode editar contratos.' }
     let updatedContract = null
     updateCommercialList('contratos', current => current.map(contract => {
-      if (contract.id !== id) return contract
+      if (!idsEqual(contract.id, id)) return contract
       updatedContract = { ...contract, ...data }
       return updatedContract
     }))
@@ -507,10 +550,10 @@ export function DataProvider({ children }) {
   }
   const deleteContract = id => {
     if (!canUse('comercial.contratos')) return { success: false, error: 'Você não pode remover contratos.' }
-    updateCommercialList('contratos', current => current.filter(contract => contract.id !== id))
+    updateCommercialList('contratos', current => current.filter(contract => !idsEqual(contract.id, id)))
     db.mutate('projetos', current => ({
       ...current,
-      projetos: (current.projetos || []).filter(project => project.contractId !== id),
+      projetos: (current.projetos || []).filter(project => !idsEqual(project.contractId, id)),
     }))
     return { success: true }
   }
@@ -527,21 +570,21 @@ export function DataProvider({ children }) {
   }
   const updateCandidate = (id, data) => {
     if (!canUse('gestaoPessoas.processo')) return { success: false, error: 'Você não pode alterar o processo seletivo.' }
-    updatePeopleList('processoSeletivo', current => current.map(candidate => candidate.id === id ? { ...candidate, ...data } : candidate))
+    updatePeopleList('processoSeletivo', current => current.map(candidate => idsEqual(candidate.id, id) ? { ...candidate, ...data } : candidate))
     return { success: true }
   }
   const deleteCandidate = id => {
     if (!canUse('gestaoPessoas.processo')) return { success: false, error: 'Você não pode alterar o processo seletivo.' }
-    updatePeopleList('processoSeletivo', current => current.filter(candidate => candidate.id !== id))
+    updatePeopleList('processoSeletivo', current => current.filter(candidate => !idsEqual(candidate.id, id)))
     return { success: true }
   }
 
   const addFeedback = ({ memberId, evaluatorId, text, stars = 5 }) => {
-    if (!canSendFeedback(user) || evaluatorId !== user?.id) {
+    if (!canSendFeedback(user) || !idsEqual(evaluatorId, user?.id)) {
       return { success: false, error: 'Você não pode enviar feedbacks.' }
     }
     const evaluations = [...(db.get('gestaoPessoas').avaliacoes || [])]
-    const index = evaluations.findIndex(evaluation => evaluation.membroId === memberId)
+    const index = evaluations.findIndex(evaluation => idsEqual(evaluation.membroId, memberId))
     const feedbackId = db.createId()
     const feedback = {
       id: feedbackId,
@@ -568,7 +611,7 @@ export function DataProvider({ children }) {
       })
     }
     updatePeopleList('avaliacoes', evaluations)
-    const evaluator = members.find(member => member.id === evaluatorId)
+    const evaluator = members.find(member => idsEqual(member.id, evaluatorId))
     addNotification({
       usuarioId: memberId,
       titulo: 'Novo feedback recebido',
@@ -597,11 +640,11 @@ export function DataProvider({ children }) {
 
   const sendMessage = ({ senderId, receiverId = null, channelId = null, content, type = 'direta' }) => {
     const text = content?.trim()
-    if (!user || senderId !== user.id || !text) return { success: false, error: 'Mensagem inválida.' }
+    if (!user || !idsEqual(senderId, user.id) || !text) return { success: false, error: 'Mensagem inválida.' }
     if (channelId === 'avisos' && !canPostAnnouncements(user)) {
       return { success: false, error: 'Somente a diretoria pode publicar avisos.' }
     }
-    if (receiverId && !db.get('usuarios').some(member => member.id === receiverId && member.status === 'ativo')) {
+    if (receiverId && !db.get('usuarios').some(member => idsEqual(member.id, receiverId) && member.status === 'ativo')) {
       return { success: false, error: 'Destinatário indisponível.' }
     }
     const recipient = channelId || receiverId
@@ -627,7 +670,7 @@ export function DataProvider({ children }) {
         fixado: false,
       }, ...(current.avisos || [])] : (current.avisos || []),
     }))
-    void syncMessageToSupabase(message)
+    void syncMessageToSupabase(message, db.get('usuarios'))
 
     if (channelId === 'avisos') {
       addNotification({
@@ -639,7 +682,7 @@ export function DataProvider({ children }) {
         lidosPor: [senderId],
       })
     } else if (receiverId) {
-      const sender = members.find(member => member.id === senderId)
+      const sender = members.find(member => idsEqual(member.id, senderId))
       addNotification({
         usuarioId: receiverId,
         titulo: sender?.nome || 'Nova mensagem',
@@ -655,7 +698,7 @@ export function DataProvider({ children }) {
   const markNotificationRead = (notificationId, userId) => {
     const current = db.get('comunicacao')
     const notifications = (current.notificacoes || []).map(notification => {
-      if (notification.id !== notificationId) return notification
+      if (!idsEqual(notification.id, notificationId)) return notification
       if (notification.usuarioId == null) {
         return { ...notification, lidosPor: [...new Set([...(notification.lidosPor || []), userId])] }
       }
@@ -668,7 +711,7 @@ export function DataProvider({ children }) {
   const markAllNotificationsRead = userId => {
     const current = db.get('comunicacao')
     const notifications = (current.notificacoes || []).map(notification => {
-      if (notification.usuarioId != null && notification.usuarioId !== userId) return notification
+      if (notification.usuarioId != null && !idsEqual(notification.usuarioId, userId)) return notification
       if (notification.usuarioId == null) {
         return { ...notification, lidosPor: [...new Set([...(notification.lidosPor || []), userId])] }
       }
@@ -676,7 +719,7 @@ export function DataProvider({ children }) {
     })
     db.set('comunicacao', { ...current, notificacoes: notifications })
     notifications
-      .filter(notification => notification.usuarioId == null || notification.usuarioId === userId)
+      .filter(notification => notification.usuarioId == null || idsEqual(notification.usuarioId, userId))
       .forEach(notification => { void markRemoteNotificationRead(notification.id, true) })
   }
 
