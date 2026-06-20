@@ -17,6 +17,14 @@ import {
 const AuthContext = createContext(null)
 const RESET_KEY = 'ej_reset_code'
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const appIdToUuid = id => {
+  const raw = `${id || ''}`
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)) return raw
+  let hex = ''
+  for (const char of raw) hex += char.charCodeAt(0).toString(16).padStart(2, '0')
+  hex = hex.slice(-12).padStart(12, '0')
+  return `00000000-0000-4000-8001-${hex}`
+}
 
 function safeUser(user) {
   if (!user) return null
@@ -48,7 +56,19 @@ function matchesEmail(user, email) {
 function sameUserIdentity(a, b) {
   if (!a || !b) return false
   return idsEqual(a.id, b.id) ||
+    idsEqual(a.supabaseId, b.supabaseId) ||
+    idsEqual(a.supabaseId, b.id) ||
+    idsEqual(a.id, b.supabaseId) ||
+    appIdToUuid(a.id) === appIdToUuid(b.id) ||
     (a.email && b.email && a.email.toLowerCase() === b.email.toLowerCase())
+}
+
+function findUserByIdentity(users, identity) {
+  return users.find(item =>
+    sameUserIdentity(item, identity) ||
+    idsEqual(item.id, identity) ||
+    idsEqual(item.supabaseId, identity)
+  )
 }
 
 function validateLogin(currentUsers, email, password) {
@@ -76,7 +96,7 @@ export function AuthProvider({ children }) {
 
   const persistUsers = nextUsers => db.set('usuarios', nextUsers)
   const syncUserById = userId => {
-    const target = db.get('usuarios').find(item => idsEqual(item.id, userId))
+    const target = findUserByIdentity(db.get('usuarios'), userId)
     if (target) void syncUsersToSupabase([target])
   }
 
@@ -181,7 +201,7 @@ export function AuthProvider({ children }) {
 
     let approved = null
     const updated = db.get('usuarios').map(item => {
-      if (!idsEqual(item.id, userId)) return item
+      if (!sameUserIdentity(item, { id: userId, supabaseId: userId })) return item
       const nextRole = role || item.role || 'membro'
       approved = {
         ...item,
@@ -215,8 +235,10 @@ export function AuthProvider({ children }) {
     if (!canApproveUsers(user)) {
       return { success: false, error: 'Você não tem permissão para reprovar usuários.' }
     }
-    db.update('usuarios', null, userId, { status: 'rejeitado' })
-    syncUserById(userId)
+    const target = findUserByIdentity(db.get('usuarios'), userId)
+    if (!target) return { success: false, error: 'Usuário não encontrado.' }
+    db.update('usuarios', null, target.id, { status: 'rejeitado' })
+    syncUserById(target.id)
     return { success: true }
   }
 
@@ -224,17 +246,17 @@ export function AuthProvider({ children }) {
     if (!canManagePermissions(user)) {
       return { success: false, error: 'Somente a presidência pode alterar permissões.' }
     }
-    const target = db.get('usuarios').find(item => idsEqual(item.id, userId))
+    const target = findUserByIdentity(db.get('usuarios'), userId)
     if (!target) return { success: false, error: 'Usuário não encontrado.' }
-    db.update('usuarios', null, userId, {
+    db.update('usuarios', null, target.id, {
       permissoes: normalizePermissions(permissions, target.role),
     })
-    syncUserById(userId)
+    syncUserById(target.id)
     return { success: true }
   }
 
   const deleteUser = userId => {
-    const target = db.get('usuarios').find(item => idsEqual(item.id, userId))
+    const target = findUserByIdentity(db.get('usuarios'), userId)
     if (!canDeleteMember(user, target)) {
       return { success: false, error: 'Você não pode remover este membro.' }
     }

@@ -54,19 +54,20 @@ const uuidToAppId = (uuid, namespace) => {
 
   if (decoded && /^[\x20-\x7E]+$/.test(decoded)) return decoded
 
-  const numeric = Number.parseInt(hex, 16)
-  return Number.isFinite(numeric) ? String(numeric) : null
+  return null
 }
 
 const dateOnly = value => value ? String(value).split('T')[0] : null
 const timeOnly = value => value ? String(value).slice(0, 5) : null
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const normalizeEmail = email => `${email || ''}`.trim().toLowerCase()
 
 const logRemoteError = (action, error) => {
   if (error) console.warn(`[Supabase] ${action}:`, error.message || error)
 }
 
 const userUuid = userId => appIdToUuid(userId, NS.user)
+const remoteUserId = user => user?.supabaseId || userUuid(user?.id)
 const meetingUuid = meetingId => stableUuid(meetingId, NS.meeting)
 const messageUuid = messageId => stableUuid(messageId, NS.message)
 const notificationUuid = notificationId => stableUuid(notificationId, NS.notification)
@@ -81,10 +82,53 @@ const defaultEmailFromName = name => {
 }
 const isLegacyTemporaryEmail = email => `${email || ''}`.toLowerCase().endsWith('@temporario.projep')
 
-function profileFromUser(user) {
+const findUserByAnyId = (users = [], id) => users.find(user =>
+  idsEqual(user.id, id) ||
+  idsEqual(user.supabaseId, id) ||
+  idsEqual(userUuid(user.id), id)
+)
+
+const sameUserIdentity = (a, b) => {
+  if (!a || !b) return false
+  return idsEqual(a.id, b.id) ||
+    idsEqual(a.supabaseId, b.supabaseId) ||
+    idsEqual(a.supabaseId, b.id) ||
+    idsEqual(a.id, b.supabaseId) ||
+    userUuid(a.id) === userUuid(b.id) ||
+    (a.email && b.email && normalizeEmail(a.email) === normalizeEmail(b.email))
+}
+
+function profileIdToUserIdMap(users = []) {
+  const map = new Map()
+  users.forEach(user => {
+    if (!user?.id) return
+    map.set(userUuid(user.id), user.id)
+    if (user.supabaseId) map.set(user.supabaseId, user.id)
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(user.id))) {
+      map.set(user.id, user.id)
+    }
+  })
+  return map
+}
+
+async function getRemoteProfileIdsByEmail(users = []) {
+  if (!isSupabaseConfigured || !supabase) return new Map()
+  const emails = [...new Set(users.map(user => normalizeEmail(user?.email)).filter(Boolean))]
+  if (!emails.length) return new Map()
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id,email')
+    .in('email', emails)
+  logRemoteError('resolve profiles by email', error)
+
+  return new Map((data || []).map(profile => [normalizeEmail(profile.email), profile.id]))
+}
+
+function profileFromUser(user, profileId = remoteUserId(user)) {
   const sector = resolveSetor(user.setorId || user.setor)
   return {
-    id: userUuid(user.id),
+    id: profileId,
     name: user.nome,
     initials: user.avatar || user.nome?.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase(),
     email: user.email,
@@ -102,14 +146,16 @@ function userFromProfile(profile, currentUsers = []) {
   const localId = uuidToAppId(profile.id, NS.user)
   const existing = currentUsers.find(user =>
     (localId && idsEqual(user.id, localId)) ||
+    idsEqual(user.supabaseId, profile.id) ||
     idsEqual(userUuid(user.id), profile.id) ||
-    user.email?.toLowerCase() === profile.email?.toLowerCase()
+    normalizeEmail(user.email) === normalizeEmail(profile.email)
   )
   const sector = resolveSetor(profile.sector_id)
   const id = localId || profile.id
   return {
     ...existing,
     id,
+    supabaseId: profile.id,
     nome: profile.name,
     email: isLegacyTemporaryEmail(profile.email) ? defaultEmailFromName(profile.name) : profile.email,
     cargo: profile.position || existing?.cargo || '',
@@ -135,26 +181,19 @@ function userFromProfile(profile, currentUsers = []) {
   }
 }
 
-const sameUserIdentity = (a, b) => {
-  if (!a || !b) return false
-  return idsEqual(a.id, b.id) ||
-    userUuid(a.id) === userUuid(b.id) ||
-    (a.email && b.email && a.email.toLowerCase() === b.email.toLowerCase())
-}
-
-function permissionRowsFromUser(user) {
+function permissionRowsFromUser(user, profileId = remoteUserId(user)) {
   const permissions = normalizePermissions(user.permissoes, user.role)
   const rows = []
   ACCESS_MODULES.forEach(module => {
     rows.push({
-      profile_id: userUuid(user.id),
+      profile_id: profileId,
       module_key: module.key,
       subarea_key: MODULE_PERMISSION_KEY,
       can_access: Boolean(permissions[module.key]),
     })
     module.subareas.forEach(subarea => {
       rows.push({
-        profile_id: userUuid(user.id),
+        profile_id: profileId,
         module_key: module.key,
         subarea_key: subarea.key,
         can_access: Boolean(permissions.subareas?.[subarea.key]),
@@ -173,7 +212,7 @@ function applyRemotePermissions(users, permissionRows = []) {
     else target[row.module_key] = row.can_access
   })
   return users.map(user => {
-    const raw = byProfile.get(userUuid(user.id))
+    const raw = byProfile.get(remoteUserId(user)) || byProfile.get(userUuid(user.id)) || byProfile.get(user.id)
     return raw ? { ...user, permissoes: normalizePermissions(raw, user.role) } : user
   })
 }
@@ -228,15 +267,15 @@ function meetingToRemote(meeting, currentUserId = null) {
   }
 }
 
-function messageToRemote(message) {
+function messageToRemote(message, remoteIds = {}) {
   const isChannel = message.tipo === 'aviso_geral' || message.destinatarioId === 'avisos'
   return {
     id: messageUuid(message.id),
-    sender_id: message.remetenteId ? userUuid(message.remetenteId) : null,
-    receiver_id: !isChannel && message.destinatarioId ? userUuid(message.destinatarioId) : null,
+    sender_id: remoteIds.senderId || (message.remetenteId ? userUuid(message.remetenteId) : null),
+    receiver_id: !isChannel && message.destinatarioId ? (remoteIds.receiverId || userUuid(message.destinatarioId)) : null,
     channel_id: isChannel ? message.destinatarioId : null,
     content: message.texto,
-    read_by: (message.lidosPor || []).map(id => userUuid(id)),
+    read_by: (remoteIds.readBy || (message.lidosPor || []).map(id => userUuid(id))),
     created_at: message.timestamp || new Date().toISOString(),
   }
 }
@@ -249,15 +288,15 @@ function messageFromRemote(row, profileIdToUserId = new Map()) {
     texto: row.content,
     timestamp: row.created_at,
     lida: Boolean(row.receiver_id && (row.read_by || []).includes(row.receiver_id)),
-    lidosPor: (row.read_by || []).map(id => profileIdToUserId.get(id)).filter(Boolean),
+    lidosPor: (row.read_by || []).map(id => profileIdToUserId.get(id) || id).filter(Boolean),
     tipo: row.channel_id ? 'aviso_geral' : 'direta',
   }
 }
 
-function notificationToRemote(notification) {
+function notificationToRemote(notification, profileId = null) {
   return {
     id: notificationUuid(notification.id),
-    profile_id: notification.usuarioId ? userUuid(notification.usuarioId) : null,
+    profile_id: profileId || (notification.usuarioId ? userUuid(notification.usuarioId) : null),
     type: notification.tipo || 'sistema',
     title: notification.titulo,
     description: notification.descricao || null,
@@ -315,7 +354,7 @@ export async function bootstrapSupabase(db) {
 
   const mergedUsers = await pullUsersFromSupabase(db)
 
-  const profileIdToUserId = new Map(mergedUsers.map(user => [userUuid(user.id), user.id]))
+  const profileIdToUserId = profileIdToUserIdMap(mergedUsers)
   await syncLocalCommunicationToSupabase(db)
   await pullCommunication(db, profileIdToUserId)
   await pullMeetings(db, profileIdToUserId)
@@ -356,19 +395,28 @@ export async function pullUsersFromSupabase(db) {
 
 export async function syncUsersToSupabase(users = []) {
   if (!isSupabaseConfigured || !supabase) return
-  const profiles = users.filter(user => user.email).map(profileFromUser)
+  const usersWithEmail = users.filter(user => user.email)
+  const remoteIdsByEmail = await getRemoteProfileIdsByEmail(usersWithEmail)
+  const usersWithRemoteIds = usersWithEmail.map(user => ({
+    ...user,
+    supabaseId: user.supabaseId || remoteIdsByEmail.get(normalizeEmail(user.email)) || userUuid(user.id),
+  }))
+
+  const profiles = usersWithRemoteIds.map(user => profileFromUser(user, user.supabaseId))
   if (!profiles.length) return
 
   const { error: profileError } = await supabase.from('profiles').upsert(profiles, { onConflict: 'id' })
   logRemoteError('upsert profiles', profileError)
 
-  const permissions = users.flatMap(permissionRowsFromUser)
+  const permissions = usersWithRemoteIds.flatMap(user => permissionRowsFromUser(user, user.supabaseId))
   if (permissions.length) {
     const { error: permissionError } = await supabase
       .from('permissions')
       .upsert(permissions, { onConflict: 'profile_id,module_key,subarea_key' })
     logRemoteError('upsert permissions', permissionError)
   }
+
+  return usersWithRemoteIds
 }
 
 export async function deleteUserFromSupabase(userId) {
@@ -407,15 +455,22 @@ export async function deleteMeetingFromSupabase(meetingId) {
 
 export async function syncMessageToSupabase(message, users = []) {
   if (!isSupabaseConfigured || !supabase || !message) return
-  const relatedUsers = users.filter(user =>
-    user?.email &&
-    (
-      userUuid(user.id) === userUuid(message.remetenteId) ||
-      userUuid(user.id) === userUuid(message.destinatarioId)
-    )
-  )
-  if (relatedUsers.length) await syncUsersToSupabase(relatedUsers)
-  const { error } = await supabase.from('chat_messages').upsert(messageToRemote(message), { onConflict: 'id' })
+  const isChannel = message.tipo === 'aviso_geral' || message.destinatarioId === 'avisos'
+  const sender = findUserByAnyId(users, message.remetenteId)
+  const receiver = isChannel ? null : findUserByAnyId(users, message.destinatarioId)
+  const relatedUsers = [sender, receiver].filter(user => user?.email)
+  const syncedUsers = relatedUsers.length ? await syncUsersToSupabase(relatedUsers) : []
+  const resolveSynced = user => syncedUsers?.find(synced => sameUserIdentity(synced, user)) || user
+  const senderId = sender ? remoteUserId(resolveSynced(sender)) : userUuid(message.remetenteId)
+  const receiverId = !isChannel && receiver ? remoteUserId(resolveSynced(receiver)) : (!isChannel && message.destinatarioId ? userUuid(message.destinatarioId) : null)
+  const readBy = (message.lidosPor || []).map(id => {
+    const reader = findUserByAnyId([...(syncedUsers || []), ...users], id)
+    return reader ? remoteUserId(reader) : userUuid(id)
+  })
+
+  const { error } = await supabase
+    .from('chat_messages')
+    .upsert(messageToRemote(message, { senderId, receiverId, readBy }), { onConflict: 'id' })
   logRemoteError('upsert message', error)
 }
 
@@ -439,16 +494,22 @@ export async function markRemoteMessageRead(messageId, userId) {
   logRemoteError('mark message read', error)
 }
 
-export async function syncNotificationToSupabase(notification) {
+export async function syncNotificationToSupabase(notification, users = []) {
   if (!isSupabaseConfigured || !supabase || !notification) return
-  const { error } = await supabase.from('notifications').upsert(notificationToRemote(notification), { onConflict: 'id' })
+  const recipient = notification.usuarioId ? findUserByAnyId(users, notification.usuarioId) : null
+  const syncedUsers = recipient?.email ? await syncUsersToSupabase([recipient]) : []
+  const syncedRecipient = syncedUsers?.find(item => sameUserIdentity(item, recipient)) || recipient
+  const profileId = syncedRecipient ? remoteUserId(syncedRecipient) : null
+  const { error } = await supabase
+    .from('notifications')
+    .upsert(notificationToRemote(notification, profileId), { onConflict: 'id' })
   logRemoteError('upsert notification', error)
 }
 
 async function syncLocalCommunicationToSupabase(db) {
   if (!isSupabaseConfigured || !supabase) return
   const users = db.get('usuarios')
-  const hasUser = id => users.some(user => idsEqual(user.id, id))
+  const hasUser = id => users.some(user => findUserByAnyId([user], id))
   const communication = db.get('comunicacao')
 
   for (const message of communication.mensagens || []) {
@@ -484,6 +545,13 @@ export async function pullCommunication(db, profileIdToUserId) {
   }))
 }
 
+export async function pullCommunicationState(db) {
+  if (!isSupabaseConfigured || !supabase) return { enabled: false, reason: 'missing-env' }
+  const profileIdToUserId = profileIdToUserIdMap(db.get('usuarios'))
+  await pullCommunication(db, profileIdToUserId)
+  return { enabled: true }
+}
+
 export async function pullMeetings(db, profileIdToUserId) {
   if (!isSupabaseConfigured || !supabase) return
   const [{ data: meetings, error: meetingError }, { data: responsibles, error: responsibleError }] = await Promise.all([
@@ -506,7 +574,7 @@ export async function pullMeetings(db, profileIdToUserId) {
 export async function pullRemoteState(db) {
   if (!isSupabaseConfigured || !supabase) return { enabled: false, reason: 'missing-env' }
   const mergedUsers = await pullUsersFromSupabase(db)
-  const profileIdToUserId = new Map(mergedUsers.map(user => [userUuid(user.id), user.id]))
+  const profileIdToUserId = profileIdToUserIdMap(mergedUsers)
   await Promise.all([
     pullCommunication(db, profileIdToUserId),
     pullMeetings(db, profileIdToUserId),

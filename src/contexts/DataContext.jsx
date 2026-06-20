@@ -13,6 +13,7 @@ import {
   bootstrapSupabase,
   deleteMeetingFromSupabase,
   deleteUserFromSupabase,
+  pullCommunicationState,
   markRemoteMessageRead,
   markRemoteNotificationRead,
   pullRemoteState,
@@ -25,6 +26,15 @@ import {
 
 const DataContext = createContext(null)
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const matchesUserId = (id, member) => Boolean(member) && (
+  idsEqual(id, member.id) ||
+  idsEqual(id, member.supabaseId)
+)
+
+function idBelongsToUser(id, userId) {
+  const target = db.get('usuarios').find(member => matchesUserId(userId, member))
+  return target ? matchesUserId(id, target) : idsEqual(id, userId)
+}
 
 function publicUsers(users) {
   return users.map(user => {
@@ -178,8 +188,8 @@ function markConversationReadInDb({ userId, memberId = null, channelId = null })
   db.mutate('comunicacao', current => {
     let changed = false
     const mensagens = (current.mensagens || []).map(message => {
-      const isDirect = memberId && idsEqual(message.remetenteId, memberId) && idsEqual(message.destinatarioId, userId) && !message.lida
-      const isChannel = channelId && message.destinatarioId === channelId && !(message.lidosPor || []).some(id => idsEqual(id, userId))
+      const isDirect = memberId && idBelongsToUser(message.remetenteId, memberId) && idBelongsToUser(message.destinatarioId, userId) && !message.lida
+      const isChannel = channelId && message.destinatarioId === channelId && !(message.lidosPor || []).some(id => idBelongsToUser(id, userId))
       if (!isDirect && !isChannel) return message
       changed = true
       changedMessageIds.push(message.id)
@@ -188,7 +198,11 @@ function markConversationReadInDb({ userId, memberId = null, channelId = null })
         : { ...message, lida: true }
     })
     const notificacoes = (current.notificacoes || []).map(notification => {
-      if (memberId && idsEqual(notification.usuarioId, userId) && !notification.lida && notification.tipo === 'mensagem' && notification.link === `/chat?user=${memberId}`) {
+      const linkUserId = notification.link?.includes('?')
+        ? new URLSearchParams(notification.link.split('?')[1]).get('user')
+        : null
+      const linkMatchesConversation = !linkUserId || idBelongsToUser(linkUserId, memberId)
+      if (memberId && idBelongsToUser(notification.usuarioId, userId) && !notification.lida && notification.tipo === 'mensagem' && linkMatchesConversation) {
         changed = true
         return { ...notification, lida: true }
       }
@@ -226,6 +240,7 @@ export function DataProvider({ children }) {
     let mounted = true
     let realtimeCleanup = () => {}
     let syncInFlight = false
+    let communicationSyncInFlight = false
     const syncRemote = async () => {
       if (syncInFlight) return
       syncInFlight = true
@@ -237,6 +252,17 @@ export function DataProvider({ children }) {
         syncInFlight = false
       }
     }
+    const syncCommunicationRemote = async () => {
+      if (communicationSyncInFlight) return
+      communicationSyncInFlight = true
+      try {
+        await pullCommunicationState(db)
+      } catch (error) {
+        console.warn('[Supabase] Falha ao buscar mensagens remotas:', error.message || error)
+      } finally {
+        communicationSyncInFlight = false
+      }
+    }
     bootstrapSupabase(db)
       .then(result => {
         if (!mounted || !result?.enabled) return
@@ -245,7 +271,8 @@ export function DataProvider({ children }) {
       })
       .catch(error => console.warn('[Supabase] Falha na sincronização inicial:', error.message || error))
     const intervalId = window.setInterval(syncRemote, 5000)
-    const handleFocus = () => { void syncRemote() }
+    const communicationIntervalId = window.setInterval(syncCommunicationRemote, 1500)
+    const handleFocus = () => { void syncRemote(); void syncCommunicationRemote() }
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') void syncRemote()
     }
@@ -256,6 +283,7 @@ export function DataProvider({ children }) {
       mounted = false
       realtimeCleanup()
       window.clearInterval(intervalId)
+      window.clearInterval(communicationIntervalId)
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
@@ -634,7 +662,7 @@ export function DataProvider({ children }) {
       ...current,
       notificacoes: [next, ...(current.notificacoes || [])],
     }))
-    void syncNotificationToSupabase(next)
+    void syncNotificationToSupabase(next, db.get('usuarios'))
     return next
   }
 
@@ -682,7 +710,7 @@ export function DataProvider({ children }) {
         lidosPor: [senderId],
       })
     } else if (receiverId) {
-      const sender = members.find(member => idsEqual(member.id, senderId))
+      const sender = members.find(member => matchesUserId(senderId, member))
       addNotification({
         usuarioId: receiverId,
         titulo: sender?.nome || 'Nova mensagem',
@@ -711,7 +739,7 @@ export function DataProvider({ children }) {
   const markAllNotificationsRead = userId => {
     const current = db.get('comunicacao')
     const notifications = (current.notificacoes || []).map(notification => {
-      if (notification.usuarioId != null && !idsEqual(notification.usuarioId, userId)) return notification
+      if (notification.usuarioId != null && !idBelongsToUser(notification.usuarioId, userId)) return notification
       if (notification.usuarioId == null) {
         return { ...notification, lidosPor: [...new Set([...(notification.lidosPor || []), userId])] }
       }
@@ -719,7 +747,7 @@ export function DataProvider({ children }) {
     })
     db.set('comunicacao', { ...current, notificacoes: notifications })
     notifications
-      .filter(notification => notification.usuarioId == null || idsEqual(notification.usuarioId, userId))
+      .filter(notification => notification.usuarioId == null || idBelongsToUser(notification.usuarioId, userId))
       .forEach(notification => { void markRemoteNotificationRead(notification.id, true) })
   }
 

@@ -9,6 +9,10 @@ import { canPostAnnouncements } from '../config/authorization'
 // ── Colors ────────────────────────────────────────────────────
 const AVATAR_COLORS = ['#3D5A80','#2A6B69','#7B2D8B','#1A3A5C','#5C3A1A','#1A4A5C','#4A1A5C']
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const matchesUserId = (id, member) => Boolean(member) && (
+  idsEqual(id, member.id) ||
+  idsEqual(id, member.supabaseId)
+)
 const memberColor = (id) => {
   const hash = String(id ?? '')
     .split('')
@@ -40,7 +44,7 @@ function presentMessage(message, members) {
   const timestamp = message.timestamp || new Date().toISOString()
   const sender = message.remetenteId === 'system'
     ? null
-    : members.find(member => idsEqual(member.id, message.remetenteId))
+    : members.find(member => matchesUserId(message.remetenteId, member))
   return {
     id: message.id,
     senderId: message.remetenteId,
@@ -197,8 +201,8 @@ export default function Chat() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedUserId = searchParams.get('user')
   const requestedConversation = members.some(member =>
-    idsEqual(member.id, requestedUserId) && !idsEqual(member.id, user?.id) && member.status === 'ativo'
-  ) ? `dm-${requestedUserId}` : 'avisos'
+    matchesUserId(requestedUserId, member) && !matchesUserId(requestedUserId, user) && member.status === 'ativo'
+  ) ? `dm-${members.find(member => matchesUserId(requestedUserId, member))?.id}` : 'avisos'
 
   const [activeTab,    setActiveTab]    = useState('comunicacao')
   const selectedConv = requestedConversation
@@ -213,7 +217,7 @@ export default function Chat() {
   // Build conversations from DataContext members (mesma fonte: db.get('usuarios'))
   const allConversations = [
     AVISOS_CONV,
-    ...members.filter(member => !idsEqual(member.id, user?.id) && member.status === 'ativo').map(m => ({
+    ...members.filter(member => !matchesUserId(member.id, user) && member.status === 'ativo').map(m => ({
       id:       `dm-${m.id}`,
       name:     m.nome,
       type:     'dm',
@@ -234,13 +238,12 @@ export default function Chat() {
 
   const conv = allConversations.find(c => c.id === selectedConv) || AVISOS_CONV
   const convMessages = (() => {
-    const selectedMemberId = conv.memberId
     return storedMessages
       .filter(message => {
         if (selectedConv === 'avisos') return message.destinatarioId === 'avisos'
         return (
-          (idsEqual(message.remetenteId, user?.id) && idsEqual(message.destinatarioId, selectedMemberId)) ||
-          (idsEqual(message.remetenteId, selectedMemberId) && idsEqual(message.destinatarioId, user?.id))
+          (matchesUserId(message.remetenteId, user) && matchesUserId(message.destinatarioId, conv.user)) ||
+          (matchesUserId(message.remetenteId, conv.user) && matchesUserId(message.destinatarioId, user))
         )
       })
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
@@ -302,8 +305,8 @@ export default function Chat() {
       .filter(message => id === 'avisos'
         ? message.destinatarioId === 'avisos'
         : (
-          (idsEqual(message.remetenteId, user?.id) && idsEqual(message.destinatarioId, target?.memberId)) ||
-          (idsEqual(message.remetenteId, target?.memberId) && idsEqual(message.destinatarioId, user?.id))
+          (matchesUserId(message.remetenteId, user) && matchesUserId(message.destinatarioId, target?.user)) ||
+          (matchesUserId(message.remetenteId, target?.user) && matchesUserId(message.destinatarioId, user))
         ))
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     return matches.length ? presentMessage(matches[matches.length - 1], members) : null
@@ -321,9 +324,9 @@ export default function Chat() {
 
   const getUnreadCount = conversation => storedMessages.filter(message => {
     if (conversation.id === 'avisos') {
-      return message.destinatarioId === 'avisos' && !(message.lidosPor || []).some(id => idsEqual(id, user?.id))
+      return message.destinatarioId === 'avisos' && !(message.lidosPor || []).some(id => matchesUserId(id, user))
     }
-    return idsEqual(message.remetenteId, conversation.memberId) && idsEqual(message.destinatarioId, user?.id) && !message.lida
+    return matchesUserId(message.remetenteId, conversation.user) && matchesUserId(message.destinatarioId, user) && !message.lida
   }).length
 
   const filteredMembers = members.filter(m =>
@@ -384,7 +387,7 @@ export default function Chat() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredMembers.map(m => (
-                <MemberCard key={m.id} member={m} onChat={goToChat} isCurrentUser={idsEqual(m.id, user?.id)} />
+                <MemberCard key={m.id} member={m} onChat={goToChat} isCurrentUser={matchesUserId(m.id, user)} />
               ))}
             </div>
           )}
@@ -472,7 +475,7 @@ export default function Chat() {
 
                   {groupedMessages[date].map((msg, idx) => {
                     // Right side = message sent by current logged-in user
-                    const isMe = idsEqual(msg.senderId, user?.id)
+                    const isMe = matchesUserId(msg.senderId, user)
                     const prevMsg = idx > 0 ? groupedMessages[date][idx - 1] : null
                     const showSender = !isMe && (idx === 0 || prevMsg?.senderId !== msg.senderId)
 
