@@ -60,7 +60,7 @@ function TeamTable({ role, entries, members, onEdit, onRemove, onToggle }) {
             <thead>
               <tr className="border-b border-[#1E1E1E] text-left">
                 <th className="px-5 py-3 text-xs text-gray-600 uppercase tracking-wider">Membro do site</th>
-                <th className="px-5 py-3 text-xs text-gray-600 uppercase tracking-wider">Nome no Pipefy</th>
+                <th className="px-5 py-3 text-xs text-gray-600 uppercase tracking-wider">E-mail no Pipefy</th>
                 <th className="px-5 py-3 text-xs text-gray-600 uppercase tracking-wider">Aliases</th>
                 <th className="px-5 py-3 text-xs text-gray-600 uppercase tracking-wider">Status</th>
                 <th className="px-5 py-3 text-xs text-gray-600 uppercase tracking-wider text-right">Ações</th>
@@ -149,8 +149,8 @@ export default function EquipeComercial() {
   const filteredPeople = useMemo(() => {
     const text = query.trim().toLowerCase()
     return pipefyPeople
-      .filter(person => !text || `${person.label} ${person.source}`.toLowerCase().includes(text))
-      .slice(0, 18)
+      .filter(person => !text || `${person.label} ${person.name || ''} ${person.source}`.toLowerCase().includes(text))
+      .slice(0, 30)
   }, [pipefyPeople, query])
 
   const activeMembers = members.filter(member => member.status === 'ativo')
@@ -165,7 +165,7 @@ export default function EquipeComercial() {
   const save = event => {
     event.preventDefault()
     if (!form.userId || !form.pipefyName.trim()) {
-      setMessage('Selecione um membro do site e informe o nome como aparece no Pipefy.')
+      setMessage('Selecione um membro do site e informe o e-mail usado no Pipefy.')
       return
     }
 
@@ -200,8 +200,16 @@ export default function EquipeComercial() {
     setMessage(result?.success === false ? result.error : 'Status atualizado.')
   }
 
-  const selectPipefyName = value => {
-    set('pipefyName', value)
+  const selectPipefyPerson = person => {
+    set('pipefyName', person.email || person.value)
+    if (person.aliases?.length) {
+      const currentAliases = `${form.pipefyAliases || ''}`
+        .split(',')
+        .map(alias => alias.trim())
+        .filter(Boolean)
+      const nextAliases = [...new Set([...currentAliases, ...person.aliases])]
+      set('pipefyAliases', nextAliases.join(', '))
+    }
     setQuery('')
   }
 
@@ -211,12 +219,12 @@ export default function EquipeComercial() {
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Equipe Comercial</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            Associe membros do site aos nomes do Pipefy para alimentar Hunters e Closers corretamente.
+            Associe membros do site aos e-mails do Pipefy para alimentar Hunters e Closers corretamente.
           </p>
         </div>
         {snapshot?.synced_at && (
           <span className="text-xs text-gray-600">
-            Nomes lidos do último snapshot: {new Date(snapshot.synced_at).toLocaleString('pt-BR')}
+            E-mails lidos do último snapshot: {new Date(snapshot.synced_at).toLocaleString('pt-BR')}
           </span>
         )}
       </div>
@@ -256,7 +264,7 @@ export default function EquipeComercial() {
                 <h2 className="text-white font-bold text-sm uppercase tracking-wider">
                   {form.id ? 'Editar vínculo' : `Adicionar ${ROLE_META[role].label.slice(0, -1)}`}
                 </h2>
-                <p className="text-gray-600 text-xs mt-0.5">O nome no Pipefy precisa bater com o responsável do card.</p>
+                <p className="text-gray-600 text-xs mt-0.5">Use o e-mail do usuário no Pipefy. Se os cards usam nome, coloque o nome em aliases.</p>
               </div>
               {form.id && (
                 <button type="button" onClick={resetForm} className="p-2 rounded text-gray-500 hover:text-white hover:bg-white/5">
@@ -276,12 +284,12 @@ export default function EquipeComercial() {
             </div>
 
             <div>
-              <label className={LABEL}>Nome/email no Pipefy</label>
+              <label className={LABEL}>E-mail no Pipefy</label>
               <div className="relative">
                 <input
                   value={form.pipefyName}
                   onChange={event => set('pipefyName', event.target.value)}
-                  placeholder="Ex: Caique Palauro ou email@projep.com"
+                  placeholder="Ex: caiquepalauro12@gmail.com"
                   className={`${INPUT} pr-10`}
                 />
                 <Link2 className="w-4 h-4 text-gray-700 absolute right-3 top-1/2 -translate-y-1/2" />
@@ -289,11 +297,11 @@ export default function EquipeComercial() {
             </div>
 
             <div>
-              <label className={LABEL}>Aliases extras</label>
+              <label className={LABEL}>Nomes/aliases extras</label>
               <input
                 value={form.pipefyAliases}
                 onChange={event => set('pipefyAliases', event.target.value)}
-                placeholder="Separados por vírgula. Ex: caique@projep.com, Caíque"
+                placeholder="Separados por vírgula. Ex: Caique Palauro, Caíque"
                 className={INPUT}
               />
             </div>
@@ -319,7 +327,7 @@ export default function EquipeComercial() {
           <div className="bg-[#111111] border border-[#1E1E1E] rounded-md p-5">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-white font-bold text-sm uppercase tracking-wider">Nomes encontrados no Pipefy</h2>
+                <h2 className="text-white font-bold text-sm uppercase tracking-wider">E-mails encontrados no Pipefy</h2>
                 <p className="text-gray-600 text-xs mt-0.5">Clique para preencher o campo acima.</p>
               </div>
             </div>
@@ -328,27 +336,29 @@ export default function EquipeComercial() {
               <input
                 value={query}
                 onChange={event => setQuery(event.target.value)}
-                placeholder="Buscar nome do Pipefy..."
+                placeholder="Buscar e-mail ou nome..."
                 className={`${INPUT} pl-9`}
               />
             </div>
             <div className="space-y-2 max-h-[330px] overflow-y-auto">
               {filteredPeople.length === 0 ? (
                 <p className="text-sm text-gray-600 py-4">
-                  Nenhum nome encontrado no snapshot atual. Você ainda pode digitar manualmente.
+                  Nenhum e-mail encontrado no snapshot atual. Você ainda pode digitar manualmente.
                 </p>
               ) : filteredPeople.map(person => (
                 <button
                   key={`${person.value}-${person.source}`}
                   type="button"
-                  onClick={() => selectPipefyName(person.value)}
+                  onClick={() => selectPipefyPerson(person)}
                   className="w-full text-left border border-[#1E1E1E] bg-[#0D0D0D] hover:border-[#CE7028]/50 rounded p-3 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-white text-sm font-semibold truncate">{person.label}</p>
+                    <p className="text-white text-sm font-semibold truncate">{person.email || person.label}</p>
                     <span className="text-[10px] text-gray-600">{person.count} card(s)</span>
                   </div>
-                  <p className="text-xs text-gray-600 mt-0.5">{person.source}</p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {[person.name, person.source].filter(Boolean).join(' · ')}
+                  </p>
                 </button>
               ))}
             </div>

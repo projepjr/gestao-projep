@@ -33,6 +33,8 @@ const normalize = value => String(value || '')
   .toLowerCase()
   .trim()
 
+const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
+
 const includesAny = (value, words) => {
   const normalized = normalize(value)
   return words.some(word => normalized.includes(normalize(word)))
@@ -193,6 +195,15 @@ function getCardAssignees(card) {
   const assignees = card?.assignees || card?.members || card?.responsibles || []
   if (!Array.isArray(assignees)) return []
   return assignees.map(item => item?.email || item?.name || item?.username || item?.id).filter(Boolean)
+}
+
+function getCardAssigneePeople(card) {
+  const assignees = card?.assignees || card?.members || card?.responsibles || []
+  if (!Array.isArray(assignees)) return []
+  return assignees.map(item => ({
+    name: item?.name || item?.username || '',
+    email: item?.email || '',
+  })).filter(item => item.name || item.email)
 }
 
 function getResponsibleMember(card, type, memberIndex) {
@@ -421,32 +432,78 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {} } 
 export function extractPipefyPeopleFromSnapshot(payload) {
   const cards = getCards(payload)
   const people = new Map()
-  const add = (value, source) => {
-    const text = String(value || '').trim()
-    const key = normalize(text)
-    if (!key || key.length < 2) return
+
+  const extractEmails = value => String(value || '').match(EMAIL_REGEX) || []
+
+  const add = ({ email, name, source, count = 1 }) => {
+    const cleanEmail = String(email || '').trim().toLowerCase()
+    if (!cleanEmail || !cleanEmail.includes('@')) return
+    const key = normalize(cleanEmail)
     if (!people.has(key)) {
       people.set(key, {
-        value: text,
-        label: text,
+        value: cleanEmail,
+        label: cleanEmail,
+        email: cleanEmail,
+        name: String(name || '').trim(),
+        aliases: String(name || '').trim() ? [String(name).trim()] : [],
         source,
         count: 0,
       })
     }
     const item = people.get(key)
-    item.count += 1
+    item.count += count
+    if (name && !item.name) item.name = String(name).trim()
+    if (name && !item.aliases.includes(String(name).trim())) item.aliases.push(String(name).trim())
     if (!item.source.includes(source)) item.source = `${item.source}, ${source}`
   }
 
-  for (const row of payload?.hunters || []) add(row.nome || row.name || row.pipefyName, 'Hunter')
-  for (const row of payload?.closers || []) add(row.nome || row.name || row.pipefyName, 'Closer')
+  const normalizePipefyMember = item => {
+    const user = item?.user || item?.member || item?.person || item?.node || item
+    return {
+      name: user?.name || user?.full_name || item?.name || item?.label || '',
+      email: user?.email || item?.email || '',
+    }
+  }
+
+  const raw = payload?.raw || {}
+  const memberCandidates = [
+    payload?.pipeMembers,
+    payload?.pipefyMembers,
+    payload?.people,
+    payload?.members,
+    raw.pipeMembers,
+    raw.pipefyMembers,
+    raw.people,
+    raw.members,
+    raw.pipe?.members,
+    raw.data?.pipe?.members,
+    raw.data?.pipe?.members?.edges?.map(edge => edge.node),
+    payload?.pipe?.members,
+  ]
+  const pipeMembers = memberCandidates.find(Array.isArray) || []
+
+  pipeMembers
+    .map(normalizePipefyMember)
+    .forEach(member => add({ ...member, source: 'Pessoa do pipe', count: 0 }))
+
+  for (const row of payload?.hunters || []) {
+    extractEmails(row.email || row.pipefyName || row.nome || row.name)
+      .forEach(email => add({ email, name: row.nome || row.name, source: 'Hunter' }))
+  }
+  for (const row of payload?.closers || []) {
+    extractEmails(row.email || row.pipefyName || row.nome || row.name)
+      .forEach(email => add({ email, name: row.nome || row.name, source: 'Closer' }))
+  }
 
   for (const card of cards) {
     getFieldValues(card, ['hunter', 'responsavel prospeccao', 'responsável prospecção', 'responsavel', 'responsável'])
-      .forEach(value => add(value, 'Responsável'))
+      .forEach(value => extractEmails(value).forEach(email => add({ email, source: 'Responsável' })))
     getFieldValues(card, ['closer', 'email do closer', 'responsavel fechamento', 'responsável fechamento'])
-      .forEach(value => add(value, 'Closer'))
-    getCardAssignees(card).forEach(value => add(value, 'Assignee'))
+      .forEach(value => extractEmails(value).forEach(email => add({ email, source: 'Closer' })))
+    getCardAssigneePeople(card).forEach(person => {
+      if (person.email) add({ email: person.email, name: person.name, source: 'Assignee' })
+      extractEmails(person.name).forEach(email => add({ email, name: person.name, source: 'Assignee' }))
+    })
   }
 
   return [...people.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
