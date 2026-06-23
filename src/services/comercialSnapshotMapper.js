@@ -2,8 +2,12 @@ const EMPTY_FUNIL = {
   leadsCadastrados: 0,
   ligoesRealizadas: 0,
   ligacoesRealizadas: 0,
+  diagnosticasAgendadas: 0,
+  diagnosticasRealizadas: 0,
   reunioesMarcadas: 0,
   reunioesRealizadas: 0,
+  propostasAgendadas: 0,
+  propostasRealizadas: 0,
   propostas: 0,
   negociacoes: 0,
   contratosFechados: 0,
@@ -90,6 +94,22 @@ const parseDateValue = value => {
   return Number.isNaN(native.getTime()) ? null : toDateOnly(native)
 }
 
+function getRangeBounds(range) {
+  if (!range?.inicio || !range?.fim) return null
+  const start = parseDateValue(range.inicio)
+  const end = parseDateValue(range.fim)
+  if (!start || !end) return null
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
+function isDateInsideRange(date, range) {
+  if (!range?.inicio || !range?.fim) return true
+  const bounds = getRangeBounds(range)
+  if (!bounds || !date) return false
+  return date >= bounds.start && date <= bounds.end
+}
+
 function getCards(payload) {
   const raw = payload?.raw || {}
   const candidates = [
@@ -143,11 +163,52 @@ function getFieldValues(card, keywords) {
     .filter(Boolean)
 }
 
+function getFirstFieldDate(card, keywords) {
+  for (const value of getFieldValues(card, keywords)) {
+    const parsed = parseDateValue(value)
+    if (parsed) return parsed
+  }
+  return null
+}
+
+function hasFieldDateInRange(card, keywords, range) {
+  const values = getFieldValues(card, keywords)
+  if (!values.length) return false
+  if (!range?.inicio || !range?.fim) return values.some(value => parseDateValue(value))
+  return values.some(value => isDateInsideRange(parseDateValue(value), range))
+}
+
+function getPhaseHistory(card) {
+  const history = card?.phases_history || card?.phasesHistory || card?.history || []
+  return Array.isArray(history) ? history : []
+}
+
+function enteredStageInRange(card, stageKeywords, range) {
+  const history = getPhaseHistory(card)
+  if (!history.length) return false
+  return history.some(item => {
+    const phaseName = item?.phase?.name || item?.phaseName || item?.name || ''
+    if (!includesAny(phaseName, stageKeywords)) return false
+    const enteredAt = parseDateValue(item?.firstTimeIn || item?.entered_at || item?.created_at)
+    return isDateInsideRange(enteredAt, range)
+  })
+}
+
+function currentOrHistoricalStage(card, stageKeywords, range) {
+  if (range?.inicio && range?.fim) return enteredStageInRange(card, stageKeywords, range)
+  return includesAny(getStageName(card), stageKeywords)
+}
+
 function getCardDate(card) {
   const prioritizedLabels = [
-    ['data de ligacao', 'data de ligação', 'data do contato', 'data contato', 'data da ligacao', 'data da ligação'],
-    ['data e hora da diagnostica', 'data e hora da diagnóstica', 'data da diagnostica', 'data da diagnóstica'],
-    ['data e hora da reuniao de proposta', 'data e hora da reunião de proposta', 'data da proposta'],
+    ['data de cadastro', 'data cadastro'],
+    ['data da primeira ligacao', 'data da primeira ligação', 'data de ligacao', 'data de ligação', 'data do contato', 'data contato', 'primeira tentativa de contato'],
+    ['data e hora da diagnostica agendada', 'data e hora da diagnóstica agendada', 'data e hora da diagnostica', 'data e hora da diagnóstica'],
+    ['data da diagnostica realizada', 'data da diagnóstica realizada'],
+    ['data e hora da reuniao de proposta', 'data e hora da reunião de proposta'],
+    ['data da proposta realizada'],
+    ['data de entrada em negociacao', 'data de entrada em negociação'],
+    ['data de fechamento do contrato', 'data da assinatura do contrato', 'data do fechamento'],
     ['data de criacao', 'data de criação', 'created at', 'created_at'],
   ]
 
@@ -186,13 +247,15 @@ const memberMatchesId = (member, id) =>
 
 function filterCardsByRange(cards, range) {
   if (!range?.inicio || !range?.fim) return cards
-  const start = parseDateValue(range.inicio)
-  const end = parseDateValue(range.fim)
-  if (!start || !end) return cards
-  end.setHours(23, 59, 59, 999)
+  const bounds = getRangeBounds(range)
+  if (!bounds) return cards
   return cards.filter(card => {
     const cardDate = getCardDate(card)
-    return cardDate && cardDate >= start && cardDate <= end
+    if (cardDate && cardDate >= bounds.start && cardDate <= bounds.end) return true
+    return getCardFields(card).some(field => {
+      if (!includesAny(field.label, ['data', 'date'])) return false
+      return isDateInsideRange(parseDateValue(field.value), range)
+    })
   })
 }
 
@@ -208,42 +271,133 @@ function getStageName(card) {
 
 function getCardValue(card) {
   return toNumber(
-    getFieldValue(card, ['valor', 'ticket', 'orcamento', 'orçamento', 'receita']) ||
+    getFieldValue(card, ['valor fechado', 'valor da proposta', 'valor', 'ticket', 'orcamento', 'orçamento', 'receita']) ||
     card?.value ||
     card?.amount,
   )
 }
 
-function getMeetingStatus(card) {
-  return getFieldValue(card, ['status reuniao', 'status reunião', 'reuniao', 'reunião', 'diagnostico', 'diagnóstico'])
+function getDiagnosticStatus(card) {
+  return getFieldValue(card, ['status da diagnostica', 'status da diagnóstica'])
+}
+
+function getProposalStatus(card) {
+  return getFieldValue(card, ['status da reuniao de proposta', 'status da reunião de proposta'])
+}
+
+function getContractStatus(card) {
+  return getFieldValue(card, ['contrato fechado', 'virou contrato'])
+}
+
+function statusIsRealized(status) {
+  return includesAny(status, ['realizada', 'aconteceu', 'compareceu'])
+}
+
+function statusIsNoShow(status) {
+  return includesAny(status, ['no-show', 'noshow', 'nao compareceu', 'não compareceu'])
 }
 
 function classifyPipeline(card) {
   const stage = getStageName(card)
-  if (includesAny(stage, ['ganho', 'fechado', 'contrato assinado'])) return 'ganhos'
+  if (includesAny(stage, ['ganho', 'fechado', 'contrato assinado', 'contratos fechados'])) return 'ganhos'
   if (includesAny(stage, ['negociacao', 'negociação'])) return 'negociacao'
   if (includesAny(stage, ['proposta'])) return 'proposta'
-  if (includesAny(stage, ['diagnostico', 'diagnóstico', 'reuniao', 'reunião'])) return 'diagnostico'
+  if (includesAny(stage, ['diagnostico', 'diagnóstico', 'diagnostica', 'diagnóstica', 'reuniao', 'reunião'])) return 'diagnostico'
   if (includesAny(stage, ['interesse futuro', 'futuro', 'retornar depois'])) return 'interesseFuturo'
   if (includesAny(stage, ['perdido', 'perda'])) return 'perdidos'
-  if (includesAny(stage, ['nao contatado', 'não contatado', 'sem contato'])) return 'naoContatados'
+  if (includesAny(stage, ['nao contatado', 'não contatado', 'sem contato', 'ligacoes', 'ligações', 'contato'])) return 'naoContatados'
   return 'cadastro'
 }
 
-function wasMeetingScheduled(card) {
-  const stage = getStageName(card)
-  const status = getMeetingStatus(card)
-  return includesAny(`${stage} ${status}`, ['diagnostico', 'diagnóstico', 'reuniao', 'reunião', 'proposta', 'negociacao', 'negociação', 'ganho', 'fechado', 'agendada'])
+const EVENT_LABELS = {
+  leadCreated: ['data de cadastro', 'data cadastro', 'data de criacao', 'data de criação', 'created at', 'created_at'],
+  contact: [
+    'data da primeira ligacao',
+    'data da primeira ligação',
+    'data de ligacao',
+    'data de ligação',
+    'data do contato',
+    'data contato',
+    'primeira tentativa de contato',
+    'segunda tentativa de contato',
+    'terceira tentativa de contato',
+  ],
+  diagnosticScheduled: [
+    'data e hora da diagnostica agendada',
+    'data e hora da diagnóstica agendada',
+    'data e hora da diagnostica',
+    'data e hora da diagnóstica',
+  ],
+  diagnosticDone: [
+    'data da diagnostica realizada',
+    'data da diagnóstica realizada',
+    'data de realizacao da diagnostica',
+    'data de realização da diagnóstica',
+  ],
+  proposalScheduled: [
+    'data e hora da reuniao de proposta',
+    'data e hora da reunião de proposta',
+    'data da reuniao de proposta',
+    'data da reunião de proposta',
+  ],
+  proposalDone: [
+    'data da proposta realizada',
+    'data de realizacao da proposta',
+    'data de realização da proposta',
+  ],
+  negotiation: ['data de entrada em negociacao', 'data de entrada em negociação'],
+  contract: ['data de fechamento do contrato', 'data da assinatura do contrato', 'data do fechamento'],
 }
 
-function wasMeetingDone(card) {
-  const stage = getStageName(card)
-  const status = getMeetingStatus(card)
-  return includesAny(`${stage} ${status}`, ['realizada', 'aconteceu', 'compareceu', 'proposta', 'negociacao', 'negociação', 'ganho', 'fechado'])
+const STAGE_KEYWORDS = {
+  cadastro: ['leads cadastrados', 'cadastro'],
+  contact: ['ligacoes', 'ligações', 'contato', 'nao contatados', 'não contatados'],
+  diagnosticScheduled: ['diagnostica agendada', 'diagnóstica agendada', 'diagnostico agendado', 'diagnóstico agendado'],
+  diagnosticDone: ['diagnostica realizada', 'diagnóstica realizada', 'diagnostico realizado', 'diagnóstico realizado'],
+  proposalScheduled: ['proposta agendada'],
+  proposalDone: ['proposta realizada'],
+  negotiation: ['negociacao', 'negociação'],
+  contract: ['contratos fechados', 'ganhos', 'ganho', 'fechado', 'contrato assinado'],
+  lost: ['perdido', 'perdidos', 'perda'],
 }
 
-function wasNoShow(card) {
-  return includesAny(getMeetingStatus(card), ['no-show', 'noshow', 'nao compareceu', 'não compareceu'])
+function hasFieldValue(card, keywords) {
+  return getFieldValues(card, keywords).some(value => String(value || '').trim())
+}
+
+function cardCreatedInPeriod(card, range) {
+  if (!range?.inicio || !range?.fim) return true
+  const date = getFirstFieldDate(card, EVENT_LABELS.leadCreated) ||
+    parseDateValue(card?.created_at) ||
+    parseDateValue(card?.createdAt)
+  return isDateInsideRange(date, range)
+}
+
+function fieldEventInPeriod(card, labels, range) {
+  if (range?.inicio && range?.fim) return hasFieldDateInRange(card, labels, range)
+  return hasFieldValue(card, labels)
+}
+
+function stageEventInPeriod(card, keywords, range) {
+  return currentOrHistoricalStage(card, keywords, range)
+}
+
+function eventInPeriod(card, labels, stageKeywords, range) {
+  return fieldEventInPeriod(card, labels, range) || stageEventInPeriod(card, stageKeywords, range)
+}
+
+function eventStatusInPeriod(card, status, labels, stageKeywords, range, predicate) {
+  if (!predicate(status)) return false
+  if (range?.inicio && range?.fim) {
+    return fieldEventInPeriod(card, labels, range) || stageEventInPeriod(card, stageKeywords, range)
+  }
+  return true
+}
+
+function contractWasClosed(card) {
+  const status = getContractStatus(card)
+  if (!status) return includesAny(getStageName(card), STAGE_KEYWORDS.contract)
+  return includesAny(status, ['sim', 'fechado', 'assinado', 'ganho', 'true', '1'])
 }
 
 function getCardAssignees(card) {
@@ -390,6 +544,7 @@ function createCloserRows(members, commercial) {
     id: person.id,
     userId: person.userId,
     nome: person.nome,
+    propostasAgendadas: 0,
     reunioesRealizadas: 0,
     noShows: 0,
     emNegociacao: 0,
@@ -405,9 +560,9 @@ function findOrCreateRow(rows, member) {
   return null
 }
 
-function buildMetricsFromCards(cards, members, commercial, payload) {
+function buildMetricsFromCards(cards, members, commercial, payload, range = null) {
   const pipeline = { ...EMPTY_PIPELINE }
-  const funil = { ...EMPTY_FUNIL, leadsCadastrados: cards.length }
+  const funil = { ...EMPTY_FUNIL }
   const hunters = createHunterRows(members, commercial)
   const closers = createCloserRows(members, commercial)
   const pipeMembers = getPipeMembers(payload)
@@ -418,37 +573,161 @@ function buildMetricsFromCards(cards, members, commercial, payload) {
   for (const card of cards) {
     const pipelineKey = classifyPipeline(card)
     pipeline[pipelineKey] += 1
-    funil.ligoesRealizadas += includesAny(getFieldValue(card, ['ligacao', 'ligação', 'contato realizado']), ['sim', 'realizada', 'feito', 'true', '1'])
-      ? 1
-      : 0
-    if (wasMeetingScheduled(card)) funil.reunioesMarcadas += 1
-    if (wasMeetingDone(card)) funil.reunioesRealizadas += 1
-    if (['proposta', 'negociacao', 'ganhos'].includes(pipelineKey)) funil.propostas += 1
-    if (['negociacao', 'ganhos'].includes(pipelineKey)) funil.negociacoes += 1
-    if (pipelineKey === 'ganhos') {
+
+    const leadCreated = cardCreatedInPeriod(card, range)
+    const contacted = range?.inicio && range?.fim
+      ? eventInPeriod(card, EVENT_LABELS.contact, STAGE_KEYWORDS.contact, range)
+      : pipelineKey !== 'cadastro' || hasFieldValue(card, EVENT_LABELS.contact)
+
+    const diagnosticScheduled = eventInPeriod(
+      card,
+      EVENT_LABELS.diagnosticScheduled,
+      [
+        ...STAGE_KEYWORDS.diagnosticScheduled,
+        ...STAGE_KEYWORDS.diagnosticDone,
+        ...STAGE_KEYWORDS.proposalScheduled,
+        ...STAGE_KEYWORDS.proposalDone,
+        ...STAGE_KEYWORDS.negotiation,
+        ...STAGE_KEYWORDS.contract,
+      ],
+      range,
+    )
+
+    const diagnosticStatus = getDiagnosticStatus(card)
+    const diagnosticDone = eventStatusInPeriod(
+      card,
+      diagnosticStatus,
+      EVENT_LABELS.diagnosticDone,
+      [
+        ...STAGE_KEYWORDS.diagnosticDone,
+        ...STAGE_KEYWORDS.proposalScheduled,
+        ...STAGE_KEYWORDS.proposalDone,
+        ...STAGE_KEYWORDS.negotiation,
+        ...STAGE_KEYWORDS.contract,
+      ],
+      range,
+      statusIsRealized,
+    ) || eventInPeriod(
+      card,
+      EVENT_LABELS.diagnosticDone,
+      [
+        ...STAGE_KEYWORDS.diagnosticDone,
+        ...STAGE_KEYWORDS.proposalScheduled,
+        ...STAGE_KEYWORDS.proposalDone,
+        ...STAGE_KEYWORDS.negotiation,
+        ...STAGE_KEYWORDS.contract,
+      ],
+      range,
+    )
+
+    const diagnosticNoShow = eventStatusInPeriod(
+      card,
+      diagnosticStatus,
+      EVENT_LABELS.diagnosticScheduled,
+      STAGE_KEYWORDS.diagnosticScheduled,
+      range,
+      statusIsNoShow,
+    )
+
+    const proposalScheduled = eventInPeriod(
+      card,
+      EVENT_LABELS.proposalScheduled,
+      [
+        ...STAGE_KEYWORDS.proposalScheduled,
+        ...STAGE_KEYWORDS.proposalDone,
+        ...STAGE_KEYWORDS.negotiation,
+        ...STAGE_KEYWORDS.contract,
+      ],
+      range,
+    )
+
+    const proposalStatus = getProposalStatus(card)
+    const proposalDone = eventStatusInPeriod(
+      card,
+      proposalStatus,
+      EVENT_LABELS.proposalDone,
+      [
+        ...STAGE_KEYWORDS.proposalDone,
+        ...STAGE_KEYWORDS.negotiation,
+        ...STAGE_KEYWORDS.contract,
+      ],
+      range,
+      statusIsRealized,
+    ) || eventInPeriod(
+      card,
+      EVENT_LABELS.proposalDone,
+      [
+        ...STAGE_KEYWORDS.proposalDone,
+        ...STAGE_KEYWORDS.negotiation,
+        ...STAGE_KEYWORDS.contract,
+      ],
+      range,
+    )
+
+    const proposalNoShow = eventStatusInPeriod(
+      card,
+      proposalStatus,
+      EVENT_LABELS.proposalScheduled,
+      STAGE_KEYWORDS.proposalScheduled,
+      range,
+      statusIsNoShow,
+    )
+
+    const inNegotiation = eventInPeriod(
+      card,
+      EVENT_LABELS.negotiation,
+      [...STAGE_KEYWORDS.negotiation, ...STAGE_KEYWORDS.contract],
+      range,
+    )
+
+    const contractClosed = contractWasClosed(card) && eventInPeriod(
+      card,
+      EVENT_LABELS.contract,
+      STAGE_KEYWORDS.contract,
+      range,
+    )
+
+    if (leadCreated) funil.leadsCadastrados += 1
+    if (contacted) {
+      funil.ligoesRealizadas += 1
+      funil.ligacoesRealizadas += 1
+    }
+    if (diagnosticScheduled) {
+      funil.diagnosticasAgendadas += 1
+      funil.reunioesMarcadas += 1
+    }
+    if (diagnosticDone) {
+      funil.diagnosticasRealizadas += 1
+      funil.reunioesRealizadas += 1
+    }
+    if (proposalScheduled) {
+      funil.propostasAgendadas += 1
+      funil.propostas += 1
+    }
+    if (proposalDone) funil.propostasRealizadas += 1
+    if (inNegotiation) funil.negociacoes += 1
+    if (contractClosed) {
       funil.contratosFechados += 1
       receitaTotal += getCardValue(card)
     }
 
     const hunter = findOrCreateRow(hunters, getResponsibleTeamMember(card, 'hunter', hunterIndex))
     if (hunter) {
-      hunter.contatadas += 1
-      if (wasMeetingScheduled(card)) hunter.reunioesMarcadas += 1
-      if (wasMeetingDone(card)) hunter.reunioesRealizadas += 1
-      if (wasNoShow(card)) hunter.noShows += 1
+      if (contacted) hunter.contatadas += 1
+      if (diagnosticScheduled) hunter.reunioesMarcadas += 1
+      if (diagnosticDone) hunter.reunioesRealizadas += 1
+      if (diagnosticNoShow) hunter.noShows += 1
     }
 
     const closer = findOrCreateRow(closers, getResponsibleTeamMember(card, 'closer', closerIndex))
     if (closer) {
-      if (wasMeetingDone(card)) closer.reunioesRealizadas += 1
-      if (wasNoShow(card)) closer.noShows += 1
-      if (pipelineKey === 'negociacao') closer.emNegociacao += 1
-      if (pipelineKey === 'ganhos') closer.contratosFechados += 1
+      if (proposalScheduled) closer.propostasAgendadas += 1
+      if (proposalDone) closer.reunioesRealizadas += 1
+      if (proposalNoShow) closer.noShows += 1
+      if (inNegotiation && !contractClosed) closer.emNegociacao += 1
+      if (contractClosed) closer.contratosFechados += 1
     }
   }
-
-  if (!funil.ligoesRealizadas) funil.ligoesRealizadas = cards.length
-  funil.ligacoesRealizadas = funil.ligoesRealizadas
 
   return {
     funil,
@@ -472,19 +751,19 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
   const allCards = getCards(payload)
   const cards = filterCardsByRange(allCards, range)
   const hasRange = Boolean(range?.inicio && range?.fim)
-  const computed = allCards.length ? buildMetricsFromCards(cards, members, commercial, payload) : null
+  const computed = allCards.length ? buildMetricsFromCards(allCards, members, commercial, payload, range) : null
   const funil = {
     ...EMPTY_FUNIL,
-    ...(computed?.funil || {}),
     ...(hasRange ? {} : (payload.funil || {})),
+    ...(computed?.funil || {}),
   }
   funil.ligoesRealizadas = funil.ligoesRealizadas || funil.ligacoesRealizadas || 0
   funil.ligacoesRealizadas = funil.ligacoesRealizadas || funil.ligoesRealizadas || 0
 
   const pipeline = {
     ...EMPTY_PIPELINE,
-    ...(computed?.pipeline || {}),
     ...(hasRange ? {} : (payload.pipeline || {})),
+    ...(computed?.pipeline || {}),
   }
 
   return {
@@ -502,11 +781,11 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
       : createCloserRows(members, commercial)),
     kpis: {
       ...EMPTY_KPIS,
-      ...(computed?.kpis || {}),
       ...(hasRange ? {} : (payload.kpis || {})),
+      ...(computed?.kpis || {}),
       contratosFechados: hasRange
         ? (computed?.kpis?.contratosFechados ?? funil.contratosFechados ?? 0)
-        : (payload.kpis?.contratosFechados ?? computed?.kpis?.contratosFechados ?? funil.contratosFechados ?? 0),
+        : (computed?.kpis?.contratosFechados ?? payload.kpis?.contratosFechados ?? funil.contratosFechados ?? 0),
     },
     pipeline,
     raw: payload.raw || {},

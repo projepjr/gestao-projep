@@ -285,32 +285,37 @@ const FUNIL_STAGES = [
   },
   {
     key: 'ligoesRealizadas',   label: 'Ligações',       color: '#3B82F6',
-    tip: 'Total de ligações registradas pelos Hunters no período',
+    tip: 'Total de leads trabalhados, excluindo os que ainda estão na fase Cadastro',
     convTip: 'Ligações Realizadas ÷ Leads Cadastrados × 100',
   },
   {
-    key: 'reunioesMarcadas',   label: 'Reuniões Marc.', color: '#8B5CF6',
-    tip: 'Total de reuniões agendadas pelos Hunters no período',
-    convTip: 'Reuniões Marcadas ÷ Ligações Realizadas × 100',
+    key: 'diagnosticasAgendadas', label: 'Diag. Ag.', color: '#8B5CF6',
+    tip: 'Total de reuniões diagnósticas agendadas no período',
+    convTip: 'Diagnósticas Agendadas ÷ Ligações Realizadas × 100',
   },
   {
-    key: 'reunioesRealizadas', label: 'Reuniões Real.', color: '#2A6B68',
-    tip: 'Reuniões que de fato aconteceram (não foram no-show)',
-    convTip: 'Reuniões Realizadas ÷ Reuniões Marcadas × 100',
+    key: 'diagnosticasRealizadas', label: 'Diag. Real.', color: '#2A6B68',
+    tip: 'Total de reuniões diagnósticas realizadas no período',
+    convTip: 'Diagnósticas Realizadas ÷ Diagnósticas Agendadas × 100',
   },
   {
-    key: 'propostas',          label: 'Propostas',      color: '#E8955A',
-    tip: 'Total de leads que chegaram à fase de Proposta no período',
-    convTip: 'Propostas ÷ Reuniões Realizadas × 100',
+    key: 'propostasAgendadas', label: 'Prop. Ag.', color: '#E8955A',
+    tip: 'Total de reuniões de proposta agendadas no período',
+    convTip: 'Propostas Agendadas ÷ Diagnósticas Realizadas × 100',
+  },
+  {
+    key: 'propostasRealizadas', label: 'Prop. Real.', color: '#F59E0B',
+    tip: 'Total de reuniões de proposta realizadas no período',
+    convTip: 'Propostas Realizadas ÷ Propostas Agendadas × 100',
   },
   {
     key: 'negociacoes',        label: 'Negociações',    color: '#CE7028',
-    tip: 'Leads em processo ativo de negociação',
-    convTip: 'Negociações ÷ Propostas Enviadas × 100',
+    tip: 'Empresas em processo ativo de negociação',
+    convTip: 'Negociações ÷ Propostas Realizadas × 100',
   },
   {
     key: 'contratosFechados',  label: 'Contratos',      color: '#16A34A',
-    tip: "Total de leads marcados como Ganho no período",
+    tip: 'Total de empresas marcadas como contrato fechado no período',
     convTip: 'Contratos Fechados ÷ Negociações × 100',
   },
 ]
@@ -533,12 +538,13 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
 
 // ── Closers com tooltips nas colunas ─────────────────────────
 const CLOSER_COLS = [
-  { label: 'Closer',      tip: null },
-  { label: 'Reuniões',    tip: 'Total de reuniões de fechamento que o Closer conduziu' },
-  { label: 'No-shows',    tip: 'Reuniões em que o lead não compareceu' },
-  { label: 'Em Neg.',     tip: 'Leads ativos em processo de negociação com este Closer' },
-  { label: 'Fechados',    tip: 'Total de contratos assinados pelo Closer no período' },
-  { label: 'Taxa Fech.',  tip: 'Contratos Fechados ÷ Reuniões Realizadas × 100' },
+  { label: 'Closer',       tip: null },
+  { label: 'Prop. Ag.',    tip: 'Total de reuniões de proposta agendadas pelo Closer no período' },
+  { label: 'Prop. Real.',  tip: 'Total de reuniões de proposta realizadas pelo Closer no período' },
+  { label: 'No-shows',     tip: 'Reuniões de proposta em que o lead não compareceu' },
+  { label: 'Em Neg.',      tip: 'Leads ativos em processo de negociação com este Closer' },
+  { label: 'Fechados',     tip: 'Total de contratos assinados pelo Closer no período' },
+  { label: 'Taxa Fech.',   tip: 'Contratos Fechados ÷ Propostas Realizadas × 100' },
 ]
 const MEDIA_TIP_C = 'Média aritmética de todos os Closers para este indicador no período'
 
@@ -549,7 +555,8 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
 
   const chartData = closers.map((c) => ({
     nome:            c.nome.split(' ')[0],
-    'Reuniões':      c.reunioesRealizadas,
+    'Prop. Ag.':     c.propostasAgendadas || 0,
+    'Prop. Real.':   c.reunioesRealizadas,
     'Em Negociação': c.emNegociacao,
     'Fechados':      c.contratosFechados,
   }))
@@ -581,7 +588,7 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
           <tbody>
             {closers.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-gray-600">
+                <td colSpan={7} className="py-6 text-center text-gray-600">
                   Nenhum closer configurado. Cadastre vínculos em Comercial &gt; Equipe.
                 </td>
               </tr>
@@ -591,6 +598,7 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
               return (
                 <tr key={c.id} className="border-b border-[#0D0D0D] hover:bg-[#0D0D0D]/60 transition-colors">
                   <td className="py-2.5 pr-4 font-semibold text-white whitespace-nowrap">{c.nome}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{c.propostasAgendadas || 0}</td>
                   <td className="py-2.5 pr-4 text-gray-300">{c.reunioesRealizadas}</td>
                   <td className="py-2.5 pr-4">
                     <span className={c.noShows > 0 ? 'text-red-400' : 'text-gray-500'}>{c.noShows}</span>
@@ -616,7 +624,7 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
                   <InfoTooltip text={MEDIA_TIP_C} />
                 </span>
               </td>
-              {['reunioesRealizadas', 'noShows', 'emNegociacao', 'contratosFechados'].map((k) => (
+              {['propostasAgendadas', 'reunioesRealizadas', 'noShows', 'emNegociacao', 'contratosFechados'].map((k) => (
                 <td key={k} className="py-2.5 pr-4 text-gray-500 font-semibold">{avg(closers, k).toFixed(1)}</td>
               ))}
               <td className="py-2.5 pr-4 text-gray-500 font-bold">
@@ -635,7 +643,8 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
             <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip content={<ChartTooltip />} cursor={{ fill: '#1A1A1A' }} />
             <Legend wrapperStyle={{ fontSize: '10px', color: '#6B7280' }} />
-            <Bar dataKey="Reuniões"      fill="#044947" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Prop. Ag."     fill="#044947" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Prop. Real."   fill="#2A6B68" radius={[2, 2, 0, 0]} />
             <Bar dataKey="Em Negociação" fill="#CE7028" radius={[2, 2, 0, 0]} />
             <Bar dataKey="Fechados"      fill="#16A34A" radius={[2, 2, 0, 0]} />
           </BarChart>
