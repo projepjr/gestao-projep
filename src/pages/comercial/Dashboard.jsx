@@ -473,48 +473,43 @@ function PipelineGrid({ pipeline }) {
 
 function ComplementaryMetrics({ funil }) {
   const ligacoes = funil.tentativasContato || funil.ligoesRealizadas || funil.ligacoesRealizadas || 0
+  const leads = funil.leadsCadastrados || 0
+  const leadsTrabalhados = funil.leadsTrabalhados || ligacoes
+  const makeRate = (label, numerator, denominator, tip, tone = 'text-blue-400') => ({
+    label,
+    value: pct(numerator, denominator),
+    suffix: '%',
+    tone,
+    tip,
+    detail: String(numerator || 0) + '/' + String(denominator || 0),
+  })
+
   const cards = [
     {
       label: 'Tentativas de Contato',
       value: ligacoes,
       suffix: '',
       tone: 'text-white',
-      tip: 'Total de leads que tiveram tentativa de contato no período. Métrica auxiliar, não fase linear do funil.',
+      tip: 'Total de leads que passaram pela fase Tentativa de Contato no periodo. Metrica auxiliar, nao fase final de conversao.',
+      detail: '',
     },
-    {
-      label: 'Taxa de Contato',
-      value: pct(ligacoes, funil.leadsCadastrados || 0),
-      suffix: '%',
-      tone: 'text-blue-400',
-      tip: 'Tentativas de Contato ÷ Leads Cadastrados × 100',
-    },
-    {
-      label: 'No-show Diagnóstica',
-      value: pct(funil.noShowsDiagnostica || 0, funil.diagnosticasAgendadas || 0),
-      suffix: '%',
-      tone: 'text-red-400',
-      tip: 'No-shows de Diagnóstica ÷ Diagnósticas Agendadas × 100',
-      detail: `${funil.noShowsDiagnostica || 0}/${funil.diagnosticasAgendadas || 0}`,
-    },
-    {
-      label: 'No-show Proposta',
-      value: pct(funil.noShowsProposta || 0, funil.propostasAgendadas || 0),
-      suffix: '%',
-      tone: 'text-red-400',
-      tip: 'No-shows de Proposta ÷ Propostas Agendadas × 100',
-      detail: `${funil.noShowsProposta || 0}/${funil.propostasAgendadas || 0}`,
-    },
-    {
-      label: 'Lead → Contrato',
-      value: pct(funil.contratosFechados || 0, funil.leadsCadastrados || 0),
-      suffix: '%',
-      tone: 'text-green-400',
-      tip: 'Contratos Fechados ÷ Leads Cadastrados × 100',
-    },
+    makeRate('Leads Trabalhados', leadsTrabalhados, leads, 'Leads que sairam de Cadastro dividido pelo Total de Leads Cadastrados.'),
+    makeRate('Taxa de Tentativa', ligacoes, leads, 'Leads que foram para Tentativa de Contato dividido pelo Total de Leads Cadastrados.'),
+    makeRate('Diag. Agendada', funil.diagnosticasAgendadas || 0, leads, 'Diagnosticas Agendadas dividido pelo Total de Leads Cadastrados.'),
+    makeRate('Diag. Realizada', funil.diagnosticasRealizadas || 0, funil.diagnosticasAgendadas || 0, 'Diagnosticas Realizadas dividido por Diagnosticas Agendadas.', 'text-green-400'),
+    makeRate('Proposta Agendada', funil.propostasAgendadas || 0, funil.diagnosticasRealizadas || 0, 'Propostas Agendadas dividido por Diagnosticas Realizadas.'),
+    makeRate('Proposta Realizada', funil.propostasRealizadas || 0, funil.propostasAgendadas || 0, 'Propostas Realizadas dividido por Propostas Agendadas.', 'text-green-400'),
+    makeRate('Negociacao', funil.negociacoes || 0, funil.propostasRealizadas || 0, 'Negociacoes dividido por Propostas Realizadas.'),
+    makeRate('Contrato', funil.contratosFechados || 0, funil.negociacoes || 0, 'Contratos Fechados dividido por Negociacoes.', 'text-green-400'),
+    makeRate('Lead -> Contrato', funil.contratosFechados || 0, leads, 'Contratos Fechados dividido pelo Total de Leads Cadastrados.', 'text-green-400'),
+    makeRate('No-show Diagnostica', funil.noShowsDiagnostica || 0, funil.diagnosticasAgendadas || 0, 'No-shows de Diagnostica dividido por Diagnosticas Agendadas.', 'text-red-400'),
+    makeRate('No-show Proposta', funil.noShowsProposta || 0, funil.propostasAgendadas || 0, 'No-shows de Proposta dividido por Propostas Agendadas.', 'text-red-400'),
+    makeRate('Perda Geral', funil.perdidos || 0, leads, 'Perdidos dividido pelo Total de Leads Cadastrados.', 'text-red-400'),
+    makeRate('Pendencia/No-show', funil.pendentesNoShow || 0, leads, 'Pendentes ou No-show dividido pelo Total de Leads Cadastrados.', 'text-yellow-400'),
   ]
 
   return (
-    <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-2">
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-2">
       {cards.map(card => {
         return (
           <div key={card.label} className="bg-[#0D0D0D] border border-[#1E1E1E] rounded-md p-3">
@@ -523,7 +518,7 @@ function ComplementaryMetrics({ funil }) {
               <InfoTooltip text={card.tip} />
             </p>
             <div className="flex items-end justify-between gap-3 mt-2">
-              <span className={`text-xl font-bold ${card.tone}`}>{card.value}{card.suffix}</span>
+              <span className={'text-xl font-bold ' + card.tone}>{card.value}{card.suffix}</span>
               <span className="text-[10px] text-gray-700">
                 {card.detail || ''}
               </span>
@@ -535,7 +530,7 @@ function ComplementaryMetrics({ funil }) {
   )
 }
 
-// ── Hunters com tooltips nas colunas ─────────────────────────
+// Hunters com tooltips nas colunas
 const HUNTER_COLS = [
   { label: 'Hunter',         tip: null },
   { label: 'Contatadas',     tip: 'Total de leads únicos que o Hunter ligou no período' },

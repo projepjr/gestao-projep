@@ -1,5 +1,6 @@
 const EMPTY_FUNIL = {
   leadsCadastrados: 0,
+  leadsTrabalhados: 0,
   tentativasContato: 0,
   ligoesRealizadas: 0,
   ligacoesRealizadas: 0,
@@ -375,7 +376,7 @@ const STAGE_KEYWORDS = {
 
 const PIPEFY_2026_STAGE_GROUPS = {
   cadastro: ['leads cadastrados', 'cadastro'],
-  contactedOrLater: ['nao contatado', 'não contatado', 'interesse futuro', 'diagnostica agendada', 'diagnóstica agendada', 'diagnostica realizada', 'diagnóstica realizada', 'proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'agendamentos pendentes', 'contratos fechados', 'perdidos'],
+  workedOrLater: ['tentativa de contato', 'tentativas de contato', 'nao contatado', 'não contatado', 'interesse futuro', 'diagnostica agendada', 'diagnóstica agendada', 'diagnostica realizada', 'diagnóstica realizada', 'proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'agendamentos pendentes', 'contratos fechados', 'perdidos'],
   diagnosticScheduledOrLater: ['diagnostica agendada', 'diagnóstica agendada', 'diagnostica realizada', 'diagnóstica realizada', 'proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'agendamentos pendentes', 'contratos fechados'],
   diagnosticDoneOrLater: ['diagnostica realizada', 'diagnóstica realizada', 'proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'contratos fechados'],
   proposalScheduledOrLater: ['proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'agendamentos pendentes', 'contratos fechados'],
@@ -677,10 +678,18 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     pipeline[pipelineKey] += 1
 
     const leadCreated = cardCreatedInPeriod(card, range)
+    const worked = eventReachedInPeriod(
+      card,
+      [],
+      PIPEFY_2026_STAGE_GROUPS.workedOrLater,
+      range,
+      FUNNEL_RANKS.contacted,
+    )
+
     const contacted = eventReachedInPeriod(
       card,
       EVENT_LABELS.contact,
-      PIPEFY_2026_STAGE_GROUPS.contactedOrLater,
+      STAGE_KEYWORDS.contact,
       range,
       FUNNEL_RANKS.contacted,
     )
@@ -771,6 +780,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     const lost = currentStageInPeriod(card, STAGE_KEYWORDS.lost, range)
 
     if (leadCreated) funil.leadsCadastrados += 1
+    if (worked) funil.leadsTrabalhados += 1
     if (contacted) {
       funil.tentativasContato += 1
       funil.ligoesRealizadas += 1
@@ -849,6 +859,7 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
   funil.ligoesRealizadas = funil.ligoesRealizadas || funil.ligacoesRealizadas || 0
   funil.ligacoesRealizadas = funil.ligacoesRealizadas || funil.ligoesRealizadas || 0
   funil.tentativasContato = funil.tentativasContato || funil.ligoesRealizadas || 0
+  funil.leadsTrabalhados = funil.leadsTrabalhados || funil.tentativasContato || 0
   funil.pendentesNoShow = funil.pendentesNoShow || funil.agendamentosPendentes || funil.noShows || 0
 
   const pipeline = {
