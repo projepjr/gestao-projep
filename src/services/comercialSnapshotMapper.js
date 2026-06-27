@@ -1,7 +1,9 @@
 const EMPTY_FUNIL = {
   leadsCadastrados: 0,
+  tentativasContato: 0,
   ligoesRealizadas: 0,
   ligacoesRealizadas: 0,
+  interesseFuturo: 0,
   diagnosticasAgendadas: 0,
   diagnosticasRealizadas: 0,
   noShowsDiagnostica: 0,
@@ -12,7 +14,9 @@ const EMPTY_FUNIL = {
   noShowsProposta: 0,
   propostas: 0,
   negociacoes: 0,
+  pendentesNoShow: 0,
   contratosFechados: 0,
+  perdidos: 0,
 }
 
 const EMPTY_KPIS = {
@@ -305,8 +309,8 @@ function classifyPipeline(card) {
   if (includesAny(stage, ['ganho', 'fechado', 'contrato assinado', 'contratos fechados'])) return 'ganhos'
   if (includesAny(stage, ['negociacao', 'negociação'])) return 'negociacao'
   if (includesAny(stage, ['proposta'])) return 'proposta'
+  if (includesAny(stage, ['pendentes / no-show', 'pendente / no-show', 'no-show', 'no show', 'agendamentos pendentes', 'agendamento pendente'])) return 'agendamentosPendentes'
   if (includesAny(stage, ['diagnostico', 'diagnóstico', 'diagnostica', 'diagnóstica', 'reuniao', 'reunião'])) return 'diagnostico'
-  if (includesAny(stage, ['agendamentos pendentes', 'agendamento pendente'])) return 'agendamentosPendentes'
   if (includesAny(stage, ['interesse futuro', 'futuro', 'retornar depois'])) return 'interesseFuturo'
   if (includesAny(stage, ['perdido', 'perda'])) return 'perdidos'
   if (includesAny(stage, ['nao contatado', 'não contatado', 'sem contato', 'ligacoes', 'ligações', 'contato'])) return 'naoContatados'
@@ -357,7 +361,8 @@ const EVENT_LABELS = {
 
 const STAGE_KEYWORDS = {
   cadastro: ['leads cadastrados', 'cadastro'],
-  contact: ['ligacoes', 'ligações', 'contato', 'nao contatados', 'não contatados'],
+  contact: ['ligacoes', 'ligações', 'contato', 'tentativa de contato', 'tentativas de contato', 'nao contatados', 'não contatados'],
+  futureInterest: ['interesse futuro', 'futuro'],
   diagnosticScheduled: ['diagnostica agendada', 'diagnóstica agendada', 'diagnostico agendado', 'diagnóstico agendado'],
   diagnosticDone: ['diagnostica realizada', 'diagnóstica realizada', 'diagnostico realizado', 'diagnóstico realizado'],
   proposalScheduled: ['proposta agendada'],
@@ -415,6 +420,12 @@ function getCurrentFunnelRank(card) {
 
 function canCountStage(card, targetRank) {
   return getCurrentFunnelRank(card) >= targetRank
+}
+
+function currentStageInPeriod(card, stageKeywords, range) {
+  if (!currentStageMatches(card, stageKeywords)) return false
+  if (!range?.inicio || !range?.fim) return true
+  return enteredStageInRange(card, stageKeywords, range)
 }
 
 function hasFieldValue(card, keywords) {
@@ -755,12 +766,17 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       range,
       FUNNEL_RANKS.contract,
     )
+    const futureInterest = currentStageInPeriod(card, STAGE_KEYWORDS.futureInterest, range)
+    const pendingNoShow = currentStageInPeriod(card, STAGE_KEYWORDS.pendingScheduling, range)
+    const lost = currentStageInPeriod(card, STAGE_KEYWORDS.lost, range)
 
     if (leadCreated) funil.leadsCadastrados += 1
     if (contacted) {
+      funil.tentativasContato += 1
       funil.ligoesRealizadas += 1
       funil.ligacoesRealizadas += 1
     }
+    if (futureInterest) funil.interesseFuturo += 1
     if (diagnosticScheduled) {
       funil.diagnosticasAgendadas += 1
       funil.reunioesMarcadas += 1
@@ -777,10 +793,12 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     if (proposalDone) funil.propostasRealizadas += 1
     if (proposalNoShow) funil.noShowsProposta += 1
     if (inNegotiation) funil.negociacoes += 1
+    if (pendingNoShow) funil.pendentesNoShow += 1
     if (contractClosed) {
       funil.contratosFechados += 1
       receitaTotal += getCardValue(card)
     }
+    if (lost) funil.perdidos += 1
 
     const hunter = findOrCreateRow(hunters, getResponsibleTeamMember(card, 'hunter', hunterIndex))
     if (hunter) {
@@ -830,12 +848,16 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
   }
   funil.ligoesRealizadas = funil.ligoesRealizadas || funil.ligacoesRealizadas || 0
   funil.ligacoesRealizadas = funil.ligacoesRealizadas || funil.ligoesRealizadas || 0
+  funil.tentativasContato = funil.tentativasContato || funil.ligoesRealizadas || 0
+  funil.pendentesNoShow = funil.pendentesNoShow || funil.agendamentosPendentes || funil.noShows || 0
 
   const pipeline = {
     ...EMPTY_PIPELINE,
     ...(hasRange ? {} : (payload.pipeline || {})),
     ...(computed?.pipeline || {}),
   }
+  pipeline.agendamentosPendentes = pipeline.agendamentosPendentes || pipeline.noShow || 0
+  delete pipeline.noShow
 
   return {
     id: range?.id || payload.periodo?.id || 'pipefy-live',

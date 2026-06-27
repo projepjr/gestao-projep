@@ -302,44 +302,65 @@ function KPICard({ label, value, prevValue, format, Icon, accent }) {
 // ── Funil — stages com tooltips ───────────────────────────────
 const FUNIL_STAGES = [
   {
-    key: 'leadsCadastrados',   label: 'Leads',          color: '#64748B',
+    key: 'leadsCadastrados',   label: 'Leads Cad.',     color: '#64748B',
     tip: 'Total de leads inseridos no Pipefy no período',
     convTip: null,
   },
   {
-    key: 'ligoesRealizadas',   label: 'Ligações',       color: '#3B82F6',
-    tip: 'Total de leads trabalhados, excluindo os que ainda estão na fase Cadastro',
-    convTip: 'Ligações Realizadas ÷ Leads Cadastrados × 100',
+    key: 'tentativasContato',  label: 'Tent. Contato',  color: '#3B82F6',
+    tip: 'Leads que saíram de Cadastro e tiveram tentativa de contato no período',
+    convTip: 'Tentativas de Contato ÷ Leads Cadastrados × 100',
+    denominatorKey: 'leadsCadastrados',
+  },
+  {
+    key: 'interesseFuturo',    label: 'Int. Futuro',    color: '#F59E0B',
+    tip: 'Leads na fase Interesse Futuro do Pipefy',
+    convTip: 'Interesse Futuro ÷ Tentativas de Contato × 100',
+    denominatorKey: 'tentativasContato',
   },
   {
     key: 'diagnosticasAgendadas', label: 'Diag. Ag.', color: '#8B5CF6',
-    tip: 'Total de reuniões diagnósticas agendadas no período',
-    convTip: 'Diagnósticas Agendadas ÷ Ligações Realizadas × 100',
+    tip: 'Cards que chegaram à fase Diagnóstica Agendada no período',
+    convTip: 'Diagnósticas Agendadas ÷ Tentativas de Contato × 100',
+    denominatorKey: 'tentativasContato',
   },
   {
     key: 'diagnosticasRealizadas', label: 'Diag. Real.', color: '#2A6B68',
-    tip: 'Total de reuniões diagnósticas realizadas no período',
+    tip: 'Cards que chegaram à fase Diagnóstica Realizada e continuam válidos nessa etapa',
     convTip: 'Diagnósticas Realizadas ÷ Diagnósticas Agendadas × 100',
   },
   {
     key: 'propostasAgendadas', label: 'Prop. Ag.', color: '#E8955A',
-    tip: 'Total de reuniões de proposta agendadas no período',
+    tip: 'Cards que chegaram à fase Proposta Agendada no período',
     convTip: 'Propostas Agendadas ÷ Diagnósticas Realizadas × 100',
   },
   {
     key: 'propostasRealizadas', label: 'Prop. Real.', color: '#F59E0B',
-    tip: 'Total de reuniões de proposta realizadas no período',
+    tip: 'Cards que chegaram à fase Proposta Realizada e continuam válidos nessa etapa',
     convTip: 'Propostas Realizadas ÷ Propostas Agendadas × 100',
   },
   {
-    key: 'negociacoes',        label: 'Negociações',    color: '#CE7028',
-    tip: 'Empresas em processo ativo de negociação',
+    key: 'negociacoes',        label: 'Negociação',     color: '#CE7028',
+    tip: 'Cards que chegaram à fase Negociação no período',
     convTip: 'Negociações ÷ Propostas Realizadas × 100',
   },
   {
+    key: 'pendentesNoShow',    label: 'Pend./No-show',  color: '#F97316',
+    tip: 'Cards atualmente em Pendentes / No-show dentro do período analisado',
+    convTip: 'Pendentes / No-show ÷ Leads Cadastrados × 100',
+    denominatorKey: 'leadsCadastrados',
+  },
+  {
     key: 'contratosFechados',  label: 'Contratos',      color: '#16A34A',
-    tip: 'Total de empresas marcadas como contrato fechado no período',
-    convTip: 'Contratos Fechados ÷ Negociações × 100',
+    tip: 'Cards que chegaram à fase Contratos Fechados no período',
+    convTip: 'Contratos Fechados ÷ Negociação × 100',
+    denominatorKey: 'negociacoes',
+  },
+  {
+    key: 'perdidos',           label: 'Perdidos',       color: '#EF4444',
+    tip: 'Cards atualmente na fase Perdidos dentro do período analisado',
+    convTip: 'Perdidos ÷ Leads Cadastrados × 100',
+    denominatorKey: 'leadsCadastrados',
   },
 ]
 
@@ -350,7 +371,8 @@ function FunnelFlow({ funil }) {
       <div className="flex items-stretch gap-0 min-w-max">
         {FUNIL_STAGES.map((stage, i) => {
           const val     = funil[stage.key] ?? 0
-          const prevVal = i > 0 ? (funil[FUNIL_STAGES[i - 1].key] ?? 1) : 0
+          const denominatorKey = stage.denominatorKey || FUNIL_STAGES[i - 1]?.key
+          const prevVal = i > 0 ? (funil[denominatorKey] ?? 0) : 0
           const conv    = i > 0 ? pct(val, prevVal) : null
           const barW    = Math.max(10, pct(val, total))
 
@@ -397,24 +419,24 @@ function FunnelFlow({ funil }) {
 
 // ── Pipeline CRM com tooltips ─────────────────────────────────
 const PIPELINE_STAGES = [
-  { key: 'cadastro',        label: 'Cadastro',    color: '#4B5563',
+  { key: 'cadastro',        label: 'Leads Cad.',  color: '#4B5563',
     tip: 'Leads inseridos no Pipefy ainda não contatados' },
-  { key: 'naoContatados',   label: 'Não Cont.',   color: '#6B7280',
-    tip: 'Leads que passaram por tentativa de contato sem sucesso' },
-  { key: 'perdidos',        label: 'Perdidos',    color: '#EF4444',
-    tip: 'Leads marcados como perdidos no Pipefy' },
+  { key: 'naoContatados',   label: 'Tent. Cont.', color: '#6B7280',
+    tip: 'Fase Tentativa de Contato do Pipefy' },
   { key: 'interesseFuturo', label: 'Int. Futuro', color: '#F59E0B',
-    tip: 'Leads que pediram retorno em data futura' },
+    tip: 'Fase Interesse Futuro do Pipefy' },
   { key: 'diagnostico',     label: 'Diagnóstico', color: '#3B82F6',
-    tip: 'Leads com reunião diagnóstico agendada ou realizada' },
+    tip: 'Fases de Diagnóstica Agendada ou Diagnóstica Realizada' },
   { key: 'proposta',        label: 'Proposta',    color: '#8B5CF6',
-    tip: 'Leads com proposta enviada aguardando resposta' },
+    tip: 'Fases de Proposta Agendada ou Proposta Realizada' },
   { key: 'negociacao',      label: 'Negociação',  color: '#CE7028',
-    tip: 'Leads em processo ativo de negociação' },
-  { key: 'agendamentosPendentes', label: 'Agend. Pend.', color: '#F97316',
-    tip: 'Leads aguardando novo agendamento, incluindo no-shows que precisam ser reagendados' },
-  { key: 'ganhos',          label: 'Ganhos',      color: '#16A34A',
-    tip: 'Leads convertidos em contrato fechado' },
+    tip: 'Fase Negociação do Pipefy' },
+  { key: 'agendamentosPendentes', label: 'Pend./No-show', color: '#F97316',
+    tip: 'Fase Pendentes / No-show do Pipefy' },
+  { key: 'ganhos',          label: 'Contratos',   color: '#16A34A',
+    tip: 'Fase Contratos Fechados do Pipefy' },
+  { key: 'perdidos',        label: 'Perdidos',    color: '#EF4444',
+    tip: 'Fase Perdidos do Pipefy' },
 ]
 
 function PipelineGrid({ pipeline }) {
@@ -449,33 +471,61 @@ function PipelineGrid({ pipeline }) {
   )
 }
 
-const CONVERSION_RATES = [
-  { label: 'Leads -> Ligações', numerator: 'ligoesRealizadas', denominator: 'leadsCadastrados', tip: 'Ligações ÷ Leads Cadastrados × 100' },
-  { label: 'Ligações -> Diagnóstica Ag.', numerator: 'diagnosticasAgendadas', denominator: 'ligoesRealizadas', tip: 'Diagnósticas Agendadas ÷ Ligações × 100' },
-  { label: 'Diagnóstica Ag. -> Real.', numerator: 'diagnosticasRealizadas', denominator: 'diagnosticasAgendadas', tip: 'Diagnósticas Realizadas ÷ Diagnósticas Agendadas × 100' },
-  { label: 'Diagnóstica Real. -> Proposta Ag.', numerator: 'propostasAgendadas', denominator: 'diagnosticasRealizadas', tip: 'Propostas Agendadas ÷ Diagnósticas Realizadas × 100' },
-  { label: 'Proposta Ag. -> Real.', numerator: 'propostasRealizadas', denominator: 'propostasAgendadas', tip: 'Propostas Realizadas ÷ Propostas Agendadas × 100' },
-  { label: 'Proposta Real. -> Negociação', numerator: 'negociacoes', denominator: 'propostasRealizadas', tip: 'Negociações ÷ Propostas Realizadas × 100' },
-  { label: 'Negociação -> Contrato', numerator: 'contratosFechados', denominator: 'negociacoes', tip: 'Contratos Fechados ÷ Negociações × 100' },
-  { label: 'Lead -> Contrato', numerator: 'contratosFechados', denominator: 'leadsCadastrados', tip: 'Contratos Fechados ÷ Leads Cadastrados × 100' },
-]
+function ComplementaryMetrics({ funil }) {
+  const ligacoes = funil.tentativasContato || funil.ligoesRealizadas || funil.ligacoesRealizadas || 0
+  const cards = [
+    {
+      label: 'Tentativas de Contato',
+      value: ligacoes,
+      suffix: '',
+      tone: 'text-white',
+      tip: 'Total de leads que tiveram tentativa de contato no período. Métrica auxiliar, não fase linear do funil.',
+    },
+    {
+      label: 'Taxa de Contato',
+      value: pct(ligacoes, funil.leadsCadastrados || 0),
+      suffix: '%',
+      tone: 'text-blue-400',
+      tip: 'Tentativas de Contato ÷ Leads Cadastrados × 100',
+    },
+    {
+      label: 'No-show Diagnóstica',
+      value: pct(funil.noShowsDiagnostica || 0, funil.diagnosticasAgendadas || 0),
+      suffix: '%',
+      tone: 'text-red-400',
+      tip: 'No-shows de Diagnóstica ÷ Diagnósticas Agendadas × 100',
+      detail: `${funil.noShowsDiagnostica || 0}/${funil.diagnosticasAgendadas || 0}`,
+    },
+    {
+      label: 'No-show Proposta',
+      value: pct(funil.noShowsProposta || 0, funil.propostasAgendadas || 0),
+      suffix: '%',
+      tone: 'text-red-400',
+      tip: 'No-shows de Proposta ÷ Propostas Agendadas × 100',
+      detail: `${funil.noShowsProposta || 0}/${funil.propostasAgendadas || 0}`,
+    },
+    {
+      label: 'Lead → Contrato',
+      value: pct(funil.contratosFechados || 0, funil.leadsCadastrados || 0),
+      suffix: '%',
+      tone: 'text-green-400',
+      tip: 'Contratos Fechados ÷ Leads Cadastrados × 100',
+    },
+  ]
 
-function ConversionRatesGrid({ funil }) {
   return (
-    <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-2">
-      {CONVERSION_RATES.map(rate => {
-        const value = pct(funil[rate.numerator] || 0, funil[rate.denominator] || 0)
-        const tone = value >= 70 ? 'text-green-400' : value >= 35 ? 'text-yellow-400' : 'text-red-400'
+    <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-2">
+      {cards.map(card => {
         return (
-          <div key={rate.label} className="bg-[#0D0D0D] border border-[#1E1E1E] rounded-md p-3">
+          <div key={card.label} className="bg-[#0D0D0D] border border-[#1E1E1E] rounded-md p-3">
             <p className="text-[10px] text-gray-600 font-semibold uppercase tracking-wider flex items-center">
-              {rate.label}
-              <InfoTooltip text={rate.tip} />
+              {card.label}
+              <InfoTooltip text={card.tip} />
             </p>
             <div className="flex items-end justify-between gap-3 mt-2">
-              <span className={`text-xl font-bold ${tone}`}>{value}%</span>
+              <span className={`text-xl font-bold ${card.tone}`}>{card.value}{card.suffix}</span>
               <span className="text-[10px] text-gray-700">
-                {funil[rate.numerator] || 0}/{funil[rate.denominator] || 0}
+                {card.detail || ''}
               </span>
             </div>
           </div>
@@ -1034,9 +1084,9 @@ export default function ComercialDashboard() {
 
         <div className="border-t border-[#1E1E1E] pt-5">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-            Taxas de Conversão
+            Indicadores Comerciais
           </p>
-          <ConversionRatesGrid funil={currentPeriod.funil} />
+          <ComplementaryMetrics funil={currentPeriod.funil} />
         </div>
 
         {showPipeline && currentPeriod.pipeline && (
