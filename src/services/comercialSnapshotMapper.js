@@ -377,6 +377,46 @@ const PIPEFY_2026_STAGE_GROUPS = {
   proposalDoneOrLater: ['proposta realizada', 'negociacao', 'negociação', 'contratos fechados'],
 }
 
+const FUNNEL_RANKS = {
+  contacted: 1,
+  diagnosticScheduled: 2,
+  diagnosticDone: 3,
+  proposalScheduled: 4,
+  proposalDone: 5,
+  negotiation: 6,
+  contract: 7,
+}
+
+function rankFromStageName(stageName) {
+  if (includesAny(stageName, STAGE_KEYWORDS.contract)) return FUNNEL_RANKS.contract
+  if (includesAny(stageName, STAGE_KEYWORDS.negotiation)) return FUNNEL_RANKS.negotiation
+  if (includesAny(stageName, STAGE_KEYWORDS.proposalDone)) return FUNNEL_RANKS.proposalDone
+  if (includesAny(stageName, STAGE_KEYWORDS.proposalScheduled)) return FUNNEL_RANKS.proposalScheduled
+  if (includesAny(stageName, STAGE_KEYWORDS.diagnosticDone)) return FUNNEL_RANKS.diagnosticDone
+  if (includesAny(stageName, STAGE_KEYWORDS.diagnosticScheduled)) return FUNNEL_RANKS.diagnosticScheduled
+  if (includesAny(stageName, STAGE_KEYWORDS.pendingScheduling)) return FUNNEL_RANKS.diagnosticScheduled
+  if (includesAny(stageName, STAGE_KEYWORDS.contact) || includesAny(stageName, ['interesse futuro', 'futuro'])) return FUNNEL_RANKS.contacted
+  return 0
+}
+
+function maxHistoricalRank(card) {
+  return getPhaseHistory(card).reduce((max, item) => {
+    const phaseName = item?.phase?.name || item?.phaseName || item?.name || ''
+    return Math.max(max, rankFromStageName(phaseName))
+  }, 0)
+}
+
+function getCurrentFunnelRank(card) {
+  const currentRank = rankFromStageName(getStageName(card))
+  if (currentRank) return currentRank
+  if (currentStageMatches(card, STAGE_KEYWORDS.lost)) return maxHistoricalRank(card)
+  return currentRank
+}
+
+function canCountStage(card, targetRank) {
+  return getCurrentFunnelRank(card) >= targetRank
+}
+
 function hasFieldValue(card, keywords) {
   return getFieldValues(card, keywords).some(value => String(value || '').trim())
 }
@@ -419,7 +459,8 @@ function hasReachedStage(card, stageKeywords, fieldLabels = []) {
   return false
 }
 
-function eventReachedInPeriod(card, fieldLabels, stageKeywords, range) {
+function eventReachedInPeriod(card, fieldLabels, stageKeywords, range, targetRank = null) {
+  if (targetRank && !canCountStage(card, targetRank)) return false
   if (!range?.inicio || !range?.fim) return hasReachedStage(card, stageKeywords, fieldLabels)
   if (enteredStageInRange(card, stageKeywords, range)) return true
   if (!hasReachedStage(card, stageKeywords, fieldLabels)) return false
@@ -625,19 +666,24 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     pipeline[pipelineKey] += 1
 
     const leadCreated = cardCreatedInPeriod(card, range)
-    const contacted = range?.inicio && range?.fim
-      ? eventReachedInPeriod(card, EVENT_LABELS.contact, PIPEFY_2026_STAGE_GROUPS.contactedOrLater, range)
-      : currentStageMatches(card, PIPEFY_2026_STAGE_GROUPS.contactedOrLater)
+    const contacted = eventReachedInPeriod(
+      card,
+      EVENT_LABELS.contact,
+      PIPEFY_2026_STAGE_GROUPS.contactedOrLater,
+      range,
+      FUNNEL_RANKS.contacted,
+    )
 
     const diagnosticScheduled = eventReachedInPeriod(
       card,
       EVENT_LABELS.diagnosticScheduled,
       PIPEFY_2026_STAGE_GROUPS.diagnosticScheduledOrLater,
       range,
+      FUNNEL_RANKS.diagnosticScheduled,
     )
 
     const diagnosticStatus = getDiagnosticStatus(card)
-    const diagnosticDone = eventStatusInPeriod(
+    const diagnosticDone = canCountStage(card, FUNNEL_RANKS.diagnosticDone) && (eventStatusInPeriod(
       card,
       diagnosticStatus,
       EVENT_LABELS.diagnosticDone,
@@ -649,7 +695,8 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       EVENT_LABELS.diagnosticDone,
       PIPEFY_2026_STAGE_GROUPS.diagnosticDoneOrLater,
       range,
-    )
+      FUNNEL_RANKS.diagnosticDone,
+    ))
 
     const diagnosticNoShow = isNoShowFor(card, 'diagnostica', range) || eventStatusInPeriod(
       card,
@@ -665,10 +712,11 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       EVENT_LABELS.proposalScheduled,
       PIPEFY_2026_STAGE_GROUPS.proposalScheduledOrLater,
       range,
+      FUNNEL_RANKS.proposalScheduled,
     )
 
     const proposalStatus = getProposalStatus(card)
-    const proposalDone = eventStatusInPeriod(
+    const proposalDone = canCountStage(card, FUNNEL_RANKS.proposalDone) && (eventStatusInPeriod(
       card,
       proposalStatus,
       EVENT_LABELS.proposalDone,
@@ -680,7 +728,8 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       EVENT_LABELS.proposalDone,
       PIPEFY_2026_STAGE_GROUPS.proposalDoneOrLater,
       range,
-    )
+      FUNNEL_RANKS.proposalDone,
+    ))
 
     const proposalNoShow = isNoShowFor(card, 'proposta', range) || eventStatusInPeriod(
       card,
@@ -696,6 +745,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       EVENT_LABELS.negotiation,
       [...STAGE_KEYWORDS.negotiation, ...STAGE_KEYWORDS.contract],
       range,
+      FUNNEL_RANKS.negotiation,
     )
 
     const contractClosed = contractWasClosed(card) && eventReachedInPeriod(
@@ -703,6 +753,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       EVENT_LABELS.contract,
       STAGE_KEYWORDS.contract,
       range,
+      FUNNEL_RANKS.contract,
     )
 
     if (leadCreated) funil.leadsCadastrados += 1
