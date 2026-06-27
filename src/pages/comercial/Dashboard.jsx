@@ -852,7 +852,7 @@ export default function ComercialDashboard() {
             .select('id, payload, synced_at')
             .eq('source', 'pipefy')
             .order('synced_at', { ascending: false })
-            .limit(6),
+            .limit(1),
           new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
         ])
         data = result.data

@@ -139,7 +139,7 @@ export default function EquipeComercial() {
         .select('payload, synced_at')
         .eq('source', 'pipefy')
         .order('synced_at', { ascending: false })
-        .limit(20)
+        .limit(1)
       if (!cancelled && !error) {
         const snapshots = Array.isArray(data) ? data : []
         setSnapshot(snapshots.find(row => {

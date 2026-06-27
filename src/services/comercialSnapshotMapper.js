@@ -199,7 +199,7 @@ function enteredStageInRange(card, stageKeywords, range) {
 
 function currentOrHistoricalStage(card, stageKeywords, range) {
   if (range?.inicio && range?.fim) return enteredStageInRange(card, stageKeywords, range)
-  return includesAny(getStageName(card), stageKeywords)
+  return includesAny(getStageName(card), stageKeywords) || enteredStageInRange(card, stageKeywords, null)
 }
 
 function getCardDate(card) {
@@ -412,6 +412,7 @@ function currentStageMatches(card, keywords) {
 
 function hasReachedStage(card, stageKeywords, fieldLabels = []) {
   if (currentStageMatches(card, stageKeywords)) return true
+  if (enteredStageInRange(card, stageKeywords, null)) return true
   if (fieldLabels.length && !currentStageMatches(card, PIPEFY_2026_STAGE_GROUPS.cadastro)) {
     return hasFieldValue(card, fieldLabels)
   }
@@ -619,8 +620,9 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
 
   for (const card of cards) {
     const pipelineKey = classifyPipeline(card)
-    const includeInPipeline = !range?.inicio || !range?.fim || filterCardsByRange([card], range).length > 0
-    if (includeInPipeline) pipeline[pipelineKey] += 1
+    // Pipeline = estoque atual do CRM no snapshot. O funil abaixo usa historico
+    // de passagem por etapa e respeita o periodo selecionado.
+    pipeline[pipelineKey] += 1
 
     const leadCreated = cardCreatedInPeriod(card, range)
     const contacted = range?.inicio && range?.fim
