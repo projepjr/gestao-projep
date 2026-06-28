@@ -459,6 +459,12 @@ function fieldEventInPeriod(card, labels, range) {
   return hasFieldValue(card, labels)
 }
 
+function contactAttemptInPeriod(card, range) {
+  if (range?.inicio && range?.fim) return hasFieldDateInRange(card, EVENT_LABELS.contact, range)
+  return hasFieldValue(card, EVENT_LABELS.contact) ||
+    hasReachedStage(card, STAGE_KEYWORDS.contact, EVENT_LABELS.contact)
+}
+
 function stageEventInPeriod(card, keywords, range) {
   return currentOrHistoricalStage(card, keywords, range)
 }
@@ -687,21 +693,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     pipeline[pipelineKey] += 1
 
     const leadCreated = cardCreatedInPeriod(card, range)
-    const worked = eventReachedInPeriod(
-      card,
-      [],
-      PIPEFY_2026_STAGE_GROUPS.workedOrLater,
-      range,
-      FUNNEL_RANKS.contacted,
-    )
-
-    const contactAttempted = eventReachedInPeriod(
-      card,
-      EVENT_LABELS.contact,
-      STAGE_KEYWORDS.contact,
-      range,
-      FUNNEL_RANKS.contacted,
-    )
+    const contactAttempted = contactAttemptInPeriod(card, range)
 
     const diagnosticScheduled = eventReachedInPeriod(
       card,
@@ -785,13 +777,22 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       FUNNEL_RANKS.contract,
     )
     const futureInterest = currentStageInPeriod(card, STAGE_KEYWORDS.futureInterest, range)
-    const contactStage = currentStageInPeriod(card, STAGE_KEYWORDS.contact, range)
     const pendingNoShow = currentStageInPeriod(card, STAGE_KEYWORDS.pendingScheduling, range)
     const lost = currentStageInPeriod(card, STAGE_KEYWORDS.lost, range)
+    const worked = contactAttempted ||
+      futureInterest ||
+      diagnosticScheduled ||
+      diagnosticDone ||
+      proposalScheduled ||
+      proposalDone ||
+      inNegotiation ||
+      pendingNoShow ||
+      contractClosed ||
+      lost
 
     if (leadCreated) funil.leadsCadastrados += 1
     if (worked) funil.leadsTrabalhados += 1
-    if (contactStage) funil.tentativasContato += 1
+    if (contactAttempted) funil.tentativasContato += 1
     if (contactAttempted) {
       funil.ligoesRealizadas += 1
       funil.ligacoesRealizadas += 1
