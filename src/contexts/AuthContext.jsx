@@ -149,6 +149,7 @@ export function AuthProvider({ children }) {
     }
 
     let found = null
+    const localMatch = validateLogin(currentUsers, normalizedEmail, password)
     const remoteLogin = await signInWithSupabaseAuth(normalizedEmail, password)
     if (remoteLogin.success) {
       try {
@@ -165,7 +166,32 @@ export function AuthProvider({ children }) {
       )
     }
 
-    if (!found) found = validateLogin(currentUsers, normalizedEmail, password)
+    if (!found && remoteLogin.enabled === false) {
+      found = localMatch
+    }
+
+    if (!found && remoteLogin.enabled !== false && localMatch) {
+      const migration = await createSupabaseAuthAccount(normalizedEmail, password, {
+        name: localMatch.nome,
+        status: localMatch.status === 'ativo' ? 'active' : localMatch.status,
+        source: 'projep-legacy-login-migration',
+      })
+      if (migration.success && migration.user?.id) {
+        const migrated = {
+          ...localMatch,
+          supabaseId: migration.user.id,
+          senha: null,
+        }
+        const syncResult = await syncUsersToSupabase([migrated])
+        if (syncResult?.success !== false) {
+          db.update('usuarios', null, localMatch.id, {
+            supabaseId: migrated.supabaseId,
+            senha: null,
+          })
+          found = migrated
+        }
+      }
+    }
 
     if (!found) return { success: false, error: 'Email ou senha invalidos' }
     if (found.status === 'pendente') return { success: false, status: 'pendente', user: found }
@@ -214,7 +240,7 @@ export function AuthProvider({ children }) {
       supabaseId: authResult.user?.id || undefined,
       nome: name.trim(),
       email: normalizedEmail,
-      senha: password,
+      senha: authResult.enabled === false ? password : null,
       cargo: jobTitle || '',
       setorId: setor?.id || null,
       setor: setor?.nome || department || '',
@@ -236,8 +262,15 @@ export function AuthProvider({ children }) {
       permissoes: normalizePermissions({ chat: false }, 'membro'),
     }
 
+    const syncResult = await syncUsersToSupabase([newUser])
+    if (syncResult?.success === false) {
+      return {
+        success: false,
+        error: `Nao foi possivel salvar seu perfil no banco: ${syncResult.error || 'erro desconhecido'}`,
+      }
+    }
+
     persistUsers([...currentUsers, newUser])
-    void syncUsersToSupabase([newUser])
 
     const comunicacao = db.get('comunicacao')
     const notification = {
@@ -263,7 +296,7 @@ export function AuthProvider({ children }) {
 
   const getPendingUsers = () => users.filter(item => item.status === 'pendente')
 
-  const approveUser = (userId, permissionChanges = {}, role = null) => {
+  const approveUser = async (userId, permissionChanges = {}, role = null) => {
     if (!canApproveUsers(user)) {
       return { success: false, error: 'Você não tem permissão para aprovar usuários.' }
     }
@@ -284,8 +317,14 @@ export function AuthProvider({ children }) {
       return approved
     })
     if (!approved) return { success: false, error: 'Usuário não encontrado.' }
+    const syncResult = await syncUsersToSupabase([approved])
+    if (syncResult?.success === false) {
+      return {
+        success: false,
+        error: `Nao foi possivel salvar a aprovacao no Supabase: ${syncResult.error || 'erro desconhecido'}`,
+      }
+    }
     persistUsers(updated)
-    void syncUsersToSupabase([approved])
     db.mutate('comunicacao', current => ({
       ...current,
       notificacoes: [{
@@ -392,7 +431,7 @@ export function AuthProvider({ children }) {
     const email = normalizeEmail(result.user?.email)
     const target = db.get('usuarios').find(item => matchesEmail(item, email))
     if (target) {
-      db.update('usuarios', null, target.id, { senha: newPassword })
+      db.update('usuarios', null, target.id, { senha: null })
       syncUserById(target.id)
     }
     return { success: true }

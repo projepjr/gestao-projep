@@ -363,7 +363,7 @@ export function DataProvider({ children }) {
     if (role === 'presidente') basePermissions.presidencia = true
 
     const created = db.insert('usuarios', null, {
-      senha,
+      senha: authResult.enabled === false ? senha : null,
       dataCadastro: new Date().toISOString().split('T')[0],
       fotoPerfil: null,
       telefone: member.telefone || '',
@@ -381,7 +381,14 @@ export function DataProvider({ children }) {
       emailTemporario: Boolean(member.usarDadosTemporarios),
       permissoes: normalizePermissions(member.permissoes || basePermissions, role),
     }).novoRegistro
-    void syncUsersToSupabase([created])
+    const syncResult = await syncUsersToSupabase([created])
+    if (syncResult?.success === false) {
+      db.removeUser(created.id)
+      return {
+        success: false,
+        error: `Nao foi possivel salvar o perfil no Supabase: ${syncResult.error || 'erro desconhecido'}`,
+      }
+    }
     return {
       success: true,
       user: publicUsers([created])[0],

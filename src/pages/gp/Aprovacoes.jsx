@@ -23,11 +23,11 @@ export default function Aprovacoes() {
   const pending = getPendingUsers()
   const selectedRole = pendingUser => roles[pendingUser.id] || getSuggestedRolePreset(user, pendingUser)?.value
 
-  const handleApprove = (u) => {
+  const handleApprove = async (u) => {
     setError('')
     const roleKey = selectedRole(u)
     const opt = roleOptions.find(r => r.value === roleKey)
-    const result = approveUser(u.id, opt?.permissions || { chat: true }, opt?.role || 'membro')
+    const result = await approveUser(u.id, opt?.permissions || { chat: true }, opt?.role || 'membro')
     if (!result.success) return setError(result.error)
     setConfirmed(prev => [...prev, { id: u.id, action: 'approved', nome: u.nome }])
   }

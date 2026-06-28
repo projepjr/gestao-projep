@@ -646,7 +646,7 @@ export async function pullUsersFromSupabase(db) {
 }
 
 export async function syncUsersToSupabase(users = []) {
-  if (!isSupabaseConfigured || !supabase) return
+  if (!isSupabaseConfigured || !supabase) return { success: true, enabled: false, users }
   const usersWithEmail = users.filter(user => user.email)
   const remoteIdsByEmail = await getRemoteProfileIdsByEmail(usersWithEmail)
   const usersWithRemoteIds = usersWithEmail.map(user => ({
@@ -655,10 +655,11 @@ export async function syncUsersToSupabase(users = []) {
   }))
 
   const profiles = usersWithRemoteIds.map(user => profileFromUser(user, user.supabaseId))
-  if (!profiles.length) return
+  if (!profiles.length) return { success: true, users: [] }
 
   const { error: profileError } = await supabase.from('profiles').upsert(profiles, { onConflict: 'id' })
   logRemoteError('upsert profiles', profileError)
+  if (profileError) return { success: false, error: profileError.message, users: usersWithRemoteIds }
 
   const permissions = usersWithRemoteIds.flatMap(user => permissionRowsFromUser(user, user.supabaseId))
   if (permissions.length) {
@@ -666,9 +667,10 @@ export async function syncUsersToSupabase(users = []) {
       .from('permissions')
       .upsert(permissions, { onConflict: 'profile_id,module_key,subarea_key' })
     logRemoteError('upsert permissions', permissionError)
+    if (permissionError) return { success: false, error: permissionError.message, users: usersWithRemoteIds }
   }
 
-  return usersWithRemoteIds
+  return { success: true, users: usersWithRemoteIds }
 }
 
 export async function deleteUserFromSupabase(userId) {
