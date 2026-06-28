@@ -343,6 +343,7 @@ const EVENT_LABELS = {
     'data da diagnóstica realizada',
     'data de realizacao da diagnostica',
     'data de realização da diagnóstica',
+    'data que foi realizada',
   ],
   proposalScheduled: [
     'data e hora da reuniao de proposta',
@@ -371,15 +372,15 @@ const STAGE_KEYWORDS = {
   negotiation: ['negociacao', 'negociação'],
   contract: ['contratos fechados', 'ganhos', 'ganho', 'fechado', 'contrato assinado'],
   lost: ['perdido', 'perdidos', 'perda'],
-  pendingScheduling: ['agendamentos pendentes', 'agendamento pendente'],
+  pendingScheduling: ['pendentes / no-show', 'pendente / no-show', 'pendentes no-show', 'pendente no-show', 'no-show', 'no show', 'agendamentos pendentes', 'agendamento pendente'],
 }
 
 const PIPEFY_2026_STAGE_GROUPS = {
   cadastro: ['leads cadastrados', 'cadastro'],
   workedOrLater: ['tentativa de contato', 'tentativas de contato', 'nao contatado', 'não contatado', 'interesse futuro', 'diagnostica agendada', 'diagnóstica agendada', 'diagnostica realizada', 'diagnóstica realizada', 'proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'agendamentos pendentes', 'contratos fechados', 'perdidos'],
-  diagnosticScheduledOrLater: ['diagnostica agendada', 'diagnóstica agendada', 'diagnostica realizada', 'diagnóstica realizada', 'proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'agendamentos pendentes', 'contratos fechados'],
+  diagnosticScheduledOrLater: ['diagnostica agendada', 'diagnóstica agendada', 'diagnostica realizada', 'diagnóstica realizada', 'proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'pendentes / no-show', 'pendente / no-show', 'agendamentos pendentes', 'contratos fechados'],
   diagnosticDoneOrLater: ['diagnostica realizada', 'diagnóstica realizada', 'proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'contratos fechados'],
-  proposalScheduledOrLater: ['proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'agendamentos pendentes', 'contratos fechados'],
+  proposalScheduledOrLater: ['proposta agendada', 'proposta realizada', 'negociacao', 'negociação', 'pendentes / no-show', 'pendente / no-show', 'agendamentos pendentes', 'contratos fechados'],
   proposalDoneOrLater: ['proposta realizada', 'negociacao', 'negociação', 'contratos fechados'],
 }
 
@@ -393,14 +394,26 @@ const FUNNEL_RANKS = {
   contract: 7,
 }
 
-function rankFromStageName(stageName) {
+function getNoShowStageType(card) {
+  const stageValue = getFieldValue(card, ['etapa que aconteceu no-show', 'etapa que aconteceu no show'])
+  if (includesAny(stageValue, ['proposta'])) return 'proposta'
+  if (includesAny(stageValue, ['diagnostica', 'diagnóstica', 'diagnostico', 'diagnóstico'])) return 'diagnostica'
+  return ''
+}
+
+function rankFromStageName(stageName, card = null) {
   if (includesAny(stageName, STAGE_KEYWORDS.contract)) return FUNNEL_RANKS.contract
   if (includesAny(stageName, STAGE_KEYWORDS.negotiation)) return FUNNEL_RANKS.negotiation
   if (includesAny(stageName, STAGE_KEYWORDS.proposalDone)) return FUNNEL_RANKS.proposalDone
   if (includesAny(stageName, STAGE_KEYWORDS.proposalScheduled)) return FUNNEL_RANKS.proposalScheduled
   if (includesAny(stageName, STAGE_KEYWORDS.diagnosticDone)) return FUNNEL_RANKS.diagnosticDone
   if (includesAny(stageName, STAGE_KEYWORDS.diagnosticScheduled)) return FUNNEL_RANKS.diagnosticScheduled
-  if (includesAny(stageName, STAGE_KEYWORDS.pendingScheduling)) return FUNNEL_RANKS.diagnosticScheduled
+  if (includesAny(stageName, STAGE_KEYWORDS.pendingScheduling)) {
+    const noShowType = card ? getNoShowStageType(card) : ''
+    if (noShowType === 'proposta') return FUNNEL_RANKS.proposalScheduled
+    if (noShowType === 'diagnostica') return FUNNEL_RANKS.diagnosticScheduled
+    return FUNNEL_RANKS.diagnosticScheduled
+  }
   if (includesAny(stageName, STAGE_KEYWORDS.contact) || includesAny(stageName, ['interesse futuro', 'futuro'])) return FUNNEL_RANKS.contacted
   return 0
 }
@@ -413,7 +426,7 @@ function maxHistoricalRank(card) {
 }
 
 function getCurrentFunnelRank(card) {
-  const currentRank = rankFromStageName(getStageName(card))
+  const currentRank = rankFromStageName(getStageName(card), card)
   if (currentRank) return currentRank
   if (currentStageMatches(card, STAGE_KEYWORDS.lost)) return maxHistoricalRank(card)
   return currentRank
@@ -480,15 +493,11 @@ function eventReachedInPeriod(card, fieldLabels, stageKeywords, range, targetRan
 }
 
 function isNoShowFor(card, type, range) {
-  const stageValue = getFieldValue(card, ['etapa que aconteceu no-show', 'etapa que aconteceu no show'])
+  const noShowType = getNoShowStageType(card)
   const flagValue = getFieldValue(card, ['foi no-show', 'foi no show'])
   const hasNoShowFlag = includesAny(flagValue, ['sim', 'true', 'yes', 'no-show', 'no show', 'noshow'])
   const hasNoShowDate = hasFieldValue(card, EVENT_LABELS.noShow)
-  const isPending = currentStageMatches(card, STAGE_KEYWORDS.pendingScheduling)
-  const typeWords = type === 'diagnostica'
-    ? ['diagnostica', 'diagnóstica', 'diagnostico', 'diagnóstico']
-    : ['proposta']
-  const typeMatches = includesAny(stageValue, typeWords) || (isPending && !stageValue)
+  const typeMatches = noShowType === type
   if ((!hasNoShowFlag && !hasNoShowDate) || !typeMatches) return false
   if (!range?.inicio || !range?.fim) return true
   return hasFieldDateInRange(card, EVENT_LABELS.noShow, range) ||
