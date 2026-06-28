@@ -197,10 +197,10 @@ function Modal({ member, onClose, onSave }) {
   }
   const removeSkill = (idx) => set('skills', form.skills.filter((_, i) => i !== idx))
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const avatar = form.nome.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-    const result = onSave({ ...form, avatar, projects: Number(form.projects), performance: Number(form.performance) })
+    const result = await onSave({ ...form, avatar, projects: Number(form.projects), performance: Number(form.performance) })
     if (result?.success === false) {
       setError(result.error)
       return
@@ -479,8 +479,8 @@ export default function Membros() {
     return matchSearch && matchDept
   })
 
-  const handleSave = (data) => {
-    return data.id ? updateMember(data.id, data) : addMember(data)
+  const handleSave = async (data) => {
+    return data.id ? updateMember(data.id, data) : await addMember(data)
   }
 
   const allDepts = [...new Set(directoryMembers.map(m => m.setor))].filter(Boolean)

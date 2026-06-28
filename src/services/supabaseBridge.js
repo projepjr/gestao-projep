@@ -435,6 +435,84 @@ const normalizeCommercialTeamConfig = equipe => ({
   closers: Array.isArray(equipe?.closers) ? equipe.closers : [],
 })
 
+export async function createSupabaseAuthAccount(email, password, metadata = {}) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, enabled: false }
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail || !password) return { success: false, error: 'Email e senha são obrigatórios.' }
+
+  const { data, error } = await supabase.auth.signUp({
+    email: normalizedEmail,
+    password,
+    options: { data: metadata },
+  })
+
+  if (error) {
+    const message = error.message || ''
+    if (/already|registered|exists|exists/i.test(message)) {
+      return { success: true, alreadyExists: true, user: null }
+    }
+    logRemoteError('create auth account', error)
+    return { success: false, error: message }
+  }
+
+  // O app usa sua própria sessão de aprovação. Não deixamos o signUp trocar a
+  // conta ativa do navegador quando um diretor cadastra outro membro.
+  await supabase.auth.signOut()
+  return { success: true, user: data?.user || null }
+}
+
+export async function signInWithSupabaseAuth(email, password) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, enabled: false }
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalizeEmail(email),
+    password,
+  })
+  if (error) return { success: false, error: error.message }
+  return { success: true, user: data?.user || null }
+}
+
+export async function sendSupabasePasswordReset(email) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, enabled: false }
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const redirectTo = origin ? `${origin}/login?reset=1` : undefined
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), {
+    redirectTo,
+  })
+  if (error) {
+    logRemoteError('send password reset', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
+export async function updateSupabaseAuthPassword(newPassword) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, enabled: false }
+  let { data: sessionData } = await supabase.auth.getSession()
+
+  if (!sessionData?.session && typeof window !== 'undefined') {
+    const code = new URLSearchParams(window.location.search).get('code')
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code)
+      if (error) {
+        logRemoteError('exchange password reset code', error)
+        return { success: false, error: error.message }
+      }
+      const refreshed = await supabase.auth.getSession()
+      sessionData = refreshed.data
+    }
+  }
+
+  if (!sessionData?.session) {
+    return { success: false, error: 'Link de recuperação expirado ou inválido.' }
+  }
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) {
+    logRemoteError('update auth password', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true, user: data?.user || sessionData.session.user || null }
+}
+
 export async function syncCommercialTeamConfig(equipe) {
   if (!isSupabaseConfigured || !supabase) return
   const payload = { equipe: normalizeCommercialTeamConfig(equipe), updatedAt: new Date().toISOString() }

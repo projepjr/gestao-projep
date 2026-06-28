@@ -8,15 +8,18 @@ import {
   canManagePermissions,
 } from '../config/authorization'
 import {
+  createSupabaseAuthAccount,
   deleteUserFromSupabase,
   pullUsersFromSupabase,
+  sendSupabasePasswordReset,
+  signInWithSupabaseAuth,
   syncCommercialTeamConfig,
   syncNotificationToSupabase,
   syncUsersToSupabase,
+  updateSupabaseAuthPassword,
 } from '../services/supabaseBridge'
 
 const AuthContext = createContext(null)
-const RESET_KEY = 'ej_reset_code'
 const SESSION_KEY = 'ej_user'
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 const normalizeEmail = email => `${email || ''}`.trim().toLowerCase()
@@ -135,6 +138,7 @@ export function AuthProvider({ children }) {
   }
 
   const login = async (email, password) => {
+    const normalizedEmail = normalizeEmail(email)
     let currentUsers = db.get('usuarios')
     try {
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
@@ -142,7 +146,24 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.warn('[Supabase] Nao foi possivel sincronizar usuarios antes do login:', error.message || error)
     }
-    const found = validateLogin(currentUsers, email, password)
+
+    let found = null
+    const remoteLogin = await signInWithSupabaseAuth(normalizedEmail, password)
+    if (remoteLogin.success) {
+      try {
+        currentUsers = await pullUsersFromSupabase(db)
+      } catch (error) {
+        console.warn('[Supabase] Nao foi possivel atualizar usuarios apos login:', error.message || error)
+      }
+
+      found = currentUsers.find(item =>
+        idsEqual(item.supabaseId, remoteLogin.user?.id) ||
+        normalizeEmail(item.email) === normalizedEmail ||
+        (item.emailAliases || []).some(alias => normalizeEmail(alias) === normalizedEmail)
+      )
+    }
+
+    if (!found) found = validateLogin(currentUsers, normalizedEmail, password)
 
     if (!found) return { success: false, error: 'Email ou senha invalidos' }
     if (found.status === 'pendente') return { success: false, status: 'pendente', user: found }
@@ -160,9 +181,10 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(SESSION_KEY)
   }
 
-  const register = ({ name, email, password, department, jobTitle }) => {
+  const register = async ({ name, email, password, department, jobTitle }) => {
     let currentUsers = db.get('usuarios')
-    const existing = currentUsers.find(item => matchesEmail(item, email))
+    const normalizedEmail = normalizeEmail(email)
+    const existing = currentUsers.find(item => matchesEmail(item, normalizedEmail))
     if (existing && existing.status !== 'rejeitado') {
       return { success: false, error: 'Este email já está cadastrado no sistema' }
     }
@@ -173,10 +195,22 @@ export function AuthProvider({ children }) {
 
     const initials = name.trim().split(/\s+/).map(word => word[0]).join('').slice(0, 2).toUpperCase()
     const setor = resolveSetor(department)
+    const authResult = await createSupabaseAuthAccount(normalizedEmail, password, {
+      name: name.trim(),
+      status: 'pending',
+      source: 'projep-register',
+    })
+    if (authResult.success === false && authResult.enabled !== false) {
+      return {
+        success: false,
+        error: `NÃ£o foi possÃ­vel criar suas credenciais de acesso: ${authResult.error || 'erro desconhecido'}`,
+      }
+    }
     const newUser = {
       id: db.createId(),
+      supabaseId: authResult.user?.id || undefined,
       nome: name.trim(),
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       senha: password,
       cargo: jobTitle || '',
       setorId: setor?.id || null,
@@ -335,40 +369,32 @@ export function AuthProvider({ children }) {
     return updateCurrentUser({ fotoPerfil: photo })
   }
 
-  const generateResetCode = email => {
-    const exists = db.get('usuarios').some(item => matchesEmail(item, email) && item.status === 'ativo')
-    if (!exists) return { exists: false }
+  const requestPasswordReset = async email => {
+    const normalizedEmail = normalizeEmail(email)
+    const exists = db.get('usuarios').some(item => matchesEmail(item, normalizedEmail) && item.status === 'ativo')
 
-    const code = String(Math.floor(100000 + Math.random() * 900000))
-    const expires = Date.now() + 15 * 60 * 1000
-    localStorage.setItem(RESET_KEY, JSON.stringify({
-      email: email.trim().toLowerCase(),
-      code,
-      expires,
-    }))
-    return { exists: true, code }
-  }
-
-  const verifyResetCode = (email, code) => {
-    try {
-      const data = JSON.parse(localStorage.getItem(RESET_KEY))
-      return Boolean(
-        data &&
-        data.email === email.trim().toLowerCase() &&
-        data.code === String(code) &&
-        Date.now() < data.expires
-      )
-    } catch {
-      return false
+    if (exists) {
+      const result = await sendSupabasePasswordReset(normalizedEmail)
+      if (result.enabled === false) {
+        return { success: false, error: 'Recupera??o real exige Supabase configurado.' }
+      }
     }
+
+    // Resposta neutra por seguran?a: n?o revela se o email existe.
+    return { success: true }
   }
 
-  const resetPassword = (email, newPassword) => {
-    const target = db.get('usuarios').find(item => matchesEmail(item, email))
-    if (!target) return { success: false, error: 'Não foi possível redefinir a senha.' }
+  const confirmPasswordReset = async newPassword => {
     if (newPassword.length < 6) return { success: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' }
-    db.update('usuarios', null, target.id, { senha: newPassword })
-    localStorage.removeItem(RESET_KEY)
+    const result = await updateSupabaseAuthPassword(newPassword)
+    if (!result.success) return result
+
+    const email = normalizeEmail(result.user?.email)
+    const target = db.get('usuarios').find(item => matchesEmail(item, email))
+    if (target) {
+      db.update('usuarios', null, target.id, { senha: newPassword })
+      syncUserById(target.id)
+    }
     return { success: true }
   }
 
@@ -399,9 +425,8 @@ export function AuthProvider({ children }) {
       updateUserPhoto,
       updateUserPermissoes,
       deleteUser,
-      generateResetCode,
-      verifyResetCode,
-      resetPassword,
+      requestPasswordReset,
+      confirmPasswordReset,
       changePassword,
     }}>
       {children}

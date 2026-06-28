@@ -11,6 +11,7 @@ import {
 } from '../config/authorization'
 import {
   bootstrapSupabase,
+  createSupabaseAuthAccount,
   deleteMeetingFromSupabase,
   deleteUserFromSupabase,
   pullCommunicationState,
@@ -318,7 +319,7 @@ export function DataProvider({ children }) {
     if (target) void syncUsersToSupabase([target])
   }
 
-  const addMember = member => {
+  const addMember = async member => {
     if (!canManageMembers(user)) return { success: false, error: 'Você não pode cadastrar membros.' }
     const temporaryCredentials = member.usarDadosTemporarios ? createTemporaryCredentials(member.nome) : null
     const email = (temporaryCredentials?.email || member.email)?.trim().toLowerCase()
@@ -331,6 +332,17 @@ export function DataProvider({ children }) {
     }
     if (!senha || senha.length < 6) {
       return { success: false, error: 'A senha inicial deve ter pelo menos 6 caracteres.' }
+    }
+    const authResult = await createSupabaseAuthAccount(email, senha, {
+      name: member.nome?.trim() || email,
+      status: 'active',
+      source: 'projep-gp-create',
+    })
+    if (authResult.success === false && authResult.enabled !== false) {
+      return {
+        success: false,
+        error: `NÃ£o foi possÃ­vel criar o login no Supabase Auth: ${authResult.error || 'erro desconhecido'}`,
+      }
     }
     const canonicalSector = resolveSetor(member.setorId || member.setor)
     const cargo = `${member.cargo || ''}`.toLowerCase()
@@ -360,6 +372,7 @@ export function DataProvider({ children }) {
       projects: 0,
       status: 'ativo',
       ...member,
+      supabaseId: authResult.user?.id || member.supabaseId,
       email,
       setorId: canonicalSector?.id || member.setorId || null,
       setor: canonicalSector?.nome || member.setor || '',
