@@ -13,6 +13,7 @@ import {
   pullUsersFromSupabase,
   sendSupabasePasswordReset,
   signInWithSupabaseAuth,
+  signOutFromSupabase,
   syncCommercialTeamConfig,
   syncNotificationToSupabase,
   syncUsersToSupabase,
@@ -151,7 +152,8 @@ export function AuthProvider({ children }) {
     const remoteLogin = await signInWithSupabaseAuth(normalizedEmail, password)
     if (remoteLogin.success) {
       try {
-        currentUsers = await pullUsersFromSupabase(db)
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+        currentUsers = await Promise.race([pullUsersFromSupabase(db), timeout])
       } catch (error) {
         console.warn('[Supabase] Nao foi possivel atualizar usuarios apos login:', error.message || error)
       }
@@ -179,6 +181,7 @@ export function AuthProvider({ children }) {
     setUser(null)
     sessionStorage.removeItem(SESSION_KEY)
     localStorage.removeItem(SESSION_KEY)
+    void signOutFromSupabase()
   }
 
   const register = async ({ name, email, password, department, jobTitle }) => {
@@ -203,7 +206,7 @@ export function AuthProvider({ children }) {
     if (authResult.success === false && authResult.enabled !== false) {
       return {
         success: false,
-        error: `NÃ£o foi possÃ­vel criar suas credenciais de acesso: ${authResult.error || 'erro desconhecido'}`,
+        error: `Não foi possível criar suas credenciais de acesso: ${authResult.error || 'erro desconhecido'}`,
       }
     }
     const newUser = {
@@ -371,16 +374,13 @@ export function AuthProvider({ children }) {
 
   const requestPasswordReset = async email => {
     const normalizedEmail = normalizeEmail(email)
-    const exists = db.get('usuarios').some(item => matchesEmail(item, normalizedEmail) && item.status === 'ativo')
-
-    if (exists) {
-      const result = await sendSupabasePasswordReset(normalizedEmail)
-      if (result.enabled === false) {
-        return { success: false, error: 'Recupera??o real exige Supabase configurado.' }
-      }
+    const result = await sendSupabasePasswordReset(normalizedEmail)
+    if (result.enabled === false) {
+      return { success: false, error: 'Recuperação de senha requer Supabase configurado.' }
     }
-
-    // Resposta neutra por seguran?a: n?o revela se o email existe.
+    if (!result.success) {
+      return { success: false, error: result.error || 'Não foi possível enviar o email de recuperação.' }
+    }
     return { success: true }
   }
 

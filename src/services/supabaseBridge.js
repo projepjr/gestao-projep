@@ -474,7 +474,7 @@ export async function signInWithSupabaseAuth(email, password) {
 export async function sendSupabasePasswordReset(email) {
   if (!isSupabaseConfigured || !supabase) return { success: false, enabled: false }
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const redirectTo = origin ? `${origin}/login?reset=1` : undefined
+  const redirectTo = origin ? `${origin}/login` : undefined
   const { error } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), {
     redirectTo,
   })
@@ -483,6 +483,11 @@ export async function sendSupabasePasswordReset(email) {
     return { success: false, error: error.message }
   }
   return { success: true }
+}
+
+export async function signOutFromSupabase() {
+  if (!isSupabaseConfigured || !supabase) return
+  await supabase.auth.signOut().catch(() => {})
 }
 
 export async function updateSupabaseAuthPassword(newPassword) {
