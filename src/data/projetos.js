@@ -10,7 +10,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-04-30",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Digital",
@@ -69,7 +69,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-06-15",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Terceirização",
       "Consultoria",
@@ -129,7 +129,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-05-20",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -188,7 +188,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-07-10",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Indústria",
@@ -247,7 +247,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-08-05",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Restaurante",
@@ -306,7 +306,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-09-20",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Plano de Negócios",
       "Financeiro",
@@ -366,7 +366,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-06-30",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Redes Sociais",
@@ -425,7 +425,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-05-15",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Pesquisa de Mercado",
       "Alimentação",
@@ -484,7 +484,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-07-25",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "5S",
       "Qualidade",
@@ -544,7 +544,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-08-20",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Pesquisa de Mercado",
       "Moda",
@@ -603,7 +603,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-09-10",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Custeio",
       "Financeiro",
@@ -663,7 +663,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-10-05",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Fornecedores",
       "Supply Chain",
@@ -723,7 +723,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-10-25",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Automotivo",
@@ -782,7 +782,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-11-10",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Telecomunicações",
@@ -841,7 +841,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-11-30",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Pesquisa de Mercado",
       "Alimentação",
@@ -900,7 +900,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2023-12-15",
     "ano": "2023",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "ISO 9001",
       "Qualidade",
@@ -961,7 +961,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-05-03",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -1008,7 +1008,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-05-04",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Pesquisa de Mercado",
       "Empresa Junior",
@@ -1059,7 +1059,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-08-20",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Plano de Negocios",
       "Energia Solar",
@@ -1110,7 +1110,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-03-23",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Pesquisa de Mercado",
       "Entretenimento",
@@ -1161,7 +1161,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-05-03",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Artesanato",
@@ -1211,7 +1211,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-05-27",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Inventario",
       "Varejo",
@@ -1261,7 +1261,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-11-05",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Plano de Negocios",
       "Construcao Civil",
@@ -1313,7 +1313,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-07-31",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Fast Food",
@@ -1364,7 +1364,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-10-28",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -1430,7 +1430,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-07-15",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Financeiro",
       "Varejo",
@@ -1482,7 +1482,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-08-14",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Confeitaria",
@@ -1533,7 +1533,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-09-16",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Fornecedores",
       "Textil",
@@ -1585,7 +1585,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-10-02",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Pesquisa de Mercado",
       "Calcados",
@@ -1636,7 +1636,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2024-11-11",
     "ano": "2024",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Prospeccao",
       "Clientes",
@@ -1688,7 +1688,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-03-17",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -1738,7 +1738,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-02-26",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Imobiliario",
@@ -1788,7 +1788,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-03-24",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Confeitaria",
@@ -1836,7 +1836,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-04-07",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -1885,7 +1885,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-04-09",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Plano Estrategico",
       "Atletica",
@@ -1934,7 +1934,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-08-05",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -1981,7 +1981,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-05-21",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Financeiro",
       "Gestao",
@@ -2032,7 +2032,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-07-02",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Saude",
@@ -2082,7 +2082,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-07-30",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -2131,7 +2131,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-07-23",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -2181,7 +2181,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-10-19",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -2227,7 +2227,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-09-08",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
@@ -2276,7 +2276,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-10-25",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Agua Mineral",
@@ -2325,7 +2325,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-11-03",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Marketing",
       "Sorveteria",
@@ -2374,7 +2374,7 @@ const BASE_CONHECIMENTO_PROJETOS = [
     "responsavelId": null,
     "data": "2025-10-28",
     "ano": "2025",
-    "status": "Conclu?do",
+    "status": "Concluído",
     "tags": [
       "Mapeamento",
       "Processos",
