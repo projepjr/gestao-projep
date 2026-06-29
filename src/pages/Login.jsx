@@ -126,11 +126,6 @@ export default function Login() {
     }
   }
 
-  const demoLogin = email => {
-    setLoginEmail(email)
-    setLoginPassword('123456')
-  }
-
   const handleRegister = async event => {
     event.preventDefault()
     setError('')
@@ -238,20 +233,6 @@ export default function Login() {
         <button onClick={() => go('register')} className={BTN_GHOST}>Criar conta</button>
       </div>
 
-      <div className="mt-8 pt-6 border-t border-[#1E1E1E]">
-        <p className="text-xs text-gray-600 mb-3 uppercase tracking-wider font-semibold">Acesso rápido - Demo</p>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { label: 'Comercial', email: 'ana.silva@projep.com.br' },
-            { label: 'GP', email: 'bruno.costa@projep.com.br' },
-            { label: 'Presidente', email: 'felipedaniel.wk@gmail.com' },
-          ].map(item => (
-            <button key={item.label} onClick={() => demoLogin(item.email)} className="text-xs bg-[#111111] hover:bg-[#1A1A1A] border border-[#1E1E1E] hover:border-[#CE7028]/40 text-gray-500 hover:text-[#FF882D] rounded py-2 px-2 transition-all">
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   )
 
