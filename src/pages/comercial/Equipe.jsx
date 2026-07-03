@@ -6,6 +6,25 @@ import { extractPipefyPeopleFromSnapshot } from '../../services/comercialSnapsho
 import UserAvatar from '../../components/UserAvatar'
 
 const PIPEFY_COMERCIAL_PIPE_ID = '307210845'
+const SNAPSHOT_LOOKBACK_LIMIT = 20
+
+function extractSnapshotPipeIds(payload = {}) {
+  return [
+    payload.pipe?.id,
+    payload.pipeId,
+    payload.pipe_id,
+    payload.raw?.pipe?.id,
+    payload.raw?.data?.pipe?.id,
+    payload.raw?.data?.pipeId,
+    payload.raw?.data?.pipe_id,
+    ...(payload.pipes || []).map(pipe => pipe?.id),
+    ...(payload.raw?.pipes || []).map(pipe => pipe?.id),
+  ].flat().filter(Boolean).map(String)
+}
+
+function isComercialPipeSnapshot(snapshot) {
+  return extractSnapshotPipeIds(snapshot?.payload || {}).includes(PIPEFY_COMERCIAL_PIPE_ID)
+}
 
 const INPUT = 'w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors placeholder-gray-700'
 const LABEL = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block'
@@ -139,21 +158,10 @@ export default function EquipeComercial() {
         .select('payload, synced_at')
         .eq('source', 'pipefy')
         .order('synced_at', { ascending: false })
-        .limit(1)
+        .limit(SNAPSHOT_LOOKBACK_LIMIT)
       if (!cancelled && !error) {
         const snapshots = Array.isArray(data) ? data : []
-        setSnapshot(snapshots.find(row => {
-          const payload = row.payload || {}
-          const pipeIds = [
-            payload.pipe?.id,
-            payload.raw?.pipe?.id,
-            payload.raw?.data?.pipe?.id,
-            ...(payload.pipes || []).map(pipe => pipe.id),
-            ...(payload.raw?.pipes || []).map(pipe => pipe.id),
-          ].filter(Boolean).map(String)
-
-          return pipeIds.includes(PIPEFY_COMERCIAL_PIPE_ID)
-        }) || null)
+        setSnapshot(snapshots.find(isComercialPipeSnapshot) || null)
       }
     }
     loadSnapshot()

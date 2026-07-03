@@ -15,6 +15,25 @@ import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 const PIPEFY_COMERCIAL_PIPE_ID = '307210845'
 const DASHBOARD_SNAPSHOT_CACHE_KEY = 'projep_comercial_dashboard_snapshot_cache_pipe_307210845_v1'
 const DASHBOARD_REFRESH_MS = 5 * 60 * 1000
+const DASHBOARD_SNAPSHOT_LOOKBACK = 20
+
+function extractSnapshotPipeIds(payload = {}) {
+  return [
+    payload.pipe?.id,
+    payload.pipeId,
+    payload.pipe_id,
+    payload.raw?.pipe?.id,
+    payload.raw?.data?.pipe?.id,
+    payload.raw?.data?.pipeId,
+    payload.raw?.data?.pipe_id,
+    ...(payload.pipes || []).map(pipe => pipe?.id),
+    ...(payload.raw?.pipes || []).map(pipe => pipe?.id),
+  ].flat().filter(Boolean).map(String)
+}
+
+function isComercialPipeSnapshot(snapshot) {
+  return extractSnapshotPipeIds(snapshot?.payload || {}).includes(PIPEFY_COMERCIAL_PIPE_ID)
+}
 
 function readCachedSnapshot() {
   if (typeof window === 'undefined') return null
@@ -890,7 +909,7 @@ export default function ComercialDashboard() {
             .select('id, payload, synced_at')
             .eq('source', 'pipefy')
             .order('synced_at', { ascending: false })
-            .limit(1),
+            .limit(DASHBOARD_SNAPSHOT_LOOKBACK),
           new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
         ])
         data = result.data
@@ -918,18 +937,7 @@ export default function ComercialDashboard() {
       }
 
       const snapshots = Array.isArray(data) ? data : []
-      const selectedSnapshot = snapshots.find(row => {
-        const payload = row.payload || {}
-        const pipeIds = [
-          payload.pipe?.id,
-          payload.raw?.pipe?.id,
-          payload.raw?.data?.pipe?.id,
-          ...(payload.pipes || []).map(pipe => pipe.id),
-          ...(payload.raw?.pipes || []).map(pipe => pipe.id),
-        ].filter(Boolean).map(String)
-
-        return pipeIds.includes(PIPEFY_COMERCIAL_PIPE_ID)
-      }) || null
+      const selectedSnapshot = snapshots.find(isComercialPipeSnapshot) || null
 
       setRemoteSnapshot(selectedSnapshot)
       remoteSnapshotRef.current = selectedSnapshot
