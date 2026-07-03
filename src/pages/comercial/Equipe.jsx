@@ -32,7 +32,13 @@ function hasUsableSnapshotPayload(snapshot) {
 
 function selectComercialSnapshot(snapshots) {
   const usableSnapshots = snapshots.filter(hasUsableSnapshotPayload)
-  return usableSnapshots.find(isComercialPipeSnapshot) || usableSnapshots[0] || null
+  const snapshotsWithPipeId = usableSnapshots.filter(snapshot => extractSnapshotPipeIds(snapshot.payload).length > 0)
+  const explicitPipeSnapshot = usableSnapshots.find(isComercialPipeSnapshot)
+
+  if (explicitPipeSnapshot) return explicitPipeSnapshot
+  if (snapshotsWithPipeId.length > 0) return null
+
+  return usableSnapshots[0] || null
 }
 
 const INPUT = 'w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors placeholder-gray-700'

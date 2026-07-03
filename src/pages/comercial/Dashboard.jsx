@@ -41,16 +41,21 @@ function hasUsableSnapshotPayload(snapshot) {
 
 function selectComercialSnapshot(snapshots) {
   const usableSnapshots = snapshots.filter(hasUsableSnapshotPayload)
+  const snapshotsWithPipeId = usableSnapshots.filter(snapshot => extractSnapshotPipeIds(snapshot.payload).length > 0)
   const explicitPipeSnapshot = usableSnapshots.find(isComercialPipeSnapshot)
 
   if (explicitPipeSnapshot) {
     return { snapshot: explicitPipeSnapshot, statusMessage: 'Snapshot Pipefy carregado' }
   }
 
+  if (snapshotsWithPipeId.length > 0) {
+    return { snapshot: null, statusMessage: '' }
+  }
+
   if (usableSnapshots[0]) {
     return {
       snapshot: usableSnapshots[0],
-      statusMessage: 'Snapshot sem pipe_id explícito. Usando snapshot remoto mais recente.',
+      statusMessage: 'Snapshot sem pipe_id explícito. Assumindo pipeline 307210845.',
     }
   }
 
