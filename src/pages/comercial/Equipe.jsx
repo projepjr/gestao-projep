@@ -26,6 +26,15 @@ function isComercialPipeSnapshot(snapshot) {
   return extractSnapshotPipeIds(snapshot?.payload || {}).includes(PIPEFY_COMERCIAL_PIPE_ID)
 }
 
+function hasUsableSnapshotPayload(snapshot) {
+  return Boolean(snapshot?.payload && typeof snapshot.payload === 'object' && !Array.isArray(snapshot.payload))
+}
+
+function selectComercialSnapshot(snapshots) {
+  const usableSnapshots = snapshots.filter(hasUsableSnapshotPayload)
+  return usableSnapshots.find(isComercialPipeSnapshot) || usableSnapshots[0] || null
+}
+
 const INPUT = 'w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors placeholder-gray-700'
 const LABEL = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block'
 
@@ -161,7 +170,7 @@ export default function EquipeComercial() {
         .limit(SNAPSHOT_LOOKBACK_LIMIT)
       if (!cancelled && !error) {
         const snapshots = Array.isArray(data) ? data : []
-        setSnapshot(snapshots.find(isComercialPipeSnapshot) || null)
+        setSnapshot(selectComercialSnapshot(snapshots))
       }
     }
     loadSnapshot()

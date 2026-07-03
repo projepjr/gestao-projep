@@ -35,6 +35,28 @@ function isComercialPipeSnapshot(snapshot) {
   return extractSnapshotPipeIds(snapshot?.payload || {}).includes(PIPEFY_COMERCIAL_PIPE_ID)
 }
 
+function hasUsableSnapshotPayload(snapshot) {
+  return Boolean(snapshot?.payload && typeof snapshot.payload === 'object' && !Array.isArray(snapshot.payload))
+}
+
+function selectComercialSnapshot(snapshots) {
+  const usableSnapshots = snapshots.filter(hasUsableSnapshotPayload)
+  const explicitPipeSnapshot = usableSnapshots.find(isComercialPipeSnapshot)
+
+  if (explicitPipeSnapshot) {
+    return { snapshot: explicitPipeSnapshot, statusMessage: 'Snapshot Pipefy carregado' }
+  }
+
+  if (usableSnapshots[0]) {
+    return {
+      snapshot: usableSnapshots[0],
+      statusMessage: 'Snapshot sem pipe_id explícito. Usando snapshot remoto mais recente.',
+    }
+  }
+
+  return { snapshot: null, statusMessage: '' }
+}
+
 function readCachedSnapshot() {
   if (typeof window === 'undefined') return null
   try {
@@ -869,6 +891,7 @@ export default function ComercialDashboard() {
   const [remoteStatus, setRemoteStatus] = useState(() => ({
     loading: !readCachedSnapshot(),
     error: '',
+    message: '',
   }))
   const remoteDashboardData = useMemo(
     () => buildRemoteDashboardData(remoteSnapshot, members, commercial),
@@ -899,7 +922,7 @@ export default function ComercialDashboard() {
         return
       }
 
-      if (!silent && !remoteSnapshotRef.current) setRemoteStatus({ loading: true, error: '' })
+      if (!silent && !remoteSnapshotRef.current) setRemoteStatus({ loading: true, error: '', message: '' })
 
       let data, error
       try {
@@ -937,14 +960,19 @@ export default function ComercialDashboard() {
       }
 
       const snapshots = Array.isArray(data) ? data : []
-      const selectedSnapshot = snapshots.find(isComercialPipeSnapshot) || null
+      const { snapshot: selectedSnapshot, statusMessage } = selectComercialSnapshot(snapshots)
 
       setRemoteSnapshot(selectedSnapshot)
       remoteSnapshotRef.current = selectedSnapshot
       cacheSnapshot(selectedSnapshot)
       setRemoteStatus({
         loading: false,
-        error: selectedSnapshot ? '' : 'Nenhum snapshot encontrado. Usando dados locais.',
+        error: selectedSnapshot
+          ? ''
+          : snapshots.length
+            ? 'Snapshot remoto inválido. Usando dados locais.'
+            : 'Nenhum snapshot encontrado. Usando dados locais.',
+        message: statusMessage,
       })
       if (selectedSnapshot && snapshotIdRef.current !== selectedSnapshot.id) {
         snapshotIdRef.current = selectedSnapshot.id
@@ -1015,7 +1043,7 @@ export default function ComercialDashboard() {
                   : 'text-gray-500 bg-[#111111] border-[#1E1E1E]'
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${remotePeriod ? 'bg-green-400' : remoteStatus.loading ? 'bg-yellow-400 animate-pulse' : 'bg-gray-600'}`} />
-              {remotePeriod ? 'Dados reais do Pipefy' : remoteStatus.loading ? 'Carregando Supabase' : 'Fallback local'}
+              {remotePeriod ? remoteStatus.message || 'Snapshot Pipefy carregado' : remoteStatus.loading ? 'Carregando Supabase' : 'Fallback local'}
             </span>
             {remoteSnapshot?.synced_at && (
               <span className="text-[10px] text-gray-600">
