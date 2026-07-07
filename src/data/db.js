@@ -227,7 +227,7 @@ function normalizeProjects(data) {
       tarefas: asArray(project?.tarefas),
     }))
   const storedKnowledge = current.baseConhecimento ? asArray(current.baseConhecimento) : []
-  const shouldApplyKnowledgeSeed = !REMOTE_PRIMARY && current.baseConhecimentoSeedVersion !== KNOWLEDGE_SEED_VERSION
+  const shouldApplyKnowledgeSeed = current.baseConhecimentoSeedVersion !== KNOWLEDGE_SEED_VERSION
   const knowledgeById = new Map()
 
   if (shouldApplyKnowledgeSeed) {
@@ -259,7 +259,7 @@ function normalizeProjects(data) {
     ...current,
     projetos: projects,
     baseConhecimento,
-    baseConhecimentoSeedVersion: REMOTE_PRIMARY ? current.baseConhecimentoSeedVersion || null : KNOWLEDGE_SEED_VERSION,
+    baseConhecimentoSeedVersion: KNOWLEDGE_SEED_VERSION,
   }
 }
 
