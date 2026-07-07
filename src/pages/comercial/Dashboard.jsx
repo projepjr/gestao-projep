@@ -398,6 +398,40 @@ const FUNIL_STAGES = [
   },
 ]
 
+const EMPTY_FUNIL = FUNIL_STAGES.reduce((acc, stage) => {
+  acc[stage.key] = 0
+  return acc
+}, {
+  leadsTrabalhados: 0,
+  noShowsDiagnostica: 0,
+  noShowsProposta: 0,
+})
+
+const EMPTY_KPIS = {
+  ticketMedio: 0,
+  receitaTotal: 0,
+  taxaConversao: 0,
+}
+
+function normalizeDashboardPeriod(period = {}, fallback = {}) {
+  return {
+    id: period.id || fallback.id || 'sem-dados',
+    label: period.label || fallback.label || 'Sem dados',
+    inicio: period.inicio || fallback.inicio || isoDate(new Date()),
+    fim: period.fim || fallback.fim || isoDate(new Date()),
+    ultimaAtualizacao: period.ultimaAtualizacao || fallback.ultimaAtualizacao || new Date().toISOString(),
+    funil: { ...EMPTY_FUNIL, ...(period.funil || {}) },
+    pipeline: { ...EMPTY_PIPELINE, ...(period.pipeline || {}) },
+    kpis: { ...EMPTY_KPIS, ...(period.kpis || {}) },
+    hunters: Array.isArray(period.hunters) ? period.hunters : [],
+    closers: Array.isArray(period.closers) ? period.closers : [],
+  }
+}
+
+function emptyPeriodFromRange(range) {
+  return normalizeDashboardPeriod({}, range)
+}
+
 function FunnelFlow({ funil }) {
   const total = funil.leadsCadastrados || 0
   return (
@@ -452,6 +486,11 @@ const PIPELINE_STAGES = [
   { key: 'perdidos',        label: 'Perdidos',    color: '#EF4444',
     tip: 'Fase Perdidos do Pipefy' },
 ]
+
+const EMPTY_PIPELINE = PIPELINE_STAGES.reduce((acc, stage) => {
+  acc[stage.key] = 0
+  return acc
+}, {})
 
 function PipelineGrid({ pipeline }) {
   const total = Object.values(pipeline).reduce((s, v) => s + v, 0) || 1
@@ -885,7 +924,27 @@ export default function ComercialDashboard() {
   )
   const remotePeriod = remoteDashboardData?.aovivo || null
   const dashboardData = remoteDashboardData || commercial
-  const { semanas = [], meses = [], aovivo } = dashboardData
+  const referenceDate = remoteSnapshot?.synced_at || new Date().toISOString()
+  const semanas = useMemo(() => {
+    const source = Array.isArray(dashboardData.semanas) ? dashboardData.semanas : []
+    const periods = source.length ? source : buildWeekRanges(referenceDate, 10).map(emptyPeriodFromRange)
+    return periods.map(period => normalizeDashboardPeriod(period))
+  }, [dashboardData.semanas, referenceDate])
+  const meses = useMemo(() => {
+    const source = Array.isArray(dashboardData.meses) ? dashboardData.meses : []
+    const periods = source.length ? source : buildMonthRanges(referenceDate, 8).map(emptyPeriodFromRange)
+    return periods.map(period => normalizeDashboardPeriod(period))
+  }, [dashboardData.meses, referenceDate])
+  const aovivo = useMemo(
+    () => normalizeDashboardPeriod(dashboardData.aovivo, {
+      id: 'aovivo',
+      label: 'Ao Vivo',
+      inicio: isoDate(new Date(referenceDate)),
+      fim: isoDate(new Date(referenceDate)),
+      ultimaAtualizacao: referenceDate,
+    }),
+    [dashboardData.aovivo, referenceDate],
+  )
   const [viewMode, setViewMode] = useState('semanal')
   const [semaIdx,  setSemaIdx]  = useState(() => findCurrentWeekIndex(semanas))
   const [mesIdx,   setMesIdx]   = useState(() => findCurrentMonthIndex(meses))
@@ -983,9 +1042,9 @@ export default function ComercialDashboard() {
   // TODO: [Supabase] substituir por: supabase.from('comercial_semanas').select('*').order('inicio')
   const currentPeriod = useMemo(() => {
     if (viewMode === 'aovivo')  return aovivo
-    if (viewMode === 'semanal') return semanas[semaIdx]
-    return meses[mesIdx]
-  }, [aovivo, meses, mesIdx, semaIdx, semanas, viewMode])
+    if (viewMode === 'semanal') return semanas[semaIdx] || emptyPeriodFromRange(buildWeekRanges(referenceDate, 1)[0])
+    return meses[mesIdx] || emptyPeriodFromRange(buildMonthRanges(referenceDate, 1)[0])
+  }, [aovivo, meses, mesIdx, referenceDate, semaIdx, semanas, viewMode])
 
   // TODO: [Supabase] carregar período anterior para delta comparativo
   const prevPeriod = useMemo(() => {
@@ -1002,15 +1061,6 @@ export default function ComercialDashboard() {
   }, [viewMode, prevPeriod])
 
   const showPipeline = viewMode !== 'semanal'
-
-  if (!currentPeriod) {
-    return (
-      <div className="bg-[#111111] border border-[#1E1E1E] rounded-md p-10 text-center">
-        <h1 className="text-xl font-bold text-white">Dashboard Comercial</h1>
-        <p className="text-gray-500 text-sm mt-2">Nenhum dado disponível para o período selecionado.</p>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-5">
