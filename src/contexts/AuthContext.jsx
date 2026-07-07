@@ -77,10 +77,8 @@ function readSession() {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY)
     const session = raw ? JSON.parse(raw) : null
-    if (!session?.id) return null
-    const current = findSessionUser(db.get('usuarios'), session)
-    if (!current || current.status !== 'ativo') return null
-    return persistSession(current)
+    if (!session?.id && !session?.supabaseId && !session?.email) return null
+    return persistSession(session)
   } catch {
     return null
   }
@@ -437,14 +435,25 @@ export function AuthProvider({ children }) {
     return { success: true }
   }
 
-  const changePassword = (currentPassword, newPassword) => {
-    if (!user) return { success: false, error: 'Usuário não autenticado' }
+  const changePassword = async (currentPassword, newPassword) => {
+    if (!user) return { success: false, error: 'Usuario nao autenticado' }
+    if (newPassword.length < 6) return { success: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' }
+    if (newPassword === currentPassword) return { success: false, error: 'A nova senha deve ser diferente da senha atual.' }
+
+    const remoteLogin = await signInWithSupabaseAuth(user.email, currentPassword)
+    if (remoteLogin.enabled !== false) {
+      if (!remoteLogin.success) return { success: false, error: 'Senha atual incorreta' }
+      const result = await updateSupabaseAuthPassword(newPassword)
+      if (!result.success) return result
+      db.update('usuarios', null, user.id, { senha: null })
+      syncUserById(user.id)
+      return { success: true }
+    }
+
     const stored = db.get('usuarios').find(item => idsEqual(item.id, user.id))
     if (!stored || stored.senha !== currentPassword) {
       return { success: false, error: 'Senha atual incorreta' }
     }
-    if (newPassword.length < 6) return { success: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' }
-    if (newPassword === currentPassword) return { success: false, error: 'A nova senha deve ser diferente da senha atual.' }
     db.update('usuarios', null, user.id, { senha: newPassword })
     return { success: true }
   }

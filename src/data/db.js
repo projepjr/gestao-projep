@@ -8,6 +8,7 @@ import { INITIAL_COMUNICACAO }    from './comunicacao'
 import { INITIAL_PROJETOS }       from './projetos'
 import { normalizePermissions }   from '../config/accessControl'
 import { resolveSetor }           from './setores'
+import { isSupabaseConfigured }   from '../lib/supabase'
 
 const KEYS = {
   usuarios:      'ej_db_usuarios_v3',
@@ -24,6 +25,38 @@ const INITIAL = {
   comunicacao:   INITIAL_COMUNICACAO,
   projetos:      INITIAL_PROJETOS,
 }
+
+const EMPTY_REMOTE = {
+  usuarios: [],
+  comercial: {
+    equipe: { hunters: [], closers: [] },
+    hunters: [],
+    closers: [],
+    semanas: [],
+    meses: [],
+    aovivo: {},
+    leads: [],
+    reunioes: [],
+    contratos: [],
+  },
+  gestaoPessoas: {
+    avaliacoes: [],
+    processoSeletivo: [],
+  },
+  comunicacao: {
+    mensagens: [],
+    notificacoes: [],
+    avisos: [],
+  },
+  projetos: {
+    projetos: [],
+    baseConhecimento: [],
+    baseConhecimentoSeedVersion: null,
+  },
+}
+
+const REMOTE_PRIMARY = Boolean(isSupabaseConfigured)
+const initialFor = tabela => REMOTE_PRIMARY ? EMPTY_REMOTE[tabela] : INITIAL[tabela]
 
 const DEFAULT_NOTIFICATION_PREFERENCES = {
   email: true,
@@ -120,6 +153,7 @@ function normalizeCommercialPeriod(period, fallback = {}) {
 
 function normalizeCommercial(data) {
   const current = isRecord(data) ? data : {}
+  const base = REMOTE_PRIMARY ? EMPTY_REMOTE.comercial : INITIAL_COMERCIAL
   const normalizePeriods = (periods, fallbacks) => {
     const source = asArray(periods, fallbacks)
     return source.map(period => {
@@ -129,29 +163,30 @@ function normalizeCommercial(data) {
   }
 
   return {
-    ...INITIAL_COMERCIAL,
+    ...base,
     ...current,
     equipe: {
       ...EMPTY_COMMERCIAL_TEAM,
-      ...(INITIAL_COMERCIAL.equipe || {}),
+      ...(base.equipe || {}),
       ...(current.equipe || {}),
-      hunters: asArray(current.equipe?.hunters, asArray(INITIAL_COMERCIAL.equipe?.hunters)),
-      closers: asArray(current.equipe?.closers, asArray(INITIAL_COMERCIAL.equipe?.closers)),
+      hunters: asArray(current.equipe?.hunters, asArray(base.equipe?.hunters)),
+      closers: asArray(current.equipe?.closers, asArray(base.equipe?.closers)),
     },
-    hunters: asArray(current.hunters, INITIAL_COMERCIAL.hunters),
-    closers: asArray(current.closers, INITIAL_COMERCIAL.closers),
-    semanas: normalizePeriods(current.semanas, INITIAL_COMERCIAL.semanas),
-    meses: normalizePeriods(current.meses, INITIAL_COMERCIAL.meses),
-    aovivo: normalizeCommercialPeriod(current.aovivo, INITIAL_COMERCIAL.aovivo),
-    leads: asArray(current.leads, INITIAL_COMERCIAL.leads),
-    reunioes: asArray(current.reunioes, INITIAL_COMERCIAL.reunioes),
-    contratos: asArray(current.contratos ?? current.contracts, INITIAL_COMERCIAL.contratos),
+    hunters: asArray(current.hunters, base.hunters),
+    closers: asArray(current.closers, base.closers),
+    semanas: normalizePeriods(current.semanas, base.semanas),
+    meses: normalizePeriods(current.meses, base.meses),
+    aovivo: normalizeCommercialPeriod(current.aovivo, base.aovivo),
+    leads: asArray(current.leads, base.leads),
+    reunioes: asArray(current.reunioes, base.reunioes),
+    contratos: asArray(current.contratos ?? current.contracts, base.contratos),
   }
 }
 
 function normalizePeople(data) {
   const current = isRecord(data) ? data : {}
-  const evaluations = asArray(current.avaliacoes ?? current.evaluations, INITIAL_GESTAO_PESSOAS.avaliacoes)
+  const base = REMOTE_PRIMARY ? EMPTY_REMOTE.gestaoPessoas : INITIAL_GESTAO_PESSOAS
+  const evaluations = asArray(current.avaliacoes ?? current.evaluations, base.avaliacoes)
     .map(evaluation => ({
       ...evaluation,
       feedbacks: asArray(evaluation?.feedbacks),
@@ -160,37 +195,39 @@ function normalizePeople(data) {
     }))
 
   return {
-    ...INITIAL_GESTAO_PESSOAS,
+    ...base,
     ...current,
     avaliacoes: evaluations,
     processoSeletivo: asArray(
       current.processoSeletivo ?? current.process,
-      INITIAL_GESTAO_PESSOAS.processoSeletivo,
+      base.processoSeletivo,
     ),
   }
 }
 
 function normalizeCommunication(data) {
   const current = isRecord(data) ? data : {}
+  const base = REMOTE_PRIMARY ? EMPTY_REMOTE.comunicacao : INITIAL_COMUNICACAO
   return {
-    ...INITIAL_COMUNICACAO,
+    ...base,
     ...current,
-    mensagens: asArray(current.mensagens ?? current.messages, INITIAL_COMUNICACAO.mensagens),
-    notificacoes: asArray(current.notificacoes ?? current.notifications, INITIAL_COMUNICACAO.notificacoes),
-    avisos: asArray(current.avisos ?? current.notices, INITIAL_COMUNICACAO.avisos),
+    mensagens: asArray(current.mensagens ?? current.messages, base.mensagens),
+    notificacoes: asArray(current.notificacoes ?? current.notifications, base.notificacoes),
+    avisos: asArray(current.avisos ?? current.notices, base.avisos),
   }
 }
 
 function normalizeProjects(data) {
   const current = isRecord(data) ? data : {}
-  const projects = asArray(current.projetos ?? current.projects, INITIAL_PROJETOS.projetos)
+  const base = REMOTE_PRIMARY ? EMPTY_REMOTE.projetos : INITIAL_PROJETOS
+  const projects = asArray(current.projetos ?? current.projects, base.projetos)
     .map(project => ({
       ...project,
       membros: asArray(project?.membros),
       tarefas: asArray(project?.tarefas),
     }))
   const storedKnowledge = current.baseConhecimento ? asArray(current.baseConhecimento) : []
-  const shouldApplyKnowledgeSeed = current.baseConhecimentoSeedVersion !== KNOWLEDGE_SEED_VERSION
+  const shouldApplyKnowledgeSeed = !REMOTE_PRIMARY && current.baseConhecimentoSeedVersion !== KNOWLEDGE_SEED_VERSION
   const knowledgeById = new Map()
 
   if (shouldApplyKnowledgeSeed) {
@@ -218,17 +255,18 @@ function normalizeProjects(data) {
       licoesAprendidas: splitTextList(record?.licoesAprendidas),
     }))
   return {
-    ...INITIAL_PROJETOS,
+    ...base,
     ...current,
     projetos: projects,
     baseConhecimento,
-    baseConhecimentoSeedVersion: KNOWLEDGE_SEED_VERSION,
+    baseConhecimentoSeedVersion: REMOTE_PRIMARY ? current.baseConhecimentoSeedVersion || null : KNOWLEDGE_SEED_VERSION,
   }
 }
 
 // ── Persistência ─────────────────────────────────────────────
 
 function read(tabela) {
+  if (REMOTE_PRIMARY) return memoryStore.has(tabela) ? memoryStore.get(tabela) : null
   try {
     const raw = localStorage.getItem(KEYS[tabela])
     return raw ? JSON.parse(raw) : null
@@ -236,6 +274,10 @@ function read(tabela) {
 }
 
 function write(tabela, data) {
+  if (REMOTE_PRIMARY) {
+    memoryStore.set(tabela, data)
+    return
+  }
   try {
     localStorage.setItem(KEYS[tabela], JSON.stringify(data))
   } catch (error) {
@@ -244,6 +286,7 @@ function write(tabela, data) {
 }
 
 const listeners = new Map()
+const memoryStore = new Map()
 let lastGeneratedId = 0
 
 function getLegacyNotificationPreferences(userId) {
@@ -257,7 +300,7 @@ function getLegacyNotificationPreferences(userId) {
 
 function normalize(tabela, data) {
   if (tabela === 'usuarios') {
-    return asArray(data, INITIAL_USUARIOS).map(user => {
+    return asArray(data, REMOTE_PRIMARY ? [] : INITIAL_USUARIOS).map(user => {
       const canonicalSector = resolveSetor(user.setorId || user.setor)
       let permissoes = normalizePermissions(user.permissoes, user.role)
 
@@ -337,7 +380,8 @@ if (typeof window !== 'undefined') {
   window.addEventListener('storage', event => {
     const tabela = Object.keys(KEYS).find(key => KEYS[key] === event.key)
     if (!tabela) return
-    const data = normalize(tabela, read(tabela) ?? INITIAL[tabela])
+    if (REMOTE_PRIMARY) return
+    const data = normalize(tabela, read(tabela) ?? initialFor(tabela))
     notify(tabela, data)
   })
 }
@@ -350,9 +394,9 @@ const db = {
     return lastGeneratedId
   },
 
-  /** Retorna todos os dados de uma tabela (localStorage ou dados iniciais) */
+  /** Retorna todos os dados de uma tabela. Com Supabase ativo, nao reidrata dados operacionais locais. */
   get(tabela) {
-    return normalize(tabela, read(tabela) ?? INITIAL[tabela])
+    return normalize(tabela, read(tabela) ?? initialFor(tabela))
   },
 
   /** Substitui toda a tabela */

@@ -208,7 +208,7 @@ function userFromProfile(profile, currentUsers = []) {
     avatar: profile.initials || existing?.avatar || profile.name?.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase(),
     status: profile.status === 'active' ? 'ativo' : profile.status === 'pending' ? 'pendente' : profile.status || existing?.status || 'ativo',
     role: profile.role || existing?.role || 'membro',
-    senha: existing?.senha && !isLegacyTemporaryEmail(existing.email) ? existing.senha : '123456',
+    senha: null,
     dataCadastro: existing?.dataCadastro || dateOnly(profile.created_at) || new Date().toISOString().split('T')[0],
     preferenciasNotificacao: existing?.preferenciasNotificacao || {
       email: true,
@@ -362,114 +362,6 @@ function notificationFromRemote(row, profileIdToUserId = new Map()) {
   }
 }
 
-const mergeById = (local = [], remote = []) => {
-  const map = new Map(local.map(item => [String(item.id), item]))
-  remote.forEach(item => {
-    const key = String(item.id)
-    map.set(key, { ...(map.get(key) || {}), ...item })
-  })
-  return [...map.values()]
-}
-
-const normalizeTimestamp = value => {
-  const time = new Date(value || 0).getTime()
-  return Number.isFinite(time) ? time : String(value || '')
-}
-
-const messageMergeKey = message => [
-  message.tipo || 'direta',
-  message.remetenteId || '',
-  message.destinatarioId || '',
-  message.texto || '',
-  normalizeTimestamp(message.timestamp),
-].join('|')
-
-const mergeMessages = (local = [], remote = []) => {
-  const items = []
-  const indexById = new Map()
-  const indexByIdentity = new Map()
-
-  const upsert = (message, preferIncoming = false) => {
-    const idKey = String(message.id)
-    const identityKey = messageMergeKey(message)
-    const existingIndex = indexById.has(idKey)
-      ? indexById.get(idKey)
-      : indexByIdentity.get(identityKey)
-
-    if (existingIndex != null) {
-      const merged = preferIncoming
-        ? { ...items[existingIndex], ...message }
-        : { ...message, ...items[existingIndex] }
-      items[existingIndex] = merged
-      indexById.set(String(merged.id), existingIndex)
-      indexByIdentity.set(messageMergeKey(merged), existingIndex)
-      return
-    }
-
-    const nextIndex = items.length
-    items.push(message)
-    indexById.set(idKey, nextIndex)
-    indexByIdentity.set(identityKey, nextIndex)
-  }
-
-  local.forEach(message => upsert(message, false))
-  remote.forEach(message => upsert(message, true))
-  return items.sort((a, b) => normalizeTimestamp(a.timestamp) - normalizeTimestamp(b.timestamp))
-}
-
-const notificationMergeKey = notification => [
-  notification.tipo || 'sistema',
-  notification.usuarioId ?? 'global',
-  notification.audiencia || '',
-  notification.modulo || '',
-  notification.titulo || '',
-  notification.descricao || '',
-  notification.link || '',
-  normalizeTimestamp(notification.timestamp),
-].join('|')
-
-const mergeReadLists = (a = [], b = []) => [...new Set([...a, ...b].filter(Boolean))]
-
-const mergeNotifications = (local = [], remote = []) => {
-  const items = []
-  const indexById = new Map()
-  const indexByIdentity = new Map()
-
-  const upsert = (notification, preferIncoming = false) => {
-    const idKey = String(notification.id)
-    const identityKey = notificationMergeKey(notification)
-    const existingIndex = indexById.has(idKey)
-      ? indexById.get(idKey)
-      : indexByIdentity.get(identityKey)
-
-    if (existingIndex != null) {
-      const current = items[existingIndex]
-      const merged = preferIncoming
-        ? { ...current, ...notification }
-        : { ...notification, ...current }
-
-      // Preserve local read state while Supabase catches up, otherwise a pull can
-      // resurrect an already-read notification as unread.
-      merged.lida = Boolean(current.lida || notification.lida)
-      merged.lidosPor = mergeReadLists(current.lidosPor, notification.lidosPor)
-
-      items[existingIndex] = merged
-      indexById.set(String(merged.id), existingIndex)
-      indexByIdentity.set(notificationMergeKey(merged), existingIndex)
-      return
-    }
-
-    const nextIndex = items.length
-    items.push(notification)
-    indexById.set(idKey, nextIndex)
-    indexByIdentity.set(identityKey, nextIndex)
-  }
-
-  local.forEach(notification => upsert(notification, false))
-  remote.forEach(notification => upsert(notification, true))
-  return items.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
-}
-
 const normalizeCommercialTeamConfig = equipe => ({
   hunters: Array.isArray(equipe?.hunters) ? equipe.hunters : [],
   closers: Array.isArray(equipe?.closers) ? equipe.closers : [],
@@ -618,11 +510,12 @@ export async function pullCommercialTeamConfig(db) {
     return normalized
   }
 
-  const localEquipe = normalizeCommercialTeamConfig(db.get('comercial')?.equipe)
-  if (localEquipe.hunters.length || localEquipe.closers.length) {
-    await syncCommercialTeamConfig(localEquipe)
-  }
-  return localEquipe
+  const emptyEquipe = normalizeCommercialTeamConfig(null)
+  db.mutate('comercial', current => ({
+    ...current,
+    equipe: emptyEquipe,
+  }))
+  return emptyEquipe
 }
 
 export async function bootstrapSupabase(db) {
@@ -638,21 +531,10 @@ export async function bootstrapSupabase(db) {
     .in('email', REMOVED_DEMO_EMAILS)
   logRemoteError('delete demo profiles', demoDeleteError)
 
-  const localUsers = db.get('usuarios')
-  const { data: existingProfiles, error: existingProfilesError } = await supabase
-    .from('profiles')
-    .select('id')
-    .limit(1)
-  logRemoteError('check existing profiles', existingProfilesError)
-  if (!existingProfiles?.length) {
-    await syncUsersToSupabase(localUsers)
-  }
-
   const mergedUsers = await pullUsersFromSupabase(db)
 
   const profileIdToUserId = profileIdToUserIdMap(mergedUsers)
   await pullCommercialTeamConfig(db)
-  await syncLocalCommunicationToSupabase(db)
   await pullCommunication(db, profileIdToUserId)
   await pullMeetings(db, profileIdToUserId)
 
@@ -669,6 +551,11 @@ export async function pullUsersFromSupabase(db) {
   ])
   logRemoteError('fetch profiles', profilesError)
   logRemoteError('fetch permissions', permissionsError)
+
+  if (!profilesError && Array.isArray(profiles) && profiles.length === 0) {
+    db.set('usuarios', [])
+    return []
+  }
 
   if (!profiles?.length) return localUsers
 
@@ -801,20 +688,6 @@ export async function syncNotificationToSupabase(notification, users = []) {
   logRemoteError('upsert notification', error)
 }
 
-async function syncLocalCommunicationToSupabase(db) {
-  if (!isSupabaseConfigured || !supabase) return
-  const users = db.get('usuarios')
-  const hasUser = id => users.some(user => findUserByAnyId([user], id))
-  const communication = db.get('comunicacao')
-
-  for (const message of communication.mensagens || []) {
-    const isChannel = message.tipo === 'aviso_geral' || message.destinatarioId === 'avisos'
-    if (!hasUser(message.remetenteId)) continue
-    if (!isChannel && !hasUser(message.destinatarioId)) continue
-    await syncMessageToSupabase(message, users)
-  }
-}
-
 export async function markRemoteNotificationRead(notificationId, read = true) {
   if (!isSupabaseConfigured || !supabase) return
   const { error } = await supabase
@@ -832,16 +705,14 @@ export async function pullCommunication(db, profileIdToUserId) {
   ])
   logRemoteError('fetch messages', messageError)
   logRemoteError('fetch notifications', notificationError)
+  if (messageError || notificationError) return
 
   db.mutate('comunicacao', current => ({
     ...current,
-    mensagens: mergeMessages(current.mensagens || [], (remoteMessages || []).map(row => messageFromRemote(row, profileIdToUserId))),
-    notificacoes: mergeNotifications(
-      current.notificacoes || [],
-      (remoteNotifications || [])
-        .filter(row => row.type !== COMMERCIAL_CONFIG_SOURCE)
-        .map(row => notificationFromRemote(row, profileIdToUserId)),
-    ),
+    mensagens: (remoteMessages || []).map(row => messageFromRemote(row, profileIdToUserId)),
+    notificacoes: (remoteNotifications || [])
+      .filter(row => row.type !== COMMERCIAL_CONFIG_SOURCE)
+      .map(row => notificationFromRemote(row, profileIdToUserId)),
   }))
 }
 
@@ -860,14 +731,11 @@ export async function pullMeetings(db, profileIdToUserId) {
   ])
   logRemoteError('fetch meetings', meetingError)
   logRemoteError('fetch meeting responsibles', responsibleError)
-  if (!meetings?.length) return
+  if (meetingError || responsibleError) return
 
   db.mutate('comercial', current => ({
     ...current,
-    reunioes: mergeById(
-      current.reunioes || [],
-      meetings.map(row => meetingFromRemote(row, responsibles || [], profileIdToUserId)),
-    ),
+    reunioes: (meetings || []).map(row => meetingFromRemote(row, responsibles || [], profileIdToUserId)),
   }))
 }
 

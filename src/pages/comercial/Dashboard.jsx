@@ -13,7 +13,6 @@ import { isSupabaseConfigured, supabase } from '../../lib/supabase'
 import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 
 const PIPEFY_COMERCIAL_PIPE_ID = '307210845'
-const DASHBOARD_SNAPSHOT_CACHE_KEY = 'projep_comercial_dashboard_snapshot_cache_pipe_307210845_v1'
 const DASHBOARD_REFRESH_MS = 5 * 60 * 1000
 const DASHBOARD_SNAPSHOT_LOOKBACK = 20
 
@@ -62,24 +61,6 @@ function selectComercialSnapshot(snapshots) {
   return { snapshot: null, statusMessage: '' }
 }
 
-function readCachedSnapshot() {
-  if (typeof window === 'undefined') return null
-  try {
-    const cached = window.localStorage.getItem(DASHBOARD_SNAPSHOT_CACHE_KEY)
-    return cached ? JSON.parse(cached) : null
-  } catch {
-    return null
-  }
-}
-
-function cacheSnapshot(snapshot) {
-  if (typeof window === 'undefined' || !snapshot) return
-  try {
-    window.localStorage.setItem(DASHBOARD_SNAPSHOT_CACHE_KEY, JSON.stringify(snapshot))
-  } catch {
-    // Cache local é apenas uma camada de tolerância para quedas momentâneas.
-  }
-}
 
 // ── Helpers ───────────────────────────────────────────────────
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -890,11 +871,11 @@ function buildRemoteDashboardData(snapshot, members, commercial) {
 
 export default function ComercialDashboard() {
   const { commercial, members } = useData()
-  const [remoteSnapshot, setRemoteSnapshot] = useState(() => readCachedSnapshot())
+  const [remoteSnapshot, setRemoteSnapshot] = useState(null)
   const remoteSnapshotRef = useRef(remoteSnapshot)
   const snapshotIdRef = useRef(remoteSnapshot?.id || null)
   const [remoteStatus, setRemoteStatus] = useState(() => ({
-    loading: !readCachedSnapshot(),
+    loading: true,
     error: '',
     message: '',
   }))
@@ -922,7 +903,7 @@ export default function ComercialDashboard() {
       fetching = true
 
       if (!isSupabaseConfigured || !supabase) {
-        setRemoteStatus({ loading: false, error: 'Supabase não configurado. Usando dados locais.' })
+        setRemoteStatus({ loading: false, error: 'Supabase nao configurado. Dados comerciais remotos indisponiveis.' })
         fetching = false
         return
       }
@@ -946,7 +927,7 @@ export default function ComercialDashboard() {
         if (cancelled) return
         setRemoteStatus({
           loading: false,
-          error: remoteSnapshotRef.current ? '' : 'Tempo esgotado. Usando dados locais.',
+          error: remoteSnapshotRef.current ? '' : 'Tempo esgotado ao carregar dados comerciais do Supabase.',
         })
         fetching = false
         return
@@ -957,7 +938,7 @@ export default function ComercialDashboard() {
       if (error) {
         setRemoteStatus({
           loading: false,
-          error: remoteSnapshotRef.current ? '' : 'Não foi possível carregar dados do Pipefy. Usando fallback local.',
+          error: remoteSnapshotRef.current ? '' : 'Nao foi possivel carregar dados comerciais do Supabase.',
         })
         console.warn('[ComercialDashboard] Falha ao carregar snapshot comercial:', error.message || error)
         fetching = false
@@ -969,14 +950,14 @@ export default function ComercialDashboard() {
 
       setRemoteSnapshot(selectedSnapshot)
       remoteSnapshotRef.current = selectedSnapshot
-      cacheSnapshot(selectedSnapshot)
+      
       setRemoteStatus({
         loading: false,
         error: selectedSnapshot
           ? ''
           : snapshots.length
-            ? 'Snapshot remoto inválido. Usando dados locais.'
-            : 'Nenhum snapshot encontrado. Usando dados locais.',
+            ? 'Snapshot remoto invalido para o pipeline comercial.'
+            : 'Nenhum snapshot remoto encontrado no Supabase.',
         message: statusMessage,
       })
       if (selectedSnapshot && snapshotIdRef.current !== selectedSnapshot.id) {
@@ -1048,7 +1029,7 @@ export default function ComercialDashboard() {
                   : 'text-gray-500 bg-[#111111] border-[#1E1E1E]'
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${remotePeriod ? 'bg-green-400' : remoteStatus.loading ? 'bg-yellow-400 animate-pulse' : 'bg-gray-600'}`} />
-              {remotePeriod ? remoteStatus.message || 'Snapshot Pipefy carregado' : remoteStatus.loading ? 'Carregando Supabase' : 'Fallback local'}
+              {remotePeriod ? remoteStatus.message || 'Snapshot Pipefy carregado' : remoteStatus.loading ? 'Carregando Supabase' : 'Sem snapshot remoto'}
             </span>
             {remoteSnapshot?.synced_at && (
               <span className="text-[10px] text-gray-600">
