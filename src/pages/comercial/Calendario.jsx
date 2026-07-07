@@ -2,7 +2,7 @@
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, X, Clock, Building2,
   User, Video, Phone, MessageCircle, Edit2, Trash2, CheckCircle2,
-  AlertTriangle, RotateCcw, Search, CircleDollarSign, ClipboardList,
+  AlertTriangle, RotateCcw, Search, ClipboardList,
   Users,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -60,12 +60,6 @@ const CHANNELS = [
   { value: 'Presencial', label: 'Presencial', Icon: Building2 },
 ]
 
-const PRIORITIES = {
-  alta: 'Alta',
-  media: 'Média',
-  baixa: 'Baixa',
-}
-
 const INPUT = 'w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors placeholder-gray-700'
 const LABEL = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block'
 
@@ -84,10 +78,6 @@ function toISO(date) {
 
 function fmtDate(date) {
   return toDate(date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-}
-
-function fmtMoney(value) {
-  return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 }
 
 function getResponsibleIds(meeting) {
@@ -197,7 +187,6 @@ function MeetingCard({ meeting, onEdit, onDelete, onStatus }) {
         <div className="flex items-center gap-2"><Clock className="w-3.5 h-3.5" />{meeting.horaInicio || '--:--'}{meeting.horaFim ? ` - ${meeting.horaFim}` : ''}</div>
         <div className="flex items-center gap-2"><ChannelIcon className="w-3.5 h-3.5" />{meeting.canal}</div>
         <div className="flex items-center gap-2"><User className="w-3.5 h-3.5" />{meeting.contato || 'Contato não informado'}</div>
-        <div className="flex items-center gap-2"><CircleDollarSign className="w-3.5 h-3.5" />{fmtMoney(meeting.valorEstimado)}</div>
       </div>
 
       <div className="mt-3 flex items-start gap-2 text-xs text-gray-500">
@@ -244,7 +233,7 @@ function MeetingCard({ meeting, onEdit, onDelete, onStatus }) {
   )
 }
 
-function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }) {
+function MeetingModal({ meeting, selectedDate, members, onClose, onSave }) {
   const [error, setError] = useState('')
   const [responsibleOpen, setResponsibleOpen] = useState(false)
   const [responsibleSearch, setResponsibleSearch] = useState('')
@@ -258,13 +247,10 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
     horaFim: '10:00',
     status: 'agendada',
     canal: 'Google Meet',
-    prioridade: 'media',
-    valorEstimado: '',
     pauta: '',
     proximoPasso: '',
     observacoes: '',
     ...(meeting || {}),
-    leadId: meeting?.leadId || '',
     responsavelIds: getResponsibleIds(meeting),
   }))
 
@@ -289,25 +275,14 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
     })
   }
 
-  const selectLead = (leadId) => {
-    const lead = leads.find(item => String(item.id) === String(leadId))
-    setForm(prev => ({
-      ...prev,
-      leadId,
-      empresa: lead?.company || prev.empresa,
-      contato: lead?.contact || prev.contato,
-      valorEstimado: lead?.value || prev.valorEstimado,
-    }))
-  }
-
   const handleSubmit = (event) => {
     event.preventDefault()
+    const { valorEstimado, prioridade, ...payload } = form
     const result = onSave({
-      ...form,
-      leadId: form.leadId || null,
+      ...payload,
+      leadId: null,
       responsavelIds: getResponsibleIds(form),
       responsavelId: getResponsibleIds(form)[0] || null,
-      valorEstimado: Number(form.valorEstimado || 0),
     })
     if (result?.success === false) return setError(result.error)
     onClose()
@@ -327,15 +302,7 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {error && <div className="bg-red-950/40 border border-red-900/40 text-red-300 text-sm rounded px-3 py-2">{error}</div>}
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className={LABEL}>Lead vinculado</label>
-              <select value={form.leadId} onChange={e => selectLead(e.target.value)} className={INPUT}>
-                <option value="">Sem vínculo com lead</option>
-                {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.company}</option>)}
-              </select>
-            </div>
-            <div>
+          <div>
               <label className={LABEL}>Responsáveis</label>
               <div className="relative">
                 <button
@@ -411,7 +378,6 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
                   )}
                 </div>
               )}
-            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -430,7 +396,7 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
             <input value={form.titulo} onChange={e => set('titulo', e.target.value)} className={INPUT} placeholder="Ex: Diagnóstico inicial" />
           </div>
 
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             <div>
               <label className={LABEL}>Data *</label>
               <input type="date" value={form.data} onChange={e => set('data', e.target.value)} required className={INPUT} />
@@ -443,13 +409,9 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
               <label className={LABEL}>Fim</label>
               <input type="time" value={form.horaFim} onChange={e => set('horaFim', e.target.value)} className={INPUT} />
             </div>
-            <div>
-              <label className={LABEL}>Valor estimado</label>
-              <input type="number" value={form.valorEstimado} onChange={e => set('valorEstimado', e.target.value)} className={INPUT} placeholder="0" />
-            </div>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             <div>
               <label className={LABEL}>Status</label>
               <select value={form.status} onChange={e => set('status', e.target.value)} className={INPUT}>
@@ -466,12 +428,6 @@ function MeetingModal({ meeting, selectedDate, leads, members, onClose, onSave }
               <label className={LABEL}>Canal</label>
               <select value={form.canal} onChange={e => set('canal', e.target.value)} className={INPUT}>
                 {CHANNELS.map(channel => <option key={channel.value} value={channel.value}>{channel.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={LABEL}>Prioridade</label>
-              <select value={form.prioridade} onChange={e => set('prioridade', e.target.value)} className={INPUT}>
-                {Object.entries(PRIORITIES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
           </div>
@@ -732,7 +688,6 @@ export default function CalendarioComercial() {
         <MeetingModal
           meeting={modalMeeting}
           selectedDate={selectedDate}
-          leads={leads}
           members={members}
           onClose={() => setShowModal(false)}
           onSave={saveMeeting}
