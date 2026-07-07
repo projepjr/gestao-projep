@@ -242,7 +242,7 @@ function MeetingModal({ meeting, selectedDate, members, onClose, onSave }) {
     empresa: '',
     contato: '',
     tipo: 'diagnostico',
-    data: selectedDate,
+    data: meeting?.data || '',
     horaInicio: '09:00',
     horaFim: '10:00',
     status: 'agendada',
