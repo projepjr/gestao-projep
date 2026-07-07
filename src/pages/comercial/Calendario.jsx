@@ -243,8 +243,8 @@ function MeetingModal({ meeting, selectedDate, members, onClose, onSave }) {
     contato: '',
     tipo: 'diagnostico',
     data: meeting?.data || '',
-    horaInicio: '09:00',
-    horaFim: '10:00',
+    horaInicio: meeting?.horaInicio || '',
+    horaFim: meeting?.horaFim || '',
     status: 'agendada',
     canal: 'Google Meet',
     pauta: '',
@@ -403,11 +403,11 @@ function MeetingModal({ meeting, selectedDate, members, onClose, onSave }) {
             </div>
             <div>
               <label className={LABEL}>Início</label>
-              <input type="time" value={form.horaInicio} onChange={e => set('horaInicio', e.target.value)} className={INPUT} />
+              <input type="time" value={form.horaInicio} onChange={e => set('horaInicio', e.target.value)} required className={INPUT} />
             </div>
             <div>
               <label className={LABEL}>Fim</label>
-              <input type="time" value={form.horaFim} onChange={e => set('horaFim', e.target.value)} className={INPUT} />
+              <input type="time" value={form.horaFim} onChange={e => set('horaFim', e.target.value)} required className={INPUT} />
             </div>
           </div>
 
