@@ -12,6 +12,7 @@ O `gestao-projep` e um sistema web interno da PROJEP Jr para gestao de setores, 
 - Supabase Database.
 - Cloudflare Pages.
 - GitHub.
+- Brevo SMTP para emails transacionais via Supabase Auth.
 
 O projeto e um SPA Vite. Nao e Next.js.
 
