@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local knowledge/workflow files
+docs/memoria-obsidian/.obsidian/
+docs/memoria-codex/.obsidian/
+workflow-calendario-v2.json
+workflow-*.json

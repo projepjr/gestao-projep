@@ -10,7 +10,7 @@ O `gestao-projep` e um sistema web interno da PROJEP Jr para gestao de setores, 
 - React Router.
 - Supabase Auth.
 - Supabase Database.
-- Vercel.
+- Cloudflare Pages.
 - GitHub.
 
 O projeto e um SPA Vite. Nao e Next.js.
@@ -59,6 +59,6 @@ Diretriz atual:
 O fluxo operacional observado e:
 
 1. Codigo no GitHub.
-2. Deploy automatico pela Vercel a partir da branch principal.
-3. Variaveis de ambiente configuradas na Vercel para o front-end Vite.
-
+2. Deploy automatico pela Cloudflare Pages a partir da branch principal.
+3. Variaveis de ambiente configuradas na Cloudflare Pages para o front-end Vite.
+4. `public/_redirects` mantem o fallback SPA para rotas internas do React Router.

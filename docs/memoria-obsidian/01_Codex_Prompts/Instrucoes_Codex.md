@@ -1,6 +1,6 @@
-# Instrucoes para Codex neste projeto
+# Instrucoes para agentes neste projeto
 
-Use este arquivo como guia antes de fazer alteracoes no `gestao-projep`.
+Use este arquivo como guia antes de fazer alteracoes no `gestao-projep`. A memoria tecnica em `docs/memoria-obsidian` deve ser consultada por Codex, Claude/Claude Code e por pessoas trabalhando no projeto.
 
 ## Postura de trabalho
 
@@ -43,4 +43,3 @@ Variaveis publicas do Vite devem manter o prefixo `VITE_`.
 - Ao alterar login/cadastro/aprovacao, validar fluxo em outro navegador ou aba anonima.
 - Ao alterar chat/notificacoes, testar dois usuarios diferentes.
 - Ao alterar funil comercial, diferenciar estoque atual do pipeline e historico/eventos usados em filtros por periodo.
-

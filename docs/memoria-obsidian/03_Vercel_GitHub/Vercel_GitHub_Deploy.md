@@ -1,8 +1,15 @@
-# Vercel e GitHub
+# Cloudflare Pages e GitHub
 
 ## Hospedagem
 
-O sistema esta hospedado na Vercel.
+O deploy oficial atual do sistema esta na Cloudflare Pages.
+
+Configuracao operacional:
+
+- Framework preset: React (Vite).
+- Build command: `npm run build`.
+- Build output directory: `dist`.
+- Branch de producao: `main`.
 
 ## Codigo-fonte
 
@@ -20,9 +27,9 @@ npm run build
 
 3. Fazer commit.
 4. Fazer push para GitHub.
-5. Vercel faz deploy automatico da branch configurada.
+5. Cloudflare Pages faz deploy automatico da branch configurada.
 
-## Variaveis de ambiente na Vercel
+## Variaveis de ambiente na Cloudflare Pages
 
 Para o front-end Vite, configurar:
 
@@ -42,7 +49,7 @@ Nao expor no front-end:
 
 ## Rotas importantes para Auth
 
-Para recuperacao de senha, a Vercel precisa servir a rota SPA:
+Para recuperacao de senha e rotas internas, a Cloudflare Pages precisa servir a rota SPA:
 
 ```text
 /redefinir-senha
@@ -50,3 +57,10 @@ Para recuperacao de senha, a Vercel precisa servir a rota SPA:
 
 No Supabase Auth, essa URL tambem precisa estar permitida como redirect.
 
+O arquivo `public/_redirects` deve existir com:
+
+```text
+/* /index.html 200
+```
+
+O arquivo `vercel.json` ainda pode existir como configuracao legada, mas nao deve ser tratado como deploy oficial enquanto Cloudflare Pages for a hospedagem ativa.

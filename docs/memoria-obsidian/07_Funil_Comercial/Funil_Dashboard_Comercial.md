@@ -40,7 +40,7 @@ O n8n e usado como automacao para buscar dados do Pipefy e salvar snapshots no S
 
 Regra:
 
-- tokens do Pipefy e chaves privadas devem ficar no n8n/Supabase/Vercel, nunca versionados no front-end.
+- tokens do Pipefy e chaves privadas devem ficar no n8n/Supabase/provedor de hospedagem, nunca versionados no front-end.
 
 ## Equipe comercial e associacao Pipefy
 
@@ -115,4 +115,3 @@ Pelo historico recente do repo:
 - percentuais do funil ajustados para representar fase sobre total filtrado;
 - no-show de diagnostica/proposta precisou diferenciar a etapa em que o no-show aconteceu;
 - associacao de equipe comercial precisava ligar membro do site ao nome/email do Pipefy.
-
