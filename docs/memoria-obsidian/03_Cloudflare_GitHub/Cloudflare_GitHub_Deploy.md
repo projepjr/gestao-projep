@@ -43,6 +43,11 @@ VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL=
 
 Nao configurar variaveis com prefixo `NEXT_PUBLIC_`, pois o projeto nao e Next.js.
 
+Observacao operacional:
+
+- Variaveis com prefixo `VITE_` sao aplicadas em tempo de build.
+- Depois de criar ou alterar `VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL`, e necessario gerar novo deploy na Cloudflare Pages.
+
 Nao expor no front-end:
 
 - `service_role` key do Supabase;

@@ -374,3 +374,11 @@ Atualizacao 2026-07-18 - Atualizacao manual de dados sincronizados:
 - A URL do webhook nao deve ficar fixa no codigo nem na memoria. Deve ser configurada nas variaveis de ambiente da Cloudflare Pages.
 - Se a variavel nao estiver configurada ou se o n8n falhar, o botao ainda tenta recarregar o estado atual do Supabase.
 - Tooltip do botao: `Atualizar dados recentes`.
+
+Correcao 2026-07-18 - Disparo real do n8n pelo botao global:
+
+- O workflow ativo `Site Projep` no n8n nao tinha Webhook Trigger; possuia apenas gatilho de agenda.
+- Foi adicionado um Webhook Trigger no mesmo workflow, ligado ao node `Configurar chaves e IDs`, para disparar a mesma linha que atualiza Pipefy -> Supabase.
+- A Cloudflare Pages recebeu a variavel `VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL` em Production e Preview.
+- Apos teste manual do webhook, a tabela `comercial_dashboard_snapshots` recebeu novo snapshot `source = pipefy`, confirmando que o n8n atualizou o Supabase.
+- O site publicado precisa de novo deploy apos mudanca de variavel `VITE_`, porque Vite injeta variaveis publicas em tempo de build.
