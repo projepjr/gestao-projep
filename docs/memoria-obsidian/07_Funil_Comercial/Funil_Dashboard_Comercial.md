@@ -266,3 +266,20 @@ Motivo:
 
 - A fase `Nao contatados` existe justamente para leads em que houve tentativa, mas ainda nao houve contato efetivo.
 - Portanto, ela nao pode alimentar o indicador `Leads Contatados`.
+
+## Atualizacao 2026-07-17 - Tooltips e KPIs superiores
+
+Regra de interface:
+
+- Os tooltips dos pontos de interrogacao da dashboard comercial devem quebrar texto automaticamente e respeitar as bordas da tela.
+- Tooltips proximos ao lado direito nao podem cortar a mensagem; o posicionamento deve ser calculado em relacao ao viewport.
+- Os textos de ajuda dos KPIs superiores devem usar linguagem gerencial simples.
+
+KPIs superiores:
+
+- `Leads Entrantes`: quantidade de leads que entraram no pipeline dentro do periodo filtrado.
+- `Total de Leads`: usado na visao ao vivo para mostrar o tamanho atual do pipeline.
+- `Ticket Medio`: media dos contratos fechados no periodo; sem contratos, o valor fica `R$ 0`.
+- `Contratos Fechados`: quantidade de empresas que viraram contrato dentro do periodo filtrado.
+- `Receita Total`: soma dos valores dos contratos fechados no periodo.
+- `Taxa de Conversao`: proporcao de leads do periodo que chegaram ate contrato fechado.

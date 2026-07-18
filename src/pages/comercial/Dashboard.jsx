@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
@@ -89,50 +90,66 @@ function InfoTooltip({ text }) {
   const ref = useRef(null)
 
   const handleEnter = () => {
-    if (!ref.current) return
+    if (!ref.current || typeof window === 'undefined') return
     const rect = ref.current.getBoundingClientRect()
-    const TW = 224 // tooltip width px (w-56)
-    let left = rect.left + rect.width / 2
-    if (left + TW / 2 > window.innerWidth - 8) left = window.innerWidth - TW / 2 - 8
-    if (left - TW / 2 < 8) left = TW / 2 + 8
-    // Show above by default; flip below if too close to top
+    const tooltipWidth = Math.min(300, window.innerWidth - 24)
+    const iconCenter = rect.left + rect.width / 2
+    const left = Math.min(
+      Math.max(iconCenter, 12 + tooltipWidth / 2),
+      window.innerWidth - 12 - tooltipWidth / 2
+    )
     const above = rect.top > 80
-    setPos({ left, top: above ? rect.top - 6 : rect.bottom + 6, above })
+    const arrowLeft = Math.min(
+      Math.max(iconCenter - (left - tooltipWidth / 2), 14),
+      tooltipWidth - 14
+    )
+    setPos({
+      left,
+      top: above ? rect.top - 10 : rect.bottom + 10,
+      above,
+      width: tooltipWidth,
+      arrowLeft,
+    })
   }
 
-  return (
-    <span
-      ref={ref}
-      onMouseEnter={handleEnter}
-      onMouseLeave={() => setPos(null)}
-      className="inline-flex items-center ml-1 cursor-help flex-shrink-0 align-middle"
-    >
-      <span className="w-3.5 h-3.5 rounded-full border border-[#CE7028]/70 text-[#CE7028] text-[9px] font-bold flex items-center justify-center hover:bg-[#CE7028]/10 transition-colors leading-none select-none">
-        ?
-      </span>
+  if (!text) return null
 
-      {pos && (
+  return (
+    <span className="inline-flex items-center ml-1 flex-shrink-0 align-middle">
+      <button
+        ref={ref}
+        type="button"
+        onMouseEnter={handleEnter}
+        onMouseLeave={() => setPos(null)}
+        onFocus={handleEnter}
+        onBlur={() => setPos(null)}
+        className="w-3.5 h-3.5 rounded-full border border-[#CE7028]/70 text-[#CE7028] text-[9px] font-bold flex items-center justify-center hover:bg-[#CE7028]/10 transition-colors leading-none select-none cursor-help"
+        aria-label={`Ajuda: ${text}`}
+      >
+        ?
+      </button>
+
+      {pos && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
-            top:  pos.above ? pos.top : pos.top,
+            top: pos.top,
             left: pos.left,
             transform: pos.above
               ? 'translate(-50%, -100%) translateY(-4px)'
               : 'translate(-50%, 4px)',
             zIndex: 9999,
-            width: '14rem',
+            width: pos.width,
           }}
-          className="pointer-events-none rounded border border-[#CE7028] bg-[#1E1E1E] px-3 py-2.5 text-[11px] text-white leading-relaxed shadow-2xl"
+          className="pointer-events-none rounded border border-[#CE7028] bg-[#1E1E1E] px-3 py-2.5 text-left text-[12px] text-white leading-snug shadow-2xl whitespace-normal break-words"
         >
           {text}
-          {/* seta */}
           <span
             style={{
               position: 'absolute',
               ...(pos.above
-                ? { bottom: -5, left: '50%', transform: 'translateX(-50%) rotate(45deg)' }
-                : { top: -5,    left: '50%', transform: 'translateX(-50%) rotate(225deg)' }),
+                ? { bottom: -5, left: pos.arrowLeft, transform: 'translateX(-50%) rotate(45deg)' }
+                : { top: -5, left: pos.arrowLeft, transform: 'translateX(-50%) rotate(225deg)' }),
               width: 8,
               height: 8,
               background: '#1E1E1E',
@@ -140,7 +157,8 @@ function InfoTooltip({ text }) {
               borderBottom: '1px solid #CE7028',
             }}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   )
@@ -290,10 +308,10 @@ function PeriodNav({ viewMode, setViewMode, semaIdx, setSemaIdx, mesIdx, setMesI
 const KPI_TIPS = {
   'Total de Leads': 'Mostra quantos leads existem no pipeline inteiro neste momento.',
   'Leads Entrantes': 'Mostra quantos leads entraram no pipeline dentro do período selecionado.',
-  'Ticket Médio': 'Mostra o valor médio dos contratos fechados no período selecionado.',
-  'Contratos Fechados': 'Mostra quantas empresas viraram contrato no período selecionado.',
-  'Receita Total': 'Mostra o dinheiro total gerado pelos contratos fechados no período selecionado.',
-  'Taxa de Conversão': 'Mostra quantos leads cadastrados no período acabaram virando contrato.',
+  'Ticket Médio': 'Mostra o valor médio dos contratos fechados no período. Se não houver contrato, fica R$ 0.',
+  'Contratos Fechados': 'Mostra quantas empresas viraram contrato dentro do período selecionado.',
+  'Receita Total': 'Mostra o valor somado dos contratos fechados dentro do período selecionado.',
+  'Taxa de Conversão': 'Mostra a proporção de leads do período que chegaram até contrato fechado.',
 }
 function KPICard({ label, value, prevValue, format, Icon, accent }) {
   const formatted =
