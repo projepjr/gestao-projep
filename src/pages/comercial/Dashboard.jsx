@@ -354,6 +354,7 @@ const EMPTY_FUNIL = FUNIL_STAGES.reduce((acc, stage) => {
 }, {
   leadsCadastrados: 0,
   leadsTrabalhados: 0,
+  leadsContatados: 0,
   noShowsDiagnostica: 0,
   noShowsProposta: 0,
 })
@@ -478,7 +479,7 @@ function ComplementaryMetrics({ funil, historico }) {
   const h = historico || funil
   const leads = h.leadsCadastrados || funil.leadsCadastrados || 0
   const worked = h.leadsTrabalhados || 0
-  const contacts = h.ligacoesRealizadas || h.ligoesRealizadas || 0
+  const contacts = h.leadsContatados || 0
 
   const makeRate = (label, numerator, denominator, tip, tone = 'text-blue-400') => ({
     label,
@@ -492,7 +493,7 @@ function ComplementaryMetrics({ funil, historico }) {
   const cards = [
     makeRate('Leads Trabalhados', worked, leads, 'Mostra a parte dos leads do período que já saiu do cadastro e recebeu algum andamento comercial.'),
     makeRate('Tentativa de Contato', h.tentativasContato || 0, leads, 'Mostra quantos leads do período chegaram na fase de tentativa de contato.'),
-    makeRate('Leads Contatados', contacts, leads, 'Mostra quantos leads do período tiveram uma primeira ligação ou contato registrado no Pipefy.'),
+    makeRate('Leads Contatados', contacts, leads, 'Mostra quantos leads responderam ou avançaram para uma etapa que indica contato real. A fase de Tentativa de Contato sozinha não conta aqui.'),
     makeRate('Diag. Agendada', h.diagnosticasAgendadas || 0, contacts || leads, 'Mostra quantos leads contatados avançaram para uma diagnóstica agendada.'),
     makeRate('Diag. Realizada', h.diagnosticasRealizadas || 0, h.diagnosticasAgendadas || 0, 'Mostra quantas diagnósticas agendadas realmente aconteceram.', 'text-green-400'),
     makeRate('Proposta Agendada', h.propostasAgendadas || 0, h.diagnosticasRealizadas || 0, 'Mostra quantas diagnósticas realizadas viraram proposta agendada.'),
@@ -531,7 +532,7 @@ function ComplementaryMetrics({ funil, historico }) {
 const HUNTER_COLS = [
   { label: 'Hunter', tip: null },
   { label: 'Leads Trab.', tip: 'Leads do período que tiveram algum andamento feito por este Hunter.' },
-  { label: 'Leads Cont.', tip: 'Leads com primeira ligação ou contato registrado por este Hunter.' },
+  { label: 'Leads Cont.', tip: 'Leads que responderam ou avançaram para uma etapa que indica contato real com este Hunter.' },
   { label: 'Diag. Ag.', tip: 'Diagnósticas agendadas sob responsabilidade deste Hunter.' },
   { label: 'Diag. Real.', tip: 'Diagnósticas que realmente aconteceram sob responsabilidade deste Hunter.' },
   { label: 'Prop. Ag.', tip: 'Leads deste Hunter que chegaram a uma proposta agendada.' },

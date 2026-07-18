@@ -241,3 +241,28 @@ Alteracao aplicada na dashboard comercial para deixar a leitura mais intuitiva:
   - no-show em proposta fica com o Closer.
 - Nenhum campo novo do Pipefy foi identificado como obrigatorio nesta alteracao.
 - O n8n deve continuar salvando snapshots brutos somente do pipeline autorizado `307256948`.
+
+## Atualizacao 2026-07-17 - Leads trabalhados vs leads contatados
+
+Regra operacional/codigo:
+
+- `Tentativa de Contato` / `Nao contatados` nao significa lead contatado.
+- Um card nessa fase deve contar como:
+  - lead trabalhado;
+  - tentativa de contato;
+  - distribuicao atual na fase de contato.
+- Um card nessa fase nao deve contar como `Leads Contatados`.
+- `Leads Contatados` deve representar leads que responderam ou avancaram para uma etapa que pressupoe contato real, como:
+  - Interesse Futuro;
+  - Diagnostica Agendada;
+  - Diagnostica Realizada;
+  - Proposta Agendada;
+  - Proposta Realizada;
+  - Negociacao;
+  - Contratos Fechados;
+  - Pendentes / No-show quando vier depois de uma interacao real.
+
+Motivo:
+
+- A fase `Nao contatados` existe justamente para leads em que houve tentativa, mas ainda nao houve contato efetivo.
+- Portanto, ela nao pode alimentar o indicador `Leads Contatados`.

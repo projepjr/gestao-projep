@@ -2,6 +2,7 @@ const EMPTY_FUNIL = {
   cadastro: 0,
   leadsCadastrados: 0,
   leadsTrabalhados: 0,
+  leadsContatados: 0,
   tentativasContato: 0,
   ligoesRealizadas: 0,
   ligacoesRealizadas: 0,
@@ -858,7 +859,17 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     const futureInterest = currentStageInPeriod(card, STAGE_KEYWORDS.futureInterest, range)
     const pendingNoShow = currentStageInPeriod(card, STAGE_KEYWORDS.pendingScheduling, range)
     const lost = currentStageInPeriod(card, STAGE_KEYWORDS.lost, range)
-    const worked = contactAttempted ||
+    const successfulContact = futureInterest ||
+      diagnosticScheduled ||
+      diagnosticDone ||
+      proposalScheduled ||
+      proposalDone ||
+      inNegotiation ||
+      pendingNoShow ||
+      contractClosed
+
+    const worked = contactStage ||
+      contactAttempted ||
       futureInterest ||
       diagnosticScheduled ||
       diagnosticDone ||
@@ -872,6 +883,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     if (leadCreated) historico.leadsCadastrados += 1
     if (worked) historico.leadsTrabalhados += 1
     if (contactStage) historico.tentativasContato += 1
+    if (successfulContact) historico.leadsContatados += 1
     if (contactAttempted) {
       historico.ligoesRealizadas += 1
       historico.ligacoesRealizadas += 1
@@ -903,7 +915,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     const hunter = findOrCreateRow(hunters, getResponsibleTeamMember(card, 'hunter', hunterIndex))
     if (hunter) {
       if (worked) hunter.leadsTrabalhados += 1
-      if (contactAttempted) {
+      if (successfulContact) {
         hunter.leadsContatados += 1
         hunter.contatadas += 1
       }
