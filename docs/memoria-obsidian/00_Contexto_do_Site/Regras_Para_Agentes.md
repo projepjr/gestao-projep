@@ -23,6 +23,8 @@ Este arquivo resume regras operacionais para Codex, Claude/Claude Code e pessoas
 - Nao introduzir mock, `localStorage` ou fallback local como fonte oficial para dados reais.
 - `localStorage` so pode guardar preferencias visuais ou cache nao critico.
 - Se o Supabase estiver vazio, a interface deve continuar visivel com estado vazio correto, sem inventar dados.
+- Pipefy comercial: o unico pipeline autorizado para alteracoes e `307256948`.
+- Nao editar, excluir, renomear, mover fases, criar campos ou alterar configuracoes em qualquer outro pipeline do Pipefy.
 
 ## Seguranca
 

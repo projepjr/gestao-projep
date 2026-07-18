@@ -5,7 +5,7 @@ import { isSupabaseConfigured, supabase } from '../../lib/supabase'
 import { extractPipefyPeopleFromSnapshot } from '../../services/comercialSnapshotMapper'
 import UserAvatar from '../../components/UserAvatar'
 
-const PIPEFY_COMERCIAL_PIPE_ID = '307210845'
+const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
 const SNAPSHOT_LOOKBACK_LIMIT = 20
 
 function extractSnapshotPipeIds(payload = {}) {

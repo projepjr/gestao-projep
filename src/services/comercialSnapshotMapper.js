@@ -346,6 +346,8 @@ const EVENT_LABELS = {
     'data que foi realizada',
   ],
   proposalScheduled: [
+    'data e hora da proposta agendada',
+    'data da proposta agendada',
     'data e hora da reuniao de proposta',
     'data e hora da reunião de proposta',
     'data da reuniao de proposta',
@@ -506,7 +508,7 @@ function eventReachedInPeriod(card, fieldLabels, stageKeywords, range, targetRan
 
 function isNoShowFor(card, type, range) {
   const noShowType = getNoShowStageType(card)
-  const flagValue = getFieldValue(card, ['foi no-show', 'foi no show'])
+  const flagValue = getFieldValue(card, ['no-show confirmado', 'no show confirmado', 'foi no-show', 'foi no show'])
   const hasNoShowFlag = includesAny(flagValue, ['sim', 'true', 'yes', 'no-show', 'no show', 'noshow'])
   const hasNoShowDate = hasFieldValue(card, EVENT_LABELS.noShow)
   const typeMatches = noShowType === type
@@ -635,7 +637,7 @@ function matchTeamValue(value, index) {
 function getResponsibleTeamMember(card, type, teamIndex) {
   const fieldKeywords = type === 'hunter'
     ? ['hunter', 'prospector', 'responsaveis pela diagnostica', 'responsáveis pela diagnóstica', 'responsavel prospeccao', 'responsável prospecção', 'responsavel', 'responsável']
-    : ['closer responsavel', 'closer responsável', 'responsaveis pela apresentacao de proposta', 'responsáveis pela apresentação de proposta', 'responsavel pela negociacao', 'responsável pela negociação', 'responsaveis pelo fechamento', 'responsáveis pelo fechamento', 'closer', 'fechador', 'email do closer', 'responsavel fechamento', 'responsável fechamento']
+    : ['closer responsavel', 'closer responsável', 'responsavel pela proposta', 'responsável pela proposta', 'responsaveis pela proposta', 'responsáveis pela proposta', 'responsaveis pela apresentacao de proposta', 'responsáveis pela apresentação de proposta', 'responsavel pela negociacao', 'responsável pela negociação', 'responsaveis pelo contrato', 'responsáveis pelo contrato', 'responsaveis pelo fechamento', 'responsáveis pelo fechamento', 'closer', 'fechador', 'email do closer', 'responsavel fechamento', 'responsável fechamento']
 
   const values = [
     ...getFieldValues(card, fieldKeywords),
@@ -682,20 +684,76 @@ function findOrCreateRow(rows, member) {
   return null
 }
 
+// Classifica cada card pelo fase ATUAL do Pipefy (para o funil ao-vivo).
+// Retorna contagens por fase corrente, sem uso de histórico de movimentação.
+function buildFunilByCurrentPhase(cards) {
+  const f = { ...EMPTY_FUNIL }
+
+  for (const card of cards) {
+    const stage = getStageName(card)
+    // leadsCadastrados = total de leads (denominador do funil)
+    f.leadsCadastrados += 1
+
+    if (includesAny(stage, STAGE_KEYWORDS.contract)) {
+      f.contratosFechados++
+      f.leadsTrabalhados++
+    } else if (includesAny(stage, STAGE_KEYWORDS.negotiation)) {
+      f.negociacoes++
+      f.leadsTrabalhados++
+    } else if (includesAny(stage, STAGE_KEYWORDS.proposalDone)) {
+      f.propostasRealizadas++
+      f.leadsTrabalhados++
+    } else if (includesAny(stage, STAGE_KEYWORDS.proposalScheduled)) {
+      f.propostasAgendadas++
+      f.propostas++
+      f.leadsTrabalhados++
+    } else if (includesAny(stage, STAGE_KEYWORDS.pendingScheduling)) {
+      f.pendentesNoShow++
+      f.leadsTrabalhados++
+      const nsType = getNoShowStageType(card)
+      if (nsType === 'proposta') f.noShowsProposta++
+      else f.noShowsDiagnostica++
+    } else if (includesAny(stage, STAGE_KEYWORDS.diagnosticDone)) {
+      f.diagnosticasRealizadas++
+      f.reunioesRealizadas++
+      f.leadsTrabalhados++
+    } else if (includesAny(stage, STAGE_KEYWORDS.diagnosticScheduled)) {
+      f.diagnosticasAgendadas++
+      f.reunioesMarcadas++
+      f.leadsTrabalhados++
+    } else if (includesAny(stage, STAGE_KEYWORDS.futureInterest)) {
+      f.interesseFuturo++
+      f.leadsTrabalhados++
+    } else if (includesAny(stage, STAGE_KEYWORDS.contact)) {
+      f.tentativasContato++
+      f.ligoesRealizadas++
+      f.ligacoesRealizadas++
+      f.leadsTrabalhados++
+    } else if (includesAny(stage, STAGE_KEYWORDS.lost)) {
+      f.perdidos++
+      f.leadsTrabalhados++
+    }
+    // else: fase Cadastro ou não mapeada → conta apenas no total (leadsCadastrados)
+  }
+
+  return f
+}
+
 function buildMetricsFromCards(cards, members, commercial, payload, range = null) {
   const pipeline = { ...EMPTY_PIPELINE }
-  const funil = { ...EMPTY_FUNIL }
+  // historico = contagens baseadas em eventos (passagem por etapa / campos preenchidos).
+  // Usado para taxas de conversão e como funil nos modos semanal/mensal.
+  const historico = { ...EMPTY_FUNIL }
   const hunters = createHunterRows(members, commercial)
   const closers = createCloserRows(members, commercial)
   const pipeMembers = getPipeMembers(payload)
   const hunterIndex = buildTeamIndex('hunter', commercial.equipe?.hunters || [], members, pipeMembers)
   const closerIndex = buildTeamIndex('closer', commercial.equipe?.closers || [], members, pipeMembers)
+  const hasRange = Boolean(range?.inicio && range?.fim)
   let receitaTotal = 0
 
   for (const card of cards) {
     const pipelineKey = classifyPipeline(card)
-    // Pipeline = estoque atual do CRM no snapshot. O funil abaixo usa historico
-    // de passagem por etapa e respeita o periodo selecionado.
     pipeline[pipelineKey] += 1
 
     const leadCreated = cardCreatedInPeriod(card, range)
@@ -797,36 +855,36 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       contractClosed ||
       lost
 
-    if (leadCreated) funil.leadsCadastrados += 1
-    if (worked) funil.leadsTrabalhados += 1
-    if (contactStage) funil.tentativasContato += 1
+    if (leadCreated) historico.leadsCadastrados += 1
+    if (worked) historico.leadsTrabalhados += 1
+    if (contactStage) historico.tentativasContato += 1
     if (contactAttempted) {
-      funil.ligoesRealizadas += 1
-      funil.ligacoesRealizadas += 1
+      historico.ligoesRealizadas += 1
+      historico.ligacoesRealizadas += 1
     }
-    if (futureInterest) funil.interesseFuturo += 1
+    if (futureInterest) historico.interesseFuturo += 1
     if (diagnosticScheduled) {
-      funil.diagnosticasAgendadas += 1
-      funil.reunioesMarcadas += 1
+      historico.diagnosticasAgendadas += 1
+      historico.reunioesMarcadas += 1
     }
     if (diagnosticDone) {
-      funil.diagnosticasRealizadas += 1
-      funil.reunioesRealizadas += 1
+      historico.diagnosticasRealizadas += 1
+      historico.reunioesRealizadas += 1
     }
-    if (diagnosticNoShow) funil.noShowsDiagnostica += 1
+    if (diagnosticNoShow) historico.noShowsDiagnostica += 1
     if (proposalScheduled) {
-      funil.propostasAgendadas += 1
-      funil.propostas += 1
+      historico.propostasAgendadas += 1
+      historico.propostas += 1
     }
-    if (proposalDone) funil.propostasRealizadas += 1
-    if (proposalNoShow) funil.noShowsProposta += 1
-    if (inNegotiation) funil.negociacoes += 1
-    if (pendingNoShow) funil.pendentesNoShow += 1
+    if (proposalDone) historico.propostasRealizadas += 1
+    if (proposalNoShow) historico.noShowsProposta += 1
+    if (inNegotiation) historico.negociacoes += 1
+    if (pendingNoShow) historico.pendentesNoShow += 1
     if (contractClosed) {
-      funil.contratosFechados += 1
+      historico.contratosFechados += 1
       receitaTotal += getCardValue(card)
     }
-    if (lost) funil.perdidos += 1
+    if (lost) historico.perdidos += 1
 
     const hunter = findOrCreateRow(hunters, getResponsibleTeamMember(card, 'hunter', hunterIndex))
     if (hunter) {
@@ -846,16 +904,21 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     }
   }
 
+  // Ao vivo (sem período): funil mostra a fase ATUAL de cada card.
+  // Com período: funil = mesmos eventos do histórico (atividade no intervalo).
+  const funil = hasRange ? { ...historico } : buildFunilByCurrentPhase(cards)
+
   return {
     funil,
+    historico,
     pipeline,
     hunters,
     closers,
     kpis: {
-      ticketMedio: funil.contratosFechados ? receitaTotal / funil.contratosFechados : 0,
+      ticketMedio: historico.contratosFechados ? receitaTotal / historico.contratosFechados : 0,
       receitaTotal,
-      contratosFechados: funil.contratosFechados,
-      taxaConversao: funil.leadsCadastrados ? (funil.contratosFechados / funil.leadsCadastrados) * 100 : 0,
+      contratosFechados: historico.contratosFechados,
+      taxaConversao: historico.leadsCadastrados ? (historico.contratosFechados / historico.leadsCadastrados) * 100 : 0,
     },
   }
 }
@@ -869,15 +932,30 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
   const cards = filterCardsByRange(allCards, range)
   const hasRange = Boolean(range?.inicio && range?.fim)
   const computed = allCards.length ? buildMetricsFromCards(allCards, members, commercial, payload, range) : null
+  // Quando computed está disponível, confiamos 100% nele — não misturamos com payload.funil
+  // para evitar que campos legados do n8n (ex: noShows) contaminem o resultado.
   const funil = {
     ...EMPTY_FUNIL,
-    ...(hasRange ? {} : (payload.funil || {})),
+    ...(computed ? {} : (hasRange ? {} : (payload.funil || {}))),
     ...(computed?.funil || {}),
   }
-  funil.ligoesRealizadas = funil.ligoesRealizadas || funil.ligacoesRealizadas || 0
-  funil.ligacoesRealizadas = funil.ligacoesRealizadas || funil.ligoesRealizadas || 0
-  funil.leadsTrabalhados = funil.leadsTrabalhados || funil.tentativasContato || 0
-  funil.pendentesNoShow = funil.pendentesNoShow || funil.agendamentosPendentes || funil.noShows || 0
+  if (!computed) {
+    funil.ligoesRealizadas = funil.ligoesRealizadas || funil.ligacoesRealizadas || 0
+    funil.ligacoesRealizadas = funil.ligacoesRealizadas || funil.ligoesRealizadas || 0
+    funil.leadsTrabalhados = funil.leadsTrabalhados || funil.tentativasContato || 0
+    funil.pendentesNoShow = funil.pendentesNoShow || funil.agendamentosPendentes || funil.noShows || 0
+  }
+
+  const historico = {
+    ...EMPTY_FUNIL,
+    ...(computed?.historico || computed?.funil || {}),
+  }
+  if (!computed) {
+    historico.ligoesRealizadas = historico.ligoesRealizadas || historico.ligacoesRealizadas || 0
+    historico.ligacoesRealizadas = historico.ligacoesRealizadas || historico.ligoesRealizadas || 0
+    historico.leadsTrabalhados = historico.leadsTrabalhados || historico.tentativasContato || 0
+    historico.pendentesNoShow = historico.pendentesNoShow || historico.agendamentosPendentes || historico.noShows || 0
+  }
 
   const pipeline = {
     ...EMPTY_PIPELINE,
@@ -894,6 +972,7 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
     fim: range?.fim || new Date().toISOString().split('T')[0],
     ultimaAtualizacao: payload.periodo?.atualizadoEm || new Date().toISOString(),
     funil,
+    historico,
     hunters: computed?.hunters || (Array.isArray(payload.hunters) && payload.hunters.length
       ? payload.hunters
       : createHunterRows(members, commercial)),
@@ -960,7 +1039,7 @@ export function extractPipefyPeopleFromSnapshot(payload) {
   for (const card of cards) {
     getFieldValues(card, ['hunter', 'responsaveis pela diagnostica', 'responsáveis pela diagnóstica', 'responsavel prospeccao', 'responsável prospecção', 'responsavel', 'responsável'])
       .forEach(value => extractEmails(value).forEach(email => add({ email, source: 'Responsável' })))
-    getFieldValues(card, ['closer responsavel', 'closer responsável', 'responsaveis pela apresentacao de proposta', 'responsáveis pela apresentação de proposta', 'responsavel pela negociacao', 'responsável pela negociação', 'responsaveis pelo fechamento', 'responsáveis pelo fechamento', 'closer', 'email do closer', 'responsavel fechamento', 'responsável fechamento'])
+    getFieldValues(card, ['closer responsavel', 'closer responsável', 'responsavel pela proposta', 'responsável pela proposta', 'responsaveis pela proposta', 'responsáveis pela proposta', 'responsaveis pela apresentacao de proposta', 'responsáveis pela apresentação de proposta', 'responsavel pela negociacao', 'responsável pela negociação', 'responsaveis pelo contrato', 'responsáveis pelo contrato', 'responsaveis pelo fechamento', 'responsáveis pelo fechamento', 'closer', 'email do closer', 'responsavel fechamento', 'responsável fechamento'])
       .forEach(value => extractEmails(value).forEach(email => add({ email, source: 'Closer' })))
     getCardAssigneePeople(card).forEach(person => {
       if (person.email) add({ email: person.email, name: person.name, source: 'Assignee' })

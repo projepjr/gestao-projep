@@ -12,7 +12,7 @@ import { useData } from '../../contexts/DataContext'
 import { isSupabaseConfigured, supabase } from '../../lib/supabase'
 import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 
-const PIPEFY_COMERCIAL_PIPE_ID = '307210845'
+const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
 const DASHBOARD_REFRESH_MS = 5 * 60 * 1000
 const DASHBOARD_SNAPSHOT_LOOKBACK = 20
 
@@ -54,7 +54,7 @@ function selectComercialSnapshot(snapshots) {
   if (usableSnapshots[0]) {
     return {
       snapshot: usableSnapshots[0],
-      statusMessage: 'Snapshot sem pipe_id explícito. Assumindo pipeline 307210845.',
+      statusMessage: 'Snapshot sem pipe_id explícito. Assumindo pipeline 307256948.',
     }
   }
 
@@ -337,62 +337,62 @@ function KPICard({ label, value, prevValue, format, Icon, accent }) {
 const FUNIL_STAGES = [
   {
     key: 'leadsCadastrados',   label: 'Leads Cad.',     color: '#64748B',
-    tip: 'Total de leads inseridos no Pipefy no período',
+    tip: 'Total de leads no Pipefy (denominador do funil)',
     convTip: null,
   },
   {
     key: 'tentativasContato',  label: 'Tent. Contato',  color: '#3B82F6',
-    tip: 'Leads que saíram de Cadastro e tiveram tentativa de contato no período',
+    tip: 'Cards atualmente na fase Tentativas de Contato',
     convTip: 'Tentativas de Contato ÷ Leads Cadastrados × 100',
     denominatorKey: 'leadsCadastrados',
   },
   {
     key: 'interesseFuturo',    label: 'Int. Futuro',    color: '#F59E0B',
-    tip: 'Leads na fase Interesse Futuro do Pipefy',
+    tip: 'Cards atualmente na fase Interesse Futuro',
     convTip: 'Interesse Futuro ÷ Tentativas de Contato × 100',
     denominatorKey: 'tentativasContato',
   },
   {
     key: 'diagnosticasAgendadas', label: 'Diag. Ag.', color: '#8B5CF6',
-    tip: 'Cards que chegaram à fase Diagnóstica Agendada no período',
+    tip: 'Cards atualmente na fase Diagnóstica Agendada',
     convTip: 'Diagnósticas Agendadas ÷ Tentativas de Contato × 100',
     denominatorKey: 'tentativasContato',
   },
   {
     key: 'diagnosticasRealizadas', label: 'Diag. Real.', color: '#2A6B68',
-    tip: 'Cards que chegaram à fase Diagnóstica Realizada e continuam válidos nessa etapa',
+    tip: 'Cards atualmente na fase Diagnóstica Realizada',
     convTip: 'Diagnósticas Realizadas ÷ Diagnósticas Agendadas × 100',
   },
   {
     key: 'propostasAgendadas', label: 'Prop. Ag.', color: '#E8955A',
-    tip: 'Cards que chegaram à fase Proposta Agendada no período',
+    tip: 'Cards atualmente na fase Proposta Agendada',
     convTip: 'Propostas Agendadas ÷ Diagnósticas Realizadas × 100',
   },
   {
     key: 'propostasRealizadas', label: 'Prop. Real.', color: '#F59E0B',
-    tip: 'Cards que chegaram à fase Proposta Realizada e continuam válidos nessa etapa',
+    tip: 'Cards atualmente na fase Proposta Realizada',
     convTip: 'Propostas Realizadas ÷ Propostas Agendadas × 100',
   },
   {
     key: 'negociacoes',        label: 'Negociação',     color: '#CE7028',
-    tip: 'Cards que chegaram à fase Negociação no período',
+    tip: 'Cards atualmente na fase Negociação',
     convTip: 'Negociações ÷ Propostas Realizadas × 100',
   },
   {
     key: 'pendentesNoShow',    label: 'Pend./No-show',  color: '#F97316',
-    tip: 'Cards atualmente em Pendentes / No-show dentro do período analisado',
+    tip: 'Cards atualmente na fase Pendentes / No-show',
     convTip: 'Pendentes / No-show ÷ Leads Cadastrados × 100',
     denominatorKey: 'leadsCadastrados',
   },
   {
     key: 'contratosFechados',  label: 'Contratos',      color: '#16A34A',
-    tip: 'Cards que chegaram à fase Contratos Fechados no período',
+    tip: 'Cards atualmente na fase Contratos Fechados',
     convTip: 'Contratos Fechados ÷ Negociação × 100',
     denominatorKey: 'negociacoes',
   },
   {
     key: 'perdidos',           label: 'Perdidos',       color: '#EF4444',
-    tip: 'Cards atualmente na fase Perdidos dentro do período analisado',
+    tip: 'Cards atualmente na fase Perdidos',
     convTip: 'Perdidos ÷ Leads Cadastrados × 100',
     denominatorKey: 'leadsCadastrados',
   },
@@ -421,6 +421,7 @@ function normalizeDashboardPeriod(period = {}, fallback = {}) {
     fim: period.fim || fallback.fim || isoDate(new Date()),
     ultimaAtualizacao: period.ultimaAtualizacao || fallback.ultimaAtualizacao || new Date().toISOString(),
     funil: { ...EMPTY_FUNIL, ...(period.funil || {}) },
+    historico: { ...EMPTY_FUNIL, ...(period.historico || period.funil || {}) },
     pipeline: { ...EMPTY_PIPELINE, ...(period.pipeline || {}) },
     kpis: { ...EMPTY_KPIS, ...(period.kpis || {}) },
     hunters: Array.isArray(period.hunters) ? period.hunters : [],
@@ -524,10 +525,13 @@ function PipelineGrid({ pipeline }) {
   )
 }
 
-function ComplementaryMetrics({ funil }) {
-  const ligacoes = funil.tentativasContato || 0
-  const leads = funil.leadsCadastrados || 0
-  const leadsTrabalhados = funil.leadsTrabalhados || ligacoes
+function ComplementaryMetrics({ funil, historico }) {
+  // taxas de conversão usam historico (passagem acumulada por etapa),
+  // não o funil ao-vivo (fase corrente). Fallback para funil se historico ausente.
+  const h = historico || funil
+  const ligacoes = h.tentativasContato || 0
+  const leads = h.leadsCadastrados || 0
+  const leadsTrabalhados = h.leadsTrabalhados || ligacoes
   const makeRate = (label, numerator, denominator, tip, tone = 'text-blue-400') => ({
     label,
     value: pct(numerator, denominator),
@@ -548,17 +552,17 @@ function ComplementaryMetrics({ funil }) {
     },
     makeRate('Leads Trabalhados', leadsTrabalhados, leads, 'Leads que sairam de Cadastro dividido pelo Total de Leads Cadastrados.'),
     makeRate('Taxa de Tentativa', ligacoes, leads, 'Leads que foram para Tentativa de Contato dividido pelo Total de Leads Cadastrados.'),
-    makeRate('Diag. Agendada', funil.diagnosticasAgendadas || 0, leads, 'Diagnosticas Agendadas dividido pelo Total de Leads Cadastrados.'),
-    makeRate('Diag. Realizada', funil.diagnosticasRealizadas || 0, funil.diagnosticasAgendadas || 0, 'Diagnosticas Realizadas dividido por Diagnosticas Agendadas.', 'text-green-400'),
-    makeRate('Proposta Agendada', funil.propostasAgendadas || 0, funil.diagnosticasRealizadas || 0, 'Propostas Agendadas dividido por Diagnosticas Realizadas.'),
-    makeRate('Proposta Realizada', funil.propostasRealizadas || 0, funil.propostasAgendadas || 0, 'Propostas Realizadas dividido por Propostas Agendadas.', 'text-green-400'),
-    makeRate('Negociacao', funil.negociacoes || 0, funil.propostasRealizadas || 0, 'Negociacoes dividido por Propostas Realizadas.'),
-    makeRate('Contrato', funil.contratosFechados || 0, funil.negociacoes || 0, 'Contratos Fechados dividido por Negociacoes.', 'text-green-400'),
-    makeRate('Lead -> Contrato', funil.contratosFechados || 0, leads, 'Contratos Fechados dividido pelo Total de Leads Cadastrados.', 'text-green-400'),
-    makeRate('No-show Diagnostica', funil.noShowsDiagnostica || 0, funil.diagnosticasAgendadas || 0, 'No-shows de Diagnostica dividido por Diagnosticas Agendadas.', 'text-red-400'),
-    makeRate('No-show Proposta', funil.noShowsProposta || 0, funil.propostasAgendadas || 0, 'No-shows de Proposta dividido por Propostas Agendadas.', 'text-red-400'),
-    makeRate('Perda Geral', funil.perdidos || 0, leads, 'Perdidos dividido pelo Total de Leads Cadastrados.', 'text-red-400'),
-    makeRate('Pendencia/No-show', funil.pendentesNoShow || 0, leads, 'Pendentes ou No-show dividido pelo Total de Leads Cadastrados.', 'text-yellow-400'),
+    makeRate('Diag. Agendada', h.diagnosticasAgendadas || 0, leads, 'Diagnosticas Agendadas dividido pelo Total de Leads Cadastrados.'),
+    makeRate('Diag. Realizada', h.diagnosticasRealizadas || 0, h.diagnosticasAgendadas || 0, 'Diagnosticas Realizadas dividido por Diagnosticas Agendadas.', 'text-green-400'),
+    makeRate('Proposta Agendada', h.propostasAgendadas || 0, h.diagnosticasRealizadas || 0, 'Propostas Agendadas dividido por Diagnosticas Realizadas.'),
+    makeRate('Proposta Realizada', h.propostasRealizadas || 0, h.propostasAgendadas || 0, 'Propostas Realizadas dividido por Propostas Agendadas.', 'text-green-400'),
+    makeRate('Negociacao', h.negociacoes || 0, h.propostasRealizadas || 0, 'Negociacoes dividido por Propostas Realizadas.'),
+    makeRate('Contrato', h.contratosFechados || 0, h.negociacoes || 0, 'Contratos Fechados dividido por Negociacoes.', 'text-green-400'),
+    makeRate('Lead -> Contrato', h.contratosFechados || 0, leads, 'Contratos Fechados dividido pelo Total de Leads Cadastrados.', 'text-green-400'),
+    makeRate('No-show Diagnostica', h.noShowsDiagnostica || 0, h.diagnosticasAgendadas || 0, 'No-shows de Diagnostica dividido por Diagnosticas Agendadas.', 'text-red-400'),
+    makeRate('No-show Proposta', h.noShowsProposta || 0, h.propostasAgendadas || 0, 'No-shows de Proposta dividido por Propostas Agendadas.', 'text-red-400'),
+    makeRate('Perda Geral', h.perdidos || 0, leads, 'Perdidos dividido pelo Total de Leads Cadastrados.', 'text-red-400'),
+    makeRate('Pendencia/No-show', h.pendentesNoShow || 0, leads, 'Pendentes ou No-show dividido pelo Total de Leads Cadastrados.', 'text-yellow-400'),
   ]
 
   return (
@@ -1147,7 +1151,7 @@ export default function ComercialDashboard() {
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
             Indicadores Comerciais
           </p>
-          <ComplementaryMetrics funil={currentPeriod.funil} />
+          <ComplementaryMetrics funil={currentPeriod.funil} historico={currentPeriod.historico} />
         </div>
 
         {showPipeline && currentPeriod.pipeline && (
