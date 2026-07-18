@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
@@ -1061,13 +1062,22 @@ export default function ComercialDashboard() {
             )}
           </div>
         </div>
-        <PeriodNav
-          viewMode={viewMode} setViewMode={setViewMode}
-          semaIdx={semaIdx}   setSemaIdx={setSemaIdx}
-          mesIdx={mesIdx}     setMesIdx={setMesIdx}
-          semanas={semanas}   meses={meses}
-          aovivo={aovivo}
-        />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <Link
+            to="/comercial/leads"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded border border-[#CE7028]/35 bg-[#CE7028]/10 text-[#FF882D] text-sm font-semibold hover:bg-[#CE7028]/20 transition-colors"
+          >
+            <Target className="w-4 h-4" />
+            Leads
+          </Link>
+          <PeriodNav
+            viewMode={viewMode} setViewMode={setViewMode}
+            semaIdx={semaIdx}   setSemaIdx={setSemaIdx}
+            mesIdx={mesIdx}     setMesIdx={setMesIdx}
+            semanas={semanas}   meses={meses}
+            aovivo={aovivo}
+          />
+        </div>
       </div>
 
       {/* ── Seção 1: KPIs (topo) ── */}

@@ -327,7 +327,8 @@ export default function Layout({ children }) {
                   <>
                     <ChevronRight className="w-3.5 h-3.5 text-gray-700" />
                     <span className="text-gray-300 font-medium">
-                      {activeSector.subItems.find(s => s.path === location.pathname)?.label || ''}
+                      {activeSector.subItems.find(s => s.path === location.pathname)?.label ||
+                        (location.pathname === '/comercial/leads' ? 'Leads' : '')}
                     </span>
                   </>
                 )}

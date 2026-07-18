@@ -303,11 +303,12 @@ Regra tecnica:
 
 ## Atualizacao 2026-07-17 - Analise de leads por CNAE/segmento
 
-Nova subarea:
+Nova tela interna da dashboard:
 
-- `Comercial > Leads`
+- Acesso por botao `Leads` dentro de `Comercial > Dashboard`.
 - Rota: `/comercial/leads`
 - Arquivo: `src/pages/comercial/Leads.jsx`
+- A tela nao deve aparecer como item proprio no menu lateral; ela e uma pagina analitica relacionada a dashboard.
 
 Objetivo:
 
@@ -348,3 +349,9 @@ Observacao importante:
 - Em 2026-07-17, o snapshot analisado nao trazia campo de CNAE/segmento preenchido.
 - Enquanto esse campo nao existir ou nao estiver preenchido no Pipefy/n8n, a pagina agrupa os leads como `Sem CNAE informado`.
 - Para o ranking ficar gerencialmente util, o Pipefy precisa alimentar um campo consistente de CNAE/segmento no snapshot.
+
+Correcao 2026-07-18:
+
+- `Leads` foi removido das subareas exibidas no sidebar.
+- O acesso a `/comercial/leads` passou a usar a permissao de `comercial.dashboard`.
+- A funcao `mapLeadSegmentInsights()` usa `ratioPct()` para calcular percentuais e nao deve depender de helper local da pagina.

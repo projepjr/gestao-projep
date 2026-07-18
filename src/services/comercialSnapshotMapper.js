@@ -50,6 +50,7 @@ const normalize = value => String(value || '')
 
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const ratioPct = (value, total) => (total > 0 ? (value / total) * 100 : 0)
 
 const includesAny = (value, words) => {
   const normalized = normalize(value)
@@ -1104,13 +1105,13 @@ export function mapLeadSegmentInsights(payload, { range = null } = {}) {
 
   const rows = [...groups.values()].map(row => ({
     ...row,
-    workedRate: pct(row.worked, row.total),
-    contactAttemptRate: pct(row.contactAttempts, row.total),
-    contactRate: pct(row.contacted, row.total),
-    diagnosticDoneRate: pct(row.diagnosticDone, row.total),
-    proposalDoneRate: pct(row.proposalDone, row.total),
-    contractRate: pct(row.contracts, row.total),
-    lostRate: pct(row.lost, row.total),
+    workedRate: ratioPct(row.worked, row.total),
+    contactAttemptRate: ratioPct(row.contactAttempts, row.total),
+    contactRate: ratioPct(row.contacted, row.total),
+    diagnosticDoneRate: ratioPct(row.diagnosticDone, row.total),
+    proposalDoneRate: ratioPct(row.proposalDone, row.total),
+    contractRate: ratioPct(row.contracts, row.total),
+    lostRate: ratioPct(row.lost, row.total),
   }))
 
   const totals = rows.reduce((acc, row) => ({
@@ -1137,10 +1138,10 @@ export function mapLeadSegmentInsights(payload, { range = null } = {}) {
     rows,
     totals: {
       ...totals,
-      contactRate: pct(totals.contacted, totals.total),
-      diagnosticDoneRate: pct(totals.diagnosticDone, totals.total),
-      proposalDoneRate: pct(totals.proposalDone, totals.total),
-      contractRate: pct(totals.contracts, totals.total),
+      contactRate: ratioPct(totals.contacted, totals.total),
+      diagnosticDoneRate: ratioPct(totals.diagnosticDone, totals.total),
+      proposalDoneRate: ratioPct(totals.proposalDone, totals.total),
+      contractRate: ratioPct(totals.contracts, totals.total),
     },
     missingSegmentCount: rows.find(row => row.segment === 'Sem CNAE informado')?.total || 0,
   }
