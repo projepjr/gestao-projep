@@ -281,10 +281,25 @@ function getStageName(card) {
 }
 
 function getCardValue(card) {
+  const contractValue = getFieldValue(card, [
+    'valor fechado',
+    'valor do contrato',
+    'valor final',
+    'valor contratado',
+    'valor de fechamento',
+    'valor assinado',
+    'receita fechada',
+    'receita do contrato',
+  ])
+
   return toNumber(
-    getFieldValue(card, ['valor do projeto', 'valor fechado', 'valor da proposta', 'valor', 'ticket', 'orcamento', 'orçamento', 'receita']) ||
-    card?.value ||
-    card?.amount,
+    contractValue ||
+    card?.closed_value ||
+    card?.closedValue ||
+    card?.contract_value ||
+    card?.contractValue ||
+    card?.final_value ||
+    card?.finalValue,
   )
 }
 

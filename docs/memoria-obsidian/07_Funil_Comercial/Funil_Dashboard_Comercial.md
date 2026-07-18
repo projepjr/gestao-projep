@@ -283,3 +283,20 @@ KPIs superiores:
 - `Contratos Fechados`: quantidade de empresas que viraram contrato dentro do periodo filtrado.
 - `Receita Total`: soma dos valores dos contratos fechados no periodo.
 - `Taxa de Conversao`: proporcao de leads do periodo que chegaram ate contrato fechado.
+
+## Atualizacao 2026-07-17 - Valor financeiro dos contratos
+
+Regra operacional:
+
+- KPIs financeiros da dashboard (`Ticket Medio` e `Receita Total`) devem usar o campo `Valor fechado`.
+- O campo `Valor apresentado` representa apenas o valor mostrado na proposta e nao deve alimentar receita real.
+- Se um contrato foi apresentado por `R$ 1.000`, mas fechado por `R$ 900`, a dashboard deve mostrar `R$ 900`.
+
+Regra tecnica:
+
+- `getCardValue()` em `src/services/comercialSnapshotMapper.js` deve priorizar campos como:
+  - `Valor fechado`;
+  - `Valor do contrato`;
+  - `Valor final`;
+  - `Valor contratado`.
+- Campos genericos ou de proposta, como `Valor apresentado` e `Valor da proposta`, nao devem ser usados para calcular receita/ticket.
