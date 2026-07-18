@@ -115,6 +115,19 @@ function MetricCard({ label, value, Icon, tone = 'text-white', helper }) {
   )
 }
 
+function HelpTip({ text, align = 'left' }) {
+  return (
+    <span className="relative inline-flex group">
+      <span className="w-4 h-4 rounded-full border border-[#CE7028] text-[#CE7028] text-[10px] font-bold inline-flex items-center justify-center leading-none cursor-help">
+        ?
+      </span>
+      <span className={`pointer-events-none absolute z-50 top-6 ${align === 'right' ? 'right-0' : 'left-0'} w-64 max-w-[min(16rem,calc(100vw-2rem))] rounded border border-[#CE7028] bg-[#1E1E1E] px-3 py-2 text-xs font-medium leading-relaxed text-white shadow-xl opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 whitespace-normal normal-case tracking-normal`}>
+        {text}
+      </span>
+    </span>
+  )
+}
+
 function PeriodSelector({ mode, setMode, weeks, weekIndex, setWeekIndex, months, monthIndex, setMonthIndex }) {
   const currentWeek = weeks[weekIndex]
   const currentMonth = months[monthIndex]
@@ -168,11 +181,10 @@ function PeriodSelector({ mode, setMode, weeks, weekIndex, setWeekIndex, months,
   )
 }
 
-function ConversionBar({ label, value, count, total, color = '#CE7028' }) {
+function ConversionBar({ value, count, total, color = '#CE7028' }) {
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-1.5">
-        <span className="text-gray-500">{label}</span>
         <span className="text-gray-300 font-semibold">{pctText(value)} <span className="text-gray-700">({count}/{total})</span></span>
       </div>
       <div className="h-1.5 rounded bg-[#1E1E1E] overflow-hidden">
@@ -267,9 +279,6 @@ export default function LeadsInsights() {
     })
   }, [insights.rows, query, sortDir, sortKey])
 
-  const topContract = insights.rows.filter(row => row.total > 0).sort((a, b) => b.contractRate - a.contractRate || b.total - a.total)[0]
-  const topContact = insights.rows.filter(row => row.total > 0).sort((a, b) => b.contactRate - a.contactRate || b.total - a.total)[0]
-
   const toggleSort = key => {
     if (sortKey === key) {
       setSortDir(prev => prev === 'desc' ? 'asc' : 'desc')
@@ -329,20 +338,6 @@ export default function LeadsInsights() {
         <MetricCard label="Proposta apresentada" value={pctText(insights.totals.proposalDoneRate)} Icon={Target} helper={`${insights.totals.proposalDone}/${insights.totals.total} chegaram à proposta realizada.`} tone="text-[#CE7028]" />
         <MetricCard label="Contratos" value={pctText(insights.totals.contractRate)} Icon={FileCheck} helper={`${insights.totals.contracts}/${insights.totals.total} viraram contrato.`} tone="text-green-400" />
       </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-[#111111] border border-[#1E1E1E] rounded-md p-5">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Melhor contato</p>
-          <p className="text-xl font-bold text-white mt-2">{topContact?.segment || 'Sem dados suficientes'}</p>
-          <p className="text-sm text-blue-400 mt-1">{topContact ? `${pctText(topContact.contactRate)} de contato real (${topContact.contacted}/${topContact.total})` : 'Preencha CNAE/segmento para comparar.'}</p>
-        </div>
-        <div className="bg-[#111111] border border-[#1E1E1E] rounded-md p-5">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Melhor fechamento</p>
-          <p className="text-xl font-bold text-white mt-2">{topContract?.segment || 'Sem dados suficientes'}</p>
-          <p className="text-sm text-green-400 mt-1">{topContract ? `${pctText(topContract.contractRate)} viraram contrato (${topContract.contracts}/${topContract.total})` : 'Ainda não há contratos no período.'}</p>
-        </div>
-      </div>
-
       <div className="bg-[#111111] border border-[#1E1E1E] rounded-md">
         <div className="p-5 border-b border-[#1E1E1E] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
@@ -365,19 +360,22 @@ export default function LeadsInsights() {
             <thead>
               <tr className="text-left text-gray-500 border-b border-[#1E1E1E]">
                 {[
-                  ['segment', 'CNAE / Segmento'],
-                  ['total', 'Leads'],
-                  ['contactRate', 'Contato real'],
-                  ['diagnosticDoneRate', 'Diag. realizada'],
-                  ['proposalDoneRate', 'Proposta realizada'],
-                  ['contractRate', 'Contrato'],
-                  ['lostRate', 'Perda'],
-                ].map(([key, label]) => (
+                  ['segment', 'CNAE / Segmento', 'Agrupamento informado no campo de CNAE ou segmento do Pipefy.', 'left'],
+                  ['total', 'Leads', 'Quantidade de leads desse segmento que entraram no período filtrado.', 'left'],
+                  ['contactRate', 'Contato real', 'Mostra quantos leads desse segmento avançaram depois da tentativa de contato. Ajuda a entender quais tipos de empresa realmente atendem ou respondem.', 'left'],
+                  ['diagnosticDoneRate', 'Diag. realizada', 'Mostra quantos leads desse segmento chegaram a uma reunião diagnóstica feita.', 'left'],
+                  ['proposalDoneRate', 'Proposta realizada', 'Mostra quantos leads desse segmento chegaram a uma apresentação de proposta feita.', 'right'],
+                  ['contractRate', 'Contrato', 'Mostra quantos leads desse segmento viraram contrato fechado.', 'right'],
+                  ['lostRate', 'Perda', 'Mostra quantos leads desse segmento foram marcados como perdidos.', 'right'],
+                ].map(([key, label, tip, align]) => (
                   <th key={key} className="px-5 py-3">
-                    <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 hover:text-white">
-                      {label}
-                      <ArrowUpDown className="w-3 h-3" />
-                    </button>
+                    <div className="inline-flex items-center gap-1.5">
+                      <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 hover:text-white">
+                        {label}
+                        <ArrowUpDown className="w-3 h-3" />
+                      </button>
+                      <HelpTip text={tip} align={align} />
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -392,11 +390,11 @@ export default function LeadsInsights() {
                     </p>
                   </td>
                   <td className="px-5 py-4 text-white font-bold">{row.total}</td>
-                  <td className="px-5 py-4 min-w-40"><ConversionBar label="Atenderam/avançaram" value={row.contactRate} count={row.contacted} total={row.total} color="#2A6B68" /></td>
-                  <td className="px-5 py-4 min-w-40"><ConversionBar label="Diagnósticas feitas" value={row.diagnosticDoneRate} count={row.diagnosticDone} total={row.total} color="#3B82F6" /></td>
-                  <td className="px-5 py-4 min-w-40"><ConversionBar label="Propostas feitas" value={row.proposalDoneRate} count={row.proposalDone} total={row.total} color="#CE7028" /></td>
-                  <td className="px-5 py-4 min-w-40"><ConversionBar label="Contratos" value={row.contractRate} count={row.contracts} total={row.total} color="#22C55E" /></td>
-                  <td className="px-5 py-4 min-w-36"><ConversionBar label="Perdidos" value={row.lostRate} count={row.lost} total={row.total} color="#EF4444" /></td>
+                  <td className="px-5 py-4 min-w-40"><ConversionBar value={row.contactRate} count={row.contacted} total={row.total} color="#2A6B68" /></td>
+                  <td className="px-5 py-4 min-w-40"><ConversionBar value={row.diagnosticDoneRate} count={row.diagnosticDone} total={row.total} color="#3B82F6" /></td>
+                  <td className="px-5 py-4 min-w-40"><ConversionBar value={row.proposalDoneRate} count={row.proposalDone} total={row.total} color="#CE7028" /></td>
+                  <td className="px-5 py-4 min-w-40"><ConversionBar value={row.contractRate} count={row.contracts} total={row.total} color="#22C55E" /></td>
+                  <td className="px-5 py-4 min-w-36"><ConversionBar value={row.lostRate} count={row.lost} total={row.total} color="#EF4444" /></td>
                 </tr>
               ))}
               {!rows.length && (

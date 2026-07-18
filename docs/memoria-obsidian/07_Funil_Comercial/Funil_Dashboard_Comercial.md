@@ -355,3 +355,11 @@ Correcao 2026-07-18:
 - `Leads` foi removido das subareas exibidas no sidebar.
 - O acesso a `/comercial/leads` passou a usar a permissao de `comercial.dashboard`.
 - A funcao `mapLeadSegmentInsights()` usa `ratioPct()` para calcular percentuais e nao deve depender de helper local da pagina.
+
+Atualizacao 2026-07-18:
+
+- A pagina interna `Comercial > Dashboard > Leads` removeu os cards `Melhor contato` e `Melhor fechamento`, porque o ranking ja permite comparar os segmentos.
+- No ranking por CNAE/segmento, cada celula de metrica deve mostrar apenas percentual, fracao e barra visual.
+- Os textos explicativos repetidos dentro das celulas foram movidos para tooltips nos cabecalhos das colunas.
+- As colunas com tooltip sao `Contato real`, `Diag. realizada`, `Proposta realizada`, `Contrato` e `Perda`.
+- Tooltips proximos ao lado direito devem alinhar para dentro da tela para evitar corte do texto.
