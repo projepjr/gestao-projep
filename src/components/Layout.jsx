@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import ProjepLogo, { ProjepSymbol } from './ProjepLogo'
 import UserAvatar from './UserAvatar'
+import RefreshButton from './RefreshButton'
 
 const ICONS = {
   crown: Crown,
@@ -95,6 +96,8 @@ export default function Layout({ children }) {
   const {
     notifications: storedNotifications,
     messages: storedMessages,
+    refreshData,
+    refreshingData,
     markNotificationRead,
     markAllNotificationsRead,
   } = useData()
@@ -116,6 +119,10 @@ export default function Layout({ children }) {
   }, [])
 
   const handleLogout = () => { logout(); navigate('/login') }
+  const handleGlobalRefresh = () => {
+    void refreshData()
+    window.dispatchEvent(new CustomEvent('projep:refresh-data'))
+  }
 
   const notifications = storedNotifications
     .filter(notification => {
@@ -337,6 +344,12 @@ export default function Layout({ children }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <RefreshButton
+              label="Atualizar site com dados mais recentes do Supabase"
+              loading={refreshingData}
+              onClick={handleGlobalRefresh}
+            />
+
             <button
               onClick={toggleTheme}
               className="inline-flex items-center gap-2 px-3 py-2 rounded border border-[#1E1E1E] bg-[#111111] text-gray-400 hover:text-white hover:border-[#CE7028]/60 hover:bg-[#161616] transition-all"

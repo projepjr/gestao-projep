@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, ArrowUpDown, BarChart2, Calendar, ChevronLeft, ChevronRight,
   FileCheck, PhoneCall, Radio, Search, Target, Users,
@@ -202,6 +202,7 @@ export default function LeadsInsights() {
   const [sortKey, setSortKey] = useState('contactRate')
   const [sortDir, setSortDir] = useState('desc')
   const snapshotRef = useRef(null)
+  const fetchingSnapshotRef = useRef(false)
 
   const referenceDate = snapshot?.synced_at || new Date().toISOString()
   const weeks = useMemo(() => buildWeekRanges(referenceDate, 10), [referenceDate])
@@ -212,6 +213,41 @@ export default function LeadsInsights() {
   useEffect(() => {
     snapshotRef.current = snapshot
   }, [snapshot])
+
+  const refreshLatestSnapshot = useCallback(async () => {
+    if (fetchingSnapshotRef.current) return
+    fetchingSnapshotRef.current = true
+
+    if (!isSupabaseConfigured || !supabase) {
+      setStatus({ loading: false, error: 'Supabase nÃ£o configurado.', message: '' })
+      fetchingSnapshotRef.current = false
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('comercial_dashboard_snapshots')
+      .select('id, payload, synced_at')
+      .eq('source', 'pipefy')
+      .order('synced_at', { ascending: false })
+      .limit(SNAPSHOT_LOOKBACK)
+
+    if (error) {
+      console.warn('[LeadsInsights] Falha ao atualizar snapshot:', error.message || error)
+      setStatus({ loading: false, error: 'NÃ£o foi possÃ­vel carregar o snapshot comercial.', message: '' })
+      fetchingSnapshotRef.current = false
+      return
+    }
+
+    const { snapshot: selected, message } = selectComercialSnapshot(Array.isArray(data) ? data : [])
+    setSnapshot(selected)
+    snapshotRef.current = selected
+    setStatus({
+      loading: false,
+      error: selected ? '' : 'Nenhum snapshot comercial vÃ¡lido encontrado.',
+      message,
+    })
+    fetchingSnapshotRef.current = false
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -254,6 +290,11 @@ export default function LeadsInsights() {
       window.clearInterval(intervalId)
     }
   }, [])
+
+  useEffect(() => {
+    window.addEventListener('projep:refresh-data', refreshLatestSnapshot)
+    return () => window.removeEventListener('projep:refresh-data', refreshLatestSnapshot)
+  }, [refreshLatestSnapshot])
 
   const selectedRange = useMemo(() => {
     if (mode === 'semanal') return weeks[weekIndex] || null

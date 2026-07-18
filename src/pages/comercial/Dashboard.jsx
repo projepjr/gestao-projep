@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
@@ -886,6 +886,7 @@ export default function ComercialDashboard() {
   const [remoteSnapshot, setRemoteSnapshot] = useState(null)
   const remoteSnapshotRef = useRef(remoteSnapshot)
   const snapshotIdRef = useRef(remoteSnapshot?.id || null)
+  const fetchingSnapshotRef = useRef(false)
   const [remoteStatus, setRemoteStatus] = useState(() => ({
     loading: true,
     error: '',
@@ -926,91 +927,92 @@ export default function ComercialDashboard() {
     remoteSnapshotRef.current = remoteSnapshot
   }, [remoteSnapshot])
 
-  useEffect(() => {
-    let cancelled = false
-    let fetching = false
+  const fetchLatestSnapshot = useCallback(async ({ silent = false } = {}) => {
+    if (fetchingSnapshotRef.current) return
+    fetchingSnapshotRef.current = true
 
-    async function fetchLatestSnapshot({ silent = false } = {}) {
-      if (fetching) return
-      fetching = true
-
-      if (!isSupabaseConfigured || !supabase) {
-        setRemoteStatus({ loading: false, error: 'Supabase nao configurado. Dados comerciais remotos indisponiveis.' })
-        fetching = false
-        return
-      }
-
-      if (!silent && !remoteSnapshotRef.current) setRemoteStatus({ loading: true, error: '', message: '' })
-
-      let data, error
-      try {
-        const result = await Promise.race([
-          supabase
-            .from('comercial_dashboard_snapshots')
-            .select('id, payload, synced_at')
-            .eq('source', 'pipefy')
-            .order('synced_at', { ascending: false })
-            .limit(DASHBOARD_SNAPSHOT_LOOKBACK),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
-        ])
-        data = result.data
-        error = result.error
-      } catch {
-        if (cancelled) return
-        setRemoteStatus({
-          loading: false,
-          error: remoteSnapshotRef.current ? '' : 'Tempo esgotado ao carregar dados comerciais do Supabase.',
-        })
-        fetching = false
-        return
-      }
-
-      if (cancelled) return
-
-      if (error) {
-        setRemoteStatus({
-          loading: false,
-          error: remoteSnapshotRef.current ? '' : 'Nao foi possivel carregar dados comerciais do Supabase.',
-        })
-        console.warn('[ComercialDashboard] Falha ao carregar snapshot comercial:', error.message || error)
-        fetching = false
-        return
-      }
-
-      const snapshots = Array.isArray(data) ? data : []
-      const { snapshot: selectedSnapshot, statusMessage } = selectComercialSnapshot(snapshots)
-
-      setRemoteSnapshot(selectedSnapshot)
-      remoteSnapshotRef.current = selectedSnapshot
-      
-      setRemoteStatus({
-        loading: false,
-        error: selectedSnapshot
-          ? ''
-          : snapshots.length
-            ? 'Snapshot remoto invalido para o pipeline comercial.'
-            : 'Nenhum snapshot remoto encontrado no Supabase.',
-        message: statusMessage,
-      })
-      if (selectedSnapshot && snapshotIdRef.current !== selectedSnapshot.id) {
-        snapshotIdRef.current = selectedSnapshot.id
-        const referenceDate = selectedSnapshot.synced_at || selectedSnapshot.payload?.periodo?.atualizadoEm || new Date().toISOString()
-        setSemaIdx(findCurrentWeekIndex(buildWeekRanges(referenceDate, 10)))
-        setMesIdx(findCurrentMonthIndex(buildMonthRanges(referenceDate, 8)))
-      }
-      fetching = false
+    if (!isSupabaseConfigured || !supabase) {
+      setRemoteStatus({ loading: false, error: 'Supabase nao configurado. Dados comerciais remotos indisponiveis.' })
+      fetchingSnapshotRef.current = false
+      return
     }
 
+    if (!silent && !remoteSnapshotRef.current) setRemoteStatus({ loading: true, error: '', message: '' })
+
+    let data, error
+    try {
+      const result = await Promise.race([
+        supabase
+          .from('comercial_dashboard_snapshots')
+          .select('id, payload, synced_at')
+          .eq('source', 'pipefy')
+          .order('synced_at', { ascending: false })
+          .limit(DASHBOARD_SNAPSHOT_LOOKBACK),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
+      ])
+      data = result.data
+      error = result.error
+    } catch {
+      setRemoteStatus({
+        loading: false,
+        error: remoteSnapshotRef.current ? '' : 'Tempo esgotado ao carregar dados comerciais do Supabase.',
+      })
+      fetchingSnapshotRef.current = false
+      return
+    }
+
+    if (error) {
+      setRemoteStatus({
+        loading: false,
+        error: remoteSnapshotRef.current ? '' : 'Nao foi possivel carregar dados comerciais do Supabase.',
+      })
+      console.warn('[ComercialDashboard] Falha ao carregar snapshot comercial:', error.message || error)
+      fetchingSnapshotRef.current = false
+      return
+    }
+
+    const snapshots = Array.isArray(data) ? data : []
+    const { snapshot: selectedSnapshot, statusMessage } = selectComercialSnapshot(snapshots)
+
+    setRemoteSnapshot(selectedSnapshot)
+    remoteSnapshotRef.current = selectedSnapshot
+
+    setRemoteStatus({
+      loading: false,
+      error: selectedSnapshot
+        ? ''
+        : snapshots.length
+          ? 'Snapshot remoto invalido para o pipeline comercial.'
+          : 'Nenhum snapshot remoto encontrado no Supabase.',
+      message: statusMessage,
+    })
+    if (selectedSnapshot && snapshotIdRef.current !== selectedSnapshot.id) {
+      snapshotIdRef.current = selectedSnapshot.id
+      const referenceDate = selectedSnapshot.synced_at || selectedSnapshot.payload?.periodo?.atualizadoEm || new Date().toISOString()
+      setSemaIdx(findCurrentWeekIndex(buildWeekRanges(referenceDate, 10)))
+      setMesIdx(findCurrentMonthIndex(buildMonthRanges(referenceDate, 8)))
+    }
+    fetchingSnapshotRef.current = false
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
     fetchLatestSnapshot()
-    const intervalId = window.setInterval(() => fetchLatestSnapshot({ silent: true }), DASHBOARD_REFRESH_MS)
-    const onFocus = () => fetchLatestSnapshot({ silent: true })
+    const intervalId = window.setInterval(() => { if (!cancelled) fetchLatestSnapshot({ silent: true }) }, DASHBOARD_REFRESH_MS)
+    const onFocus = () => { if (!cancelled) fetchLatestSnapshot({ silent: true }) }
     window.addEventListener('focus', onFocus)
     return () => {
       cancelled = true
       window.clearInterval(intervalId)
       window.removeEventListener('focus', onFocus)
     }
-  }, [])
+  }, [fetchLatestSnapshot])
+
+  useEffect(() => {
+    const handleRefresh = () => fetchLatestSnapshot()
+    window.addEventListener('projep:refresh-data', handleRefresh)
+    return () => window.removeEventListener('projep:refresh-data', handleRefresh)
+  }, [fetchLatestSnapshot])
 
   // TODO: [Supabase] substituir por: supabase.from('comercial_semanas').select('*').order('inicio')
   const currentPeriod = useMemo(() => {

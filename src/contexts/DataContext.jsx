@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import db from '../data/db'
 import { hasSubareaAccess, normalizePermissions } from '../config/accessControl'
 import { resolveSetor } from '../data/setores'
@@ -243,6 +243,7 @@ export function DataProvider({ children }) {
   const [people, setPeople] = useState(() => db.get('gestaoPessoas'))
   const [communication, setCommunication] = useState(() => db.get('comunicacao'))
   const [projectData, setProjectData] = useState(() => db.get('projetos'))
+  const [refreshingData, setRefreshingData] = useState(false)
 
   useEffect(() => {
     const unsubscribers = [
@@ -318,6 +319,18 @@ export function DataProvider({ children }) {
     const target = db.get('usuarios').find(member => idsEqual(member.id, userId))
     if (target) void syncUsersToSupabase([target])
   }
+
+  const refreshData = useCallback(async () => {
+    setRefreshingData(true)
+    try {
+      await pullRemoteState(db)
+      await pullCommunicationState(db)
+    } catch (error) {
+      console.warn('[Supabase] Falha ao atualizar dados manualmente:', error.message || error)
+    } finally {
+      setRefreshingData(false)
+    }
+  }, [])
 
   const addMember = async member => {
     if (!canManageMembers(user)) return { success: false, error: 'Você não pode cadastrar membros.' }
@@ -919,6 +932,8 @@ export function DataProvider({ children }) {
   return (
     <DataContext.Provider value={{
       members,
+      refreshData,
+      refreshingData,
       addMember,
       updateMember,
       deleteMember,

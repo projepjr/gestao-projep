@@ -363,3 +363,12 @@ Atualizacao 2026-07-18:
 - Os textos explicativos repetidos dentro das celulas foram movidos para tooltips nos cabecalhos das colunas.
 - As colunas com tooltip sao `Contato real`, `Diag. realizada`, `Proposta realizada`, `Contrato` e `Perda`.
 - Tooltips proximos ao lado direito devem alinhar para dentro da tela para evitar corte do texto.
+
+Atualizacao 2026-07-18 - Atualizacao manual de dados sincronizados:
+
+- O sistema passou a ter um unico botao global de atualizacao no header, ao lado do sininho.
+- O botao usa o componente `src/components/RefreshButton.jsx`.
+- Ao clicar, `Layout.jsx` chama `refreshData()` do `DataContext` para buscar dados mais recentes do Supabase e dispara o evento interno `projep:refresh-data`.
+- Paginas comerciais baseadas em snapshot do Pipefy (`Dashboard.jsx`, `Leads.jsx` e `Equipe.jsx`) escutam esse evento para recarregar `comercial_dashboard_snapshots`.
+- O botao global nao executa o workflow n8n diretamente; ele apenas puxa do Supabase o ultimo estado salvo pelas sincronizacoes existentes.
+- Tooltip do botao: `Atualizar site com as informacoes mais recentes`.

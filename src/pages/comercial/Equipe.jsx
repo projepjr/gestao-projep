@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Edit2, Link2, Plus, Search, Trash2, Users, X } from 'lucide-react'
 import { useData } from '../../contexts/DataContext'
 import { isSupabaseConfigured, supabase } from '../../lib/supabase'
@@ -164,24 +164,30 @@ export default function EquipeComercial() {
   const [snapshot, setSnapshot] = useState(null)
   const [message, setMessage] = useState('')
 
-  useEffect(() => {
-    let cancelled = false
-    async function loadSnapshot() {
-      if (!isSupabaseConfigured || !supabase) return
-      const { data, error } = await supabase
-        .from('comercial_dashboard_snapshots')
-        .select('payload, synced_at')
-        .eq('source', 'pipefy')
-        .order('synced_at', { ascending: false })
-        .limit(SNAPSHOT_LOOKBACK_LIMIT)
-      if (!cancelled && !error) {
-        const snapshots = Array.isArray(data) ? data : []
-        setSnapshot(selectComercialSnapshot(snapshots))
-      }
+  const loadSnapshot = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) return
+    const { data, error } = await supabase
+      .from('comercial_dashboard_snapshots')
+      .select('payload, synced_at')
+      .eq('source', 'pipefy')
+      .order('synced_at', { ascending: false })
+      .limit(SNAPSHOT_LOOKBACK_LIMIT)
+    if (!error) {
+      const snapshots = Array.isArray(data) ? data : []
+      setSnapshot(selectComercialSnapshot(snapshots))
+    } else {
+      console.warn('[EquipeComercial] Falha ao carregar snapshot:', error.message || error)
     }
-    loadSnapshot()
-    return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    loadSnapshot()
+  }, [loadSnapshot])
+
+  useEffect(() => {
+    window.addEventListener('projep:refresh-data', loadSnapshot)
+    return () => window.removeEventListener('projep:refresh-data', loadSnapshot)
+  }, [loadSnapshot])
 
   const entries = commercial.equipe?.[role] || []
   const pipefyPeople = useMemo(
