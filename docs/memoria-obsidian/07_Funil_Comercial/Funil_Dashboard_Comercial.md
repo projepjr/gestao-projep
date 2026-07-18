@@ -204,3 +204,40 @@ Pelo historico recente do repo:
 - percentuais do funil ajustados para representar fase sobre total filtrado;
 - no-show de diagnostica/proposta precisou diferenciar a etapa em que o no-show aconteceu;
 - associacao de equipe comercial precisava ligar membro do site ao nome/email do Pipefy.
+
+## Atualizacao 2026-07-17 - leitura gerencial da dashboard
+
+Alteracao aplicada na dashboard comercial para deixar a leitura mais intuitiva:
+
+- O Funil de Vendas visual passou a mostrar apenas a distribuicao de leads por fase do pipeline.
+- Os percentuais abaixo dos cards do funil foram removidos, pois confundiam a leitura gerencial.
+- A distribuicao do funil continua respeitando o filtro selecionado:
+  - Ao vivo: considera todos os cards atuais do pipeline.
+  - Semanal/mensal: considera os leads que entraram no periodo filtrado.
+- Os KPIs principais passaram a incluir:
+  - Total de Leads na visao ao vivo.
+  - Leads Entrantes nas visoes semanal e mensal.
+- O bloco Indicadores Comerciais concentra as taxas e metricas auxiliares.
+- Tooltips dos indicadores devem explicar a metrica em linguagem simples, sem depender de formula matematica.
+- Hunters agora devem exibir:
+  - leads trabalhados;
+  - leads contatados;
+  - diagnosticas agendadas;
+  - diagnosticas realizadas;
+  - propostas agendadas;
+  - propostas realizadas;
+  - no-shows de diagnostica;
+  - taxa de conversao ate proposta apresentada.
+- Closers agora devem exibir:
+  - diagnosticas realizadas;
+  - propostas agendadas;
+  - propostas realizadas;
+  - no-shows de proposta;
+  - em negociacao;
+  - contratos;
+  - taxa de contratos.
+- Responsabilidade dos no-shows:
+  - no-show em diagnostica fica com o Hunter;
+  - no-show em proposta fica com o Closer.
+- Nenhum campo novo do Pipefy foi identificado como obrigatorio nesta alteracao.
+- O n8n deve continuar salvando snapshots brutos somente do pipeline autorizado `307256948`.

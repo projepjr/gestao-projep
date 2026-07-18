@@ -1,4 +1,5 @@
 const EMPTY_FUNIL = {
+  cadastro: 0,
   leadsCadastrados: 0,
   leadsTrabalhados: 0,
   tentativasContato: 0,
@@ -21,6 +22,7 @@ const EMPTY_FUNIL = {
 }
 
 const EMPTY_KPIS = {
+  leadsEntrantes: 0,
   ticketMedio: 0,
   receitaTotal: 0,
   contratosFechados: 0,
@@ -656,6 +658,12 @@ function createHunterRows(members, commercial) {
     id: person.id,
     userId: person.userId,
     nome: person.nome,
+    leadsTrabalhados: 0,
+    leadsContatados: 0,
+    diagnosticasAgendadas: 0,
+    diagnosticasRealizadas: 0,
+    propostasAgendadas: 0,
+    propostasRealizadas: 0,
     contatadas: 0,
     reunioesMarcadas: 0,
     reunioesRealizadas: 0,
@@ -668,7 +676,9 @@ function createCloserRows(members, commercial) {
     id: person.id,
     userId: person.userId,
     nome: person.nome,
+    diagnosticasRealizadas: 0,
     propostasAgendadas: 0,
+    propostasRealizadas: 0,
     reunioesRealizadas: 0,
     noShows: 0,
     emNegociacao: 0,
@@ -732,11 +742,18 @@ function buildFunilByCurrentPhase(cards) {
     } else if (includesAny(stage, STAGE_KEYWORDS.lost)) {
       f.perdidos++
       f.leadsTrabalhados++
+    } else {
+      f.cadastro++
     }
     // else: fase Cadastro ou não mapeada → conta apenas no total (leadsCadastrados)
   }
 
   return f
+}
+
+function buildFunilDistribution(cards, range) {
+  if (!range?.inicio || !range?.fim) return buildFunilByCurrentPhase(cards)
+  return buildFunilByCurrentPhase(cards.filter(card => cardCreatedInPeriod(card, range)))
 }
 
 function buildMetricsFromCards(cards, members, commercial, payload, range = null) {
@@ -753,9 +770,6 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
   let receitaTotal = 0
 
   for (const card of cards) {
-    const pipelineKey = classifyPipeline(card)
-    pipeline[pipelineKey] += 1
-
     const leadCreated = cardCreatedInPeriod(card, range)
     const contactAttempted = contactAttemptInPeriod(card, range)
     const contactStage = contactStageInPeriod(card, range)
@@ -888,16 +902,32 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
 
     const hunter = findOrCreateRow(hunters, getResponsibleTeamMember(card, 'hunter', hunterIndex))
     if (hunter) {
-      if (contactAttempted) hunter.contatadas += 1
-      if (diagnosticScheduled) hunter.reunioesMarcadas += 1
-      if (diagnosticDone) hunter.reunioesRealizadas += 1
+      if (worked) hunter.leadsTrabalhados += 1
+      if (contactAttempted) {
+        hunter.leadsContatados += 1
+        hunter.contatadas += 1
+      }
+      if (diagnosticScheduled) {
+        hunter.diagnosticasAgendadas += 1
+        hunter.reunioesMarcadas += 1
+      }
+      if (diagnosticDone) {
+        hunter.diagnosticasRealizadas += 1
+        hunter.reunioesRealizadas += 1
+      }
+      if (proposalScheduled) hunter.propostasAgendadas += 1
+      if (proposalDone) hunter.propostasRealizadas += 1
       if (diagnosticNoShow) hunter.noShows += 1
     }
 
     const closer = findOrCreateRow(closers, getResponsibleTeamMember(card, 'closer', closerIndex))
     if (closer) {
+      if (diagnosticDone) closer.diagnosticasRealizadas += 1
       if (proposalScheduled) closer.propostasAgendadas += 1
-      if (proposalDone) closer.reunioesRealizadas += 1
+      if (proposalDone) {
+        closer.propostasRealizadas += 1
+        closer.reunioesRealizadas += 1
+      }
       if (proposalNoShow) closer.noShows += 1
       if (inNegotiation && !contractClosed) closer.emNegociacao += 1
       if (contractClosed) closer.contratosFechados += 1
@@ -906,7 +936,13 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
 
   // Ao vivo (sem período): funil mostra a fase ATUAL de cada card.
   // Com período: funil = mesmos eventos do histórico (atividade no intervalo).
-  const funil = hasRange ? { ...historico } : buildFunilByCurrentPhase(cards)
+  const pipelineCards = hasRange ? cards.filter(card => cardCreatedInPeriod(card, range)) : cards
+  for (const card of pipelineCards) {
+    const pipelineKey = classifyPipeline(card)
+    pipeline[pipelineKey] += 1
+  }
+
+  const funil = buildFunilDistribution(cards, range)
 
   return {
     funil,
@@ -915,6 +951,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     hunters,
     closers,
     kpis: {
+      leadsEntrantes: funil.leadsCadastrados,
       ticketMedio: historico.contratosFechados ? receitaTotal / historico.contratosFechados : 0,
       receitaTotal,
       contratosFechados: historico.contratosFechados,

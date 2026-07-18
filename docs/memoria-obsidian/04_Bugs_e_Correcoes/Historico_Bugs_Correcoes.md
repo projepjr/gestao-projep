@@ -28,7 +28,7 @@ Este arquivo resume problemas ja corrigidos ou investigados no projeto, com base
 ## Comercial
 
 - Dashboard usando pipeline errado.
-  - Regra atual: usar pipe comercial `307210845`.
+  - Regra atual: usar somente o pipe comercial `307256948`.
 
 - Filtro semanal originalmente nao cobria domingo/sabado.
   - Regra atual: semana comercial de domingo a sabado.
@@ -43,4 +43,3 @@ Este arquivo resume problemas ja corrigidos ou investigados no projeto, com base
 
 - Status `Conclu?do` aparecia nos cards da Base de Conhecimento.
   - Correcao: registros em `src/data/projetos.js` ajustados para `Concluído`.
-

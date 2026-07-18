@@ -6,7 +6,7 @@ import {
 import {
   ChevronLeft, ChevronRight, Radio, Calendar, BarChart2,
   TrendingUp, TrendingDown, DollarSign, FileCheck,
-  Percent, Target,
+  Percent, Target, Users,
 } from 'lucide-react'
 import { useData } from '../../contexts/DataContext'
 import { isSupabaseConfigured, supabase } from '../../lib/supabase'
@@ -288,12 +288,13 @@ function PeriodNav({ viewMode, setViewMode, semaIdx, setSemaIdx, mesIdx, setMesI
 
 // ── KPI Card (com tooltip por indicador) ─────────────────────
 const KPI_TIPS = {
-  'Ticket Médio':         'Receita Total ÷ Número de Contratos Fechados no período',
-  'Contratos Fechados':   "Total de negócios marcados como 'Ganho' no período",
-  'Receita Total':        'Soma dos valores de todos os contratos fechados no período',
-  'Taxa de Conversão':    'Contratos Fechados ÷ Leads Cadastrados × 100',
+  'Total de Leads': 'Mostra quantos leads existem no pipeline inteiro neste momento.',
+  'Leads Entrantes': 'Mostra quantos leads entraram no pipeline dentro do período selecionado.',
+  'Ticket Médio': 'Mostra o valor médio dos contratos fechados no período selecionado.',
+  'Contratos Fechados': 'Mostra quantas empresas viraram contrato no período selecionado.',
+  'Receita Total': 'Mostra o dinheiro total gerado pelos contratos fechados no período selecionado.',
+  'Taxa de Conversão': 'Mostra quantos leads cadastrados no período acabaram virando contrato.',
 }
-
 function KPICard({ label, value, prevValue, format, Icon, accent }) {
   const formatted =
     format === 'currency' ? fmtR(value) :
@@ -335,81 +336,33 @@ function KPICard({ label, value, prevValue, format, Icon, accent }) {
 
 // ── Funil — stages com tooltips ───────────────────────────────
 const FUNIL_STAGES = [
-  {
-    key: 'leadsCadastrados',   label: 'Leads Cad.',     color: '#64748B',
-    tip: 'Total de leads no Pipefy (denominador do funil)',
-    convTip: null,
-  },
-  {
-    key: 'tentativasContato',  label: 'Tent. Contato',  color: '#3B82F6',
-    tip: 'Cards atualmente na fase Tentativas de Contato',
-    convTip: 'Tentativas de Contato ÷ Leads Cadastrados × 100',
-    denominatorKey: 'leadsCadastrados',
-  },
-  {
-    key: 'interesseFuturo',    label: 'Int. Futuro',    color: '#F59E0B',
-    tip: 'Cards atualmente na fase Interesse Futuro',
-    convTip: 'Interesse Futuro ÷ Tentativas de Contato × 100',
-    denominatorKey: 'tentativasContato',
-  },
-  {
-    key: 'diagnosticasAgendadas', label: 'Diag. Ag.', color: '#8B5CF6',
-    tip: 'Cards atualmente na fase Diagnóstica Agendada',
-    convTip: 'Diagnósticas Agendadas ÷ Tentativas de Contato × 100',
-    denominatorKey: 'tentativasContato',
-  },
-  {
-    key: 'diagnosticasRealizadas', label: 'Diag. Real.', color: '#2A6B68',
-    tip: 'Cards atualmente na fase Diagnóstica Realizada',
-    convTip: 'Diagnósticas Realizadas ÷ Diagnósticas Agendadas × 100',
-  },
-  {
-    key: 'propostasAgendadas', label: 'Prop. Ag.', color: '#E8955A',
-    tip: 'Cards atualmente na fase Proposta Agendada',
-    convTip: 'Propostas Agendadas ÷ Diagnósticas Realizadas × 100',
-  },
-  {
-    key: 'propostasRealizadas', label: 'Prop. Real.', color: '#F59E0B',
-    tip: 'Cards atualmente na fase Proposta Realizada',
-    convTip: 'Propostas Realizadas ÷ Propostas Agendadas × 100',
-  },
-  {
-    key: 'negociacoes',        label: 'Negociação',     color: '#CE7028',
-    tip: 'Cards atualmente na fase Negociação',
-    convTip: 'Negociações ÷ Propostas Realizadas × 100',
-  },
-  {
-    key: 'pendentesNoShow',    label: 'Pend./No-show',  color: '#F97316',
-    tip: 'Cards atualmente na fase Pendentes / No-show',
-    convTip: 'Pendentes / No-show ÷ Leads Cadastrados × 100',
-    denominatorKey: 'leadsCadastrados',
-  },
-  {
-    key: 'contratosFechados',  label: 'Contratos',      color: '#16A34A',
-    tip: 'Cards atualmente na fase Contratos Fechados',
-    convTip: 'Contratos Fechados ÷ Negociação × 100',
-    denominatorKey: 'negociacoes',
-  },
-  {
-    key: 'perdidos',           label: 'Perdidos',       color: '#EF4444',
-    tip: 'Cards atualmente na fase Perdidos',
-    convTip: 'Perdidos ÷ Leads Cadastrados × 100',
-    denominatorKey: 'leadsCadastrados',
-  },
+  { key: 'cadastro', label: 'Leads Cad.', color: '#64748B', tip: 'Leads que entraram no período e ainda estão parados em cadastro.' },
+  { key: 'tentativasContato', label: 'Tent. Contato', color: '#3B82F6', tip: 'Leads que entraram no período e hoje estão em tentativa de contato.' },
+  { key: 'interesseFuturo', label: 'Int. Futuro', color: '#F59E0B', tip: 'Leads que entraram no período e ficaram para retorno futuro.' },
+  { key: 'diagnosticasAgendadas', label: 'Diag. Ag.', color: '#8B5CF6', tip: 'Leads que entraram no período e hoje estão com diagnóstica agendada.' },
+  { key: 'diagnosticasRealizadas', label: 'Diag. Real.', color: '#2A6B68', tip: 'Leads que entraram no período e hoje estão com diagnóstica realizada.' },
+  { key: 'propostasAgendadas', label: 'Prop. Ag.', color: '#E8955A', tip: 'Leads que entraram no período e hoje estão com proposta agendada.' },
+  { key: 'propostasRealizadas', label: 'Prop. Real.', color: '#F59E0B', tip: 'Leads que entraram no período e hoje estão com proposta apresentada.' },
+  { key: 'negociacoes', label: 'Negociação', color: '#CE7028', tip: 'Leads que entraram no período e hoje estão em negociação.' },
+  { key: 'pendentesNoShow', label: 'Pend./No-show', color: '#F97316', tip: 'Leads que entraram no período e hoje estão pendentes ou tiveram no-show.' },
+  { key: 'contratosFechados', label: 'Contratos', color: '#16A34A', tip: 'Leads que entraram no período e hoje viraram contrato.' },
+  { key: 'perdidos', label: 'Perdidos', color: '#EF4444', tip: 'Leads que entraram no período e hoje estão marcados como perdidos.' },
 ]
-
 const EMPTY_FUNIL = FUNIL_STAGES.reduce((acc, stage) => {
   acc[stage.key] = 0
   return acc
 }, {
+  leadsCadastrados: 0,
   leadsTrabalhados: 0,
   noShowsDiagnostica: 0,
   noShowsProposta: 0,
 })
 
 const EMPTY_KPIS = {
+  leadsEntrantes: 0,
   ticketMedio: 0,
   receitaTotal: 0,
+  contratosFechados: 0,
   taxaConversao: 0,
 }
 
@@ -434,14 +387,13 @@ function emptyPeriodFromRange(range) {
 }
 
 function FunnelFlow({ funil }) {
-  const total = funil.leadsCadastrados || 0
+  const maxValue = Math.max(...FUNIL_STAGES.map(stage => funil[stage.key] ?? 0), 1)
   return (
     <div className="overflow-x-auto pb-2">
       <div className="flex items-stretch gap-3 min-w-max">
         {FUNIL_STAGES.map((stage) => {
           const val = funil[stage.key] ?? 0
-          const representatividade = pct(val, total)
-          const barW = total > 0 && val > 0 ? Math.max(10, representatividade) : 0
+          const barW = val > 0 ? Math.max(10, (val / maxValue) * 100) : 0
 
           return (
             <div key={stage.key} className="flex flex-col items-center bg-[#0D0D0D] border border-[#1E1E1E] rounded-md px-4 py-4 min-w-[112px] hover:border-[#2A2A2A] transition-colors">
@@ -455,9 +407,6 @@ function FunnelFlow({ funil }) {
               <p className="text-[10px] text-gray-500 mt-1.5 text-center leading-tight flex items-center justify-center gap-0.5">
                 {stage.label}
                 <InfoTooltip text={stage.tip} />
-              </p>
-              <p className="text-[10px] font-semibold text-gray-600 mt-1">
-                {representatividade}% do total
               </p>
             </div>
           )
@@ -526,12 +475,11 @@ function PipelineGrid({ pipeline }) {
 }
 
 function ComplementaryMetrics({ funil, historico }) {
-  // taxas de conversão usam historico (passagem acumulada por etapa),
-  // não o funil ao-vivo (fase corrente). Fallback para funil se historico ausente.
   const h = historico || funil
-  const ligacoes = h.tentativasContato || 0
-  const leads = h.leadsCadastrados || 0
-  const leadsTrabalhados = h.leadsTrabalhados || ligacoes
+  const leads = h.leadsCadastrados || funil.leadsCadastrados || 0
+  const worked = h.leadsTrabalhados || 0
+  const contacts = h.ligacoesRealizadas || h.ligoesRealizadas || 0
+
   const makeRate = (label, numerator, denominator, tip, tone = 'text-blue-400') => ({
     label,
     value: pct(numerator, denominator),
@@ -542,27 +490,20 @@ function ComplementaryMetrics({ funil, historico }) {
   })
 
   const cards = [
-    {
-      label: 'Tentativas de Contato',
-      value: ligacoes,
-      suffix: '',
-      tone: 'text-white',
-      tip: 'Total de leads que passaram pela fase Tentativa de Contato no periodo. Metrica auxiliar, nao fase final de conversao.',
-      detail: '',
-    },
-    makeRate('Leads Trabalhados', leadsTrabalhados, leads, 'Leads que sairam de Cadastro dividido pelo Total de Leads Cadastrados.'),
-    makeRate('Taxa de Tentativa', ligacoes, leads, 'Leads que foram para Tentativa de Contato dividido pelo Total de Leads Cadastrados.'),
-    makeRate('Diag. Agendada', h.diagnosticasAgendadas || 0, leads, 'Diagnosticas Agendadas dividido pelo Total de Leads Cadastrados.'),
-    makeRate('Diag. Realizada', h.diagnosticasRealizadas || 0, h.diagnosticasAgendadas || 0, 'Diagnosticas Realizadas dividido por Diagnosticas Agendadas.', 'text-green-400'),
-    makeRate('Proposta Agendada', h.propostasAgendadas || 0, h.diagnosticasRealizadas || 0, 'Propostas Agendadas dividido por Diagnosticas Realizadas.'),
-    makeRate('Proposta Realizada', h.propostasRealizadas || 0, h.propostasAgendadas || 0, 'Propostas Realizadas dividido por Propostas Agendadas.', 'text-green-400'),
-    makeRate('Negociacao', h.negociacoes || 0, h.propostasRealizadas || 0, 'Negociacoes dividido por Propostas Realizadas.'),
-    makeRate('Contrato', h.contratosFechados || 0, h.negociacoes || 0, 'Contratos Fechados dividido por Negociacoes.', 'text-green-400'),
-    makeRate('Lead -> Contrato', h.contratosFechados || 0, leads, 'Contratos Fechados dividido pelo Total de Leads Cadastrados.', 'text-green-400'),
-    makeRate('No-show Diagnostica', h.noShowsDiagnostica || 0, h.diagnosticasAgendadas || 0, 'No-shows de Diagnostica dividido por Diagnosticas Agendadas.', 'text-red-400'),
-    makeRate('No-show Proposta', h.noShowsProposta || 0, h.propostasAgendadas || 0, 'No-shows de Proposta dividido por Propostas Agendadas.', 'text-red-400'),
-    makeRate('Perda Geral', h.perdidos || 0, leads, 'Perdidos dividido pelo Total de Leads Cadastrados.', 'text-red-400'),
-    makeRate('Pendencia/No-show', h.pendentesNoShow || 0, leads, 'Pendentes ou No-show dividido pelo Total de Leads Cadastrados.', 'text-yellow-400'),
+    makeRate('Leads Trabalhados', worked, leads, 'Mostra a parte dos leads do período que já saiu do cadastro e recebeu algum andamento comercial.'),
+    makeRate('Tentativa de Contato', h.tentativasContato || 0, leads, 'Mostra quantos leads do período chegaram na fase de tentativa de contato.'),
+    makeRate('Leads Contatados', contacts, leads, 'Mostra quantos leads do período tiveram uma primeira ligação ou contato registrado no Pipefy.'),
+    makeRate('Diag. Agendada', h.diagnosticasAgendadas || 0, contacts || leads, 'Mostra quantos leads contatados avançaram para uma diagnóstica agendada.'),
+    makeRate('Diag. Realizada', h.diagnosticasRealizadas || 0, h.diagnosticasAgendadas || 0, 'Mostra quantas diagnósticas agendadas realmente aconteceram.', 'text-green-400'),
+    makeRate('Proposta Agendada', h.propostasAgendadas || 0, h.diagnosticasRealizadas || 0, 'Mostra quantas diagnósticas realizadas viraram proposta agendada.'),
+    makeRate('Proposta Realizada', h.propostasRealizadas || 0, h.propostasAgendadas || 0, 'Mostra quantas propostas agendadas realmente foram apresentadas.', 'text-green-400'),
+    makeRate('Negociação', h.negociacoes || 0, h.propostasRealizadas || 0, 'Mostra quantas propostas apresentadas entraram em negociação.'),
+    makeRate('Contrato', h.contratosFechados || 0, h.negociacoes || 0, 'Mostra quantas negociações viraram contratos fechados.', 'text-green-400'),
+    makeRate('Lead -> Contrato', h.contratosFechados || 0, leads, 'Mostra quantos leads cadastrados no período chegaram até contrato fechado.', 'text-green-400'),
+    makeRate('No-show Diagnóstica', h.noShowsDiagnostica || 0, h.diagnosticasAgendadas || 0, 'Mostra a taxa de bolo em diagnósticas. Essa responsabilidade fica com o Hunter.', 'text-red-400'),
+    makeRate('No-show Proposta', h.noShowsProposta || 0, h.propostasAgendadas || 0, 'Mostra a taxa de bolo em apresentações de proposta. Essa responsabilidade fica com o Closer.', 'text-red-400'),
+    makeRate('Perda Geral', h.perdidos || 0, leads, 'Mostra quantos leads do período terminaram como perdidos.', 'text-red-400'),
+    makeRate('Pendência/No-show', h.pendentesNoShow || 0, leads, 'Mostra quantos leads do período estão aguardando nova ação ou foram marcados como no-show.', 'text-yellow-400'),
   ]
 
   return (
@@ -586,30 +527,32 @@ function ComplementaryMetrics({ funil, historico }) {
     </div>
   )
 }
-
 // Hunters com tooltips nas colunas
 const HUNTER_COLS = [
-  { label: 'Hunter',         tip: null },
-  { label: 'Contatadas',     tip: 'Total de leads únicos que o Hunter ligou no período' },
-  { label: 'Reuniões Marc.', tip: 'Total de reuniões agendadas pelo Hunter no período' },
-  { label: 'Reuniões Real.', tip: 'Reuniões que de fato aconteceram (não foram no-show)' },
-  { label: 'No-shows',       tip: 'Reuniões agendadas em que o lead não compareceu' },
-  { label: 'Taxa No-show',   tip: 'No-shows ÷ Reuniões Marcadas × 100' },
-  { label: 'Taxa Conv.',     tip: 'Reuniões Realizadas ÷ Pessoas Contatadas × 100' },
+  { label: 'Hunter', tip: null },
+  { label: 'Leads Trab.', tip: 'Leads do período que tiveram algum andamento feito por este Hunter.' },
+  { label: 'Leads Cont.', tip: 'Leads com primeira ligação ou contato registrado por este Hunter.' },
+  { label: 'Diag. Ag.', tip: 'Diagnósticas agendadas sob responsabilidade deste Hunter.' },
+  { label: 'Diag. Real.', tip: 'Diagnósticas que realmente aconteceram sob responsabilidade deste Hunter.' },
+  { label: 'Prop. Ag.', tip: 'Leads deste Hunter que chegaram a uma proposta agendada.' },
+  { label: 'Prop. Real.', tip: 'Leads deste Hunter que chegaram a uma proposta apresentada.' },
+  { label: 'No-shows', tip: 'Bolos em diagnósticas. Essa responsabilidade fica com o Hunter.' },
+  { label: 'Taxa Conv.', tip: 'Mostra quantos leads trabalhados pelo Hunter chegaram até uma proposta apresentada.' },
 ]
-const MEDIA_TIP_H = 'Média aritmética de todos os Hunters para este indicador no período'
+const MEDIA_TIP_H = 'Média geral dos Hunters configurados para este período.'
 
 function HuntersSection({ hunters, prevHunters, prevLabel }) {
-  const sumKey    = (arr, key) => arr.reduce((s, h) => s + h[key], 0)
-  const currTotal = sumKey(hunters, 'reunioesRealizadas')
-  const prevTotal = prevHunters ? sumKey(prevHunters, 'reunioesRealizadas') : null
+  const sumKey = (arr, key) => arr.reduce((s, h) => s + (h[key] || 0), 0)
+  const currTotal = sumKey(hunters, 'propostasRealizadas')
+  const prevTotal = prevHunters ? sumKey(prevHunters, 'propostasRealizadas') : null
 
   const chartData = hunters.map((h) => ({
-    nome:               h.nome.split(' ')[0],
-    'Contatadas':       h.contatadas,
-    'Reun. Marcadas':   h.reunioesMarcadas,
-    'Reun. Realizadas': h.reunioesRealizadas,
-    'No-shows':         h.noShows,
+    nome: h.nome.split(' ')[0],
+    'Leads Trab.': h.leadsTrabalhados || 0,
+    'Leads Cont.': h.leadsContatados || h.contatadas || 0,
+    'Diag. Ag.': h.diagnosticasAgendadas || h.reunioesMarcadas || 0,
+    'Diag. Real.': h.diagnosticasRealizadas || h.reunioesRealizadas || 0,
+    'Prop. Real.': h.propostasRealizadas || 0,
   }))
 
   return (
@@ -617,7 +560,7 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">Hunters</h2>
-          <p className="text-xs text-gray-600 mt-0.5">Prospecção e agendamento</p>
+          <p className="text-xs text-gray-600 mt-0.5">Prospecção, contato e diagnóstica</p>
         </div>
         <DeltaTag curr={currTotal} prev={prevTotal} label={prevLabel ? `vs ${prevLabel}` : ''} />
       </div>
@@ -639,30 +582,33 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
           <tbody>
             {hunters.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-gray-600">
+                <td colSpan={9} className="py-6 text-center text-gray-600">
                   Nenhum hunter configurado. Cadastre vínculos em Comercial &gt; Equipe.
                 </td>
               </tr>
             )}
             {hunters.map((h) => {
-              const taxa = pct(h.reunioesRealizadas, h.contatadas)
-              const taxaNoShow = pct(h.noShows, h.reunioesMarcadas)
+              const leadsTrabalhados = h.leadsTrabalhados || 0
+              const leadsContatados = h.leadsContatados || h.contatadas || 0
+              const diagnosticasAgendadas = h.diagnosticasAgendadas || h.reunioesMarcadas || 0
+              const diagnosticasRealizadas = h.diagnosticasRealizadas || h.reunioesRealizadas || 0
+              const propostasAgendadas = h.propostasAgendadas || 0
+              const propostasRealizadas = h.propostasRealizadas || 0
+              const taxa = pct(propostasRealizadas, leadsTrabalhados)
               return (
                 <tr key={h.id} className="border-b border-[#0D0D0D] hover:bg-[#0D0D0D]/60 transition-colors">
                   <td className="py-2.5 pr-4 font-semibold text-white whitespace-nowrap">{h.nome}</td>
-                  <td className="py-2.5 pr-4 text-gray-300">{h.contatadas}</td>
-                  <td className="py-2.5 pr-4 text-gray-300">{h.reunioesMarcadas}</td>
-                  <td className="py-2.5 pr-4 text-gray-300">{h.reunioesRealizadas}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{leadsTrabalhados}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{leadsContatados}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{diagnosticasAgendadas}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{diagnosticasRealizadas}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{propostasAgendadas}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{propostasRealizadas}</td>
                   <td className="py-2.5 pr-4">
-                    <span className={h.noShows > 0 ? 'text-red-400' : 'text-gray-500'}>{h.noShows}</span>
+                    <span className={h.noShows > 0 ? 'text-red-400' : 'text-gray-500'}>{h.noShows || 0}</span>
                   </td>
                   <td className="py-2.5 pr-4">
-                    <span className={`font-bold ${taxaNoShow > 20 ? 'text-red-400' : taxaNoShow > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>
-                      {taxaNoShow}%
-                    </span>
-                  </td>
-                  <td className="py-2.5 pr-4">
-                    <span className={`font-bold ${taxa >= 30 ? 'text-green-400' : taxa >= 20 ? 'text-yellow-400' : 'text-red-400'}`}>
+                    <span className={`font-bold ${taxa >= 30 ? 'text-green-400' : taxa >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
                       {taxa}%
                     </span>
                   </td>
@@ -676,14 +622,11 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
                   <InfoTooltip text={MEDIA_TIP_H} />
                 </span>
               </td>
-              {['contatadas', 'reunioesMarcadas', 'reunioesRealizadas', 'noShows'].map((k) => (
+              {['leadsTrabalhados', 'leadsContatados', 'diagnosticasAgendadas', 'diagnosticasRealizadas', 'propostasAgendadas', 'propostasRealizadas', 'noShows'].map((k) => (
                 <td key={k} className="py-2.5 pr-4 text-gray-500 font-semibold">{avg(hunters, k).toFixed(1)}</td>
               ))}
               <td className="py-2.5 pr-4 text-gray-500 font-bold">
-                {pct(sumKey(hunters, 'noShows'), sumKey(hunters, 'reunioesMarcadas'))}%
-              </td>
-              <td className="py-2.5 pr-4 text-gray-500 font-bold">
-                {pct(sumKey(hunters, 'reunioesRealizadas'), sumKey(hunters, 'contatadas'))}%
+                {pct(sumKey(hunters, 'propostasRealizadas'), sumKey(hunters, 'leadsTrabalhados'))}%
               </td>
             </tr>}
           </tbody>
@@ -698,40 +641,42 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
             <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip content={<ChartTooltip />} cursor={{ fill: '#1A1A1A' }} />
             <Legend wrapperStyle={{ fontSize: '10px', color: '#6B7280' }} />
-            <Bar dataKey="Contatadas"       fill="#044947" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Reun. Marcadas"   fill="#2A6B68" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Reun. Realizadas" fill="#CE7028" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="No-shows"         fill="#374151" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Leads Trab." fill="#044947" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Leads Cont." fill="#2A6B68" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Diag. Ag." fill="#3B82F6" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Diag. Real." fill="#8B5CF6" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Prop. Real." fill="#CE7028" radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
     </div>
   )
 }
-
-// ── Closers com tooltips nas colunas ─────────────────────────
+// Closers com tooltips nas colunas ─────────────────────────
 const CLOSER_COLS = [
-  { label: 'Closer',       tip: null },
-  { label: 'Prop. Ag.',    tip: 'Total de reuniões de proposta agendadas pelo Closer no período' },
-  { label: 'Prop. Real.',  tip: 'Total de reuniões de proposta realizadas pelo Closer no período' },
-  { label: 'No-shows',     tip: 'Reuniões de proposta em que o lead não compareceu' },
-  { label: 'Em Neg.',      tip: 'Leads ativos em processo de negociação com este Closer' },
-  { label: 'Fechados',     tip: 'Total de contratos assinados pelo Closer no período' },
-  { label: 'Taxa Fech.',   tip: 'Contratos Fechados ÷ Propostas Realizadas × 100' },
+  { label: 'Closer', tip: null },
+  { label: 'Diag. Real.', tip: 'Diagnósticas realizadas que chegaram ao contexto deste Closer.' },
+  { label: 'Prop. Ag.', tip: 'Apresentações de proposta agendadas por este Closer.' },
+  { label: 'Prop. Real.', tip: 'Apresentações de proposta que realmente aconteceram com este Closer.' },
+  { label: 'No-shows', tip: 'Bolos em apresentações de proposta. Essa responsabilidade fica com o Closer.' },
+  { label: 'Em Neg.', tip: 'Leads que estão em negociação com este Closer.' },
+  { label: 'Contratos', tip: 'Contratos fechados por este Closer no período.' },
+  { label: 'Taxa Contratos', tip: 'Mostra quantas propostas apresentadas pelo Closer viraram contratos fechados.' },
 ]
-const MEDIA_TIP_C = 'Média aritmética de todos os Closers para este indicador no período'
+const MEDIA_TIP_C = 'Média geral dos Closers configurados para este período.'
 
 function ClosersSection({ closers, prevClosers, prevLabel }) {
-  const sumKey    = (arr, key) => arr.reduce((s, c) => s + c[key], 0)
+  const sumKey = (arr, key) => arr.reduce((s, c) => s + (c[key] || 0), 0)
   const currTotal = sumKey(closers, 'contratosFechados')
   const prevTotal = prevClosers ? sumKey(prevClosers, 'contratosFechados') : null
 
   const chartData = closers.map((c) => ({
-    nome:            c.nome.split(' ')[0],
-    'Prop. Ag.':     c.propostasAgendadas || 0,
-    'Prop. Real.':   c.reunioesRealizadas,
-    'Em Negociação': c.emNegociacao,
-    'Fechados':      c.contratosFechados,
+    nome: c.nome.split(' ')[0],
+    'Diag. Real.': c.diagnosticasRealizadas || 0,
+    'Prop. Ag.': c.propostasAgendadas || 0,
+    'Prop. Real.': c.propostasRealizadas || c.reunioesRealizadas || 0,
+    'Em Negociação': c.emNegociacao || 0,
+    'Contratos': c.contratosFechados || 0,
   }))
 
   return (
@@ -739,7 +684,7 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">Closers</h2>
-          <p className="text-xs text-gray-600 mt-0.5">Negociação e fechamento</p>
+          <p className="text-xs text-gray-600 mt-0.5">Proposta, negociação e fechamento</p>
         </div>
         <DeltaTag curr={currTotal} prev={prevTotal} label={prevLabel ? `vs ${prevLabel}` : ''} />
       </div>
@@ -761,25 +706,29 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
           <tbody>
             {closers.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-gray-600">
+                <td colSpan={8} className="py-6 text-center text-gray-600">
                   Nenhum closer configurado. Cadastre vínculos em Comercial &gt; Equipe.
                 </td>
               </tr>
             )}
             {closers.map((c) => {
-              const taxa = pct(c.contratosFechados, c.reunioesRealizadas)
+              const diagnosticasRealizadas = c.diagnosticasRealizadas || 0
+              const propostasAgendadas = c.propostasAgendadas || 0
+              const propostasRealizadas = c.propostasRealizadas || c.reunioesRealizadas || 0
+              const taxa = pct(c.contratosFechados || 0, propostasRealizadas)
               return (
                 <tr key={c.id} className="border-b border-[#0D0D0D] hover:bg-[#0D0D0D]/60 transition-colors">
                   <td className="py-2.5 pr-4 font-semibold text-white whitespace-nowrap">{c.nome}</td>
-                  <td className="py-2.5 pr-4 text-gray-300">{c.propostasAgendadas || 0}</td>
-                  <td className="py-2.5 pr-4 text-gray-300">{c.reunioesRealizadas}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{diagnosticasRealizadas}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{propostasAgendadas}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{propostasRealizadas}</td>
                   <td className="py-2.5 pr-4">
-                    <span className={c.noShows > 0 ? 'text-red-400' : 'text-gray-500'}>{c.noShows}</span>
+                    <span className={c.noShows > 0 ? 'text-red-400' : 'text-gray-500'}>{c.noShows || 0}</span>
                   </td>
-                  <td className="py-2.5 pr-4 text-gray-300">{c.emNegociacao}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{c.emNegociacao || 0}</td>
                   <td className="py-2.5 pr-4">
                     <span className={c.contratosFechados > 0 ? 'text-green-400 font-bold' : 'text-gray-500'}>
-                      {c.contratosFechados}
+                      {c.contratosFechados || 0}
                     </span>
                   </td>
                   <td className="py-2.5 pr-4">
@@ -797,11 +746,11 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
                   <InfoTooltip text={MEDIA_TIP_C} />
                 </span>
               </td>
-              {['propostasAgendadas', 'reunioesRealizadas', 'noShows', 'emNegociacao', 'contratosFechados'].map((k) => (
+              {['diagnosticasRealizadas', 'propostasAgendadas', 'propostasRealizadas', 'noShows', 'emNegociacao', 'contratosFechados'].map((k) => (
                 <td key={k} className="py-2.5 pr-4 text-gray-500 font-semibold">{avg(closers, k).toFixed(1)}</td>
               ))}
               <td className="py-2.5 pr-4 text-gray-500 font-bold">
-                {pct(sumKey(closers, 'contratosFechados'), sumKey(closers, 'reunioesRealizadas'))}%
+                {pct(sumKey(closers, 'contratosFechados'), sumKey(closers, 'propostasRealizadas'))}%
               </td>
             </tr>}
           </tbody>
@@ -816,18 +765,18 @@ function ClosersSection({ closers, prevClosers, prevLabel }) {
             <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip content={<ChartTooltip />} cursor={{ fill: '#1A1A1A' }} />
             <Legend wrapperStyle={{ fontSize: '10px', color: '#6B7280' }} />
-            <Bar dataKey="Prop. Ag."     fill="#044947" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Prop. Real."   fill="#2A6B68" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Em Negociação" fill="#CE7028" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Fechados"      fill="#16A34A" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Diag. Real." fill="#044947" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Prop. Ag." fill="#2A6B68" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Prop. Real." fill="#CE7028" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Em Negociação" fill="#E8955A" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Contratos" fill="#16A34A" radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
     </div>
   )
 }
-
-// ── Componente principal ──────────────────────────────────────
+// Componente principal ──────────────────────────────────────
 function findCurrentWeekIndex(weeks) {
   if (!weeks.length) return 0
   const now = new Date()
@@ -1064,8 +1013,6 @@ export default function ComercialDashboard() {
     return 'mês anterior'
   }, [viewMode, prevPeriod])
 
-  const showPipeline = viewMode !== 'semanal'
-
   return (
     <div className="space-y-5">
 
@@ -1106,7 +1053,15 @@ export default function ComercialDashboard() {
 
       {/* ── Seção 1: KPIs (topo) ── */}
       {/* TODO: [Supabase] supabase.from('kpis_comercial').select('*').eq('periodo_id', periodoId) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <KPICard
+          label={viewMode === 'aovivo' ? 'Total de Leads' : 'Leads Entrantes'}
+          value={currentPeriod.kpis.leadsEntrantes ?? currentPeriod.funil.leadsCadastrados ?? 0}
+          prevValue={prevPeriod?.kpis.leadsEntrantes ?? prevPeriod?.funil.leadsCadastrados ?? null}
+          format="number"
+          Icon={Users}
+          accent="#2A6B68"
+        />
         <KPICard
           label="Ticket Médio"
           value={currentPeriod.kpis.ticketMedio}
@@ -1117,8 +1072,8 @@ export default function ComercialDashboard() {
         />
         <KPICard
           label="Contratos Fechados"
-          value={currentPeriod.funil.contratosFechados}
-          prevValue={prevPeriod?.funil.contratosFechados ?? null}
+          value={currentPeriod.kpis.contratosFechados ?? currentPeriod.historico.contratosFechados ?? 0}
+          prevValue={prevPeriod?.kpis.contratosFechados ?? prevPeriod?.historico.contratosFechados ?? null}
           format="number"
           Icon={FileCheck}
           accent="#16A34A"
@@ -1153,16 +1108,6 @@ export default function ComercialDashboard() {
           </p>
           <ComplementaryMetrics funil={currentPeriod.funil} historico={currentPeriod.historico} />
         </div>
-
-        {showPipeline && currentPeriod.pipeline && (
-          <div className="border-t border-[#1E1E1E] pt-5">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-              Distribuição do Pipeline (CRM)
-            </p>
-            {/* TODO: [Pipefy] pipefy.getPipeCards(pipeId).then(groupByStage) */}
-            <PipelineGrid pipeline={currentPeriod.pipeline} />
-          </div>
-        )}
       </div>
 
       {/* ── Seção 3: Hunters ── */}
