@@ -300,3 +300,51 @@ Regra tecnica:
   - `Valor final`;
   - `Valor contratado`.
 - Campos genericos ou de proposta, como `Valor apresentado` e `Valor da proposta`, nao devem ser usados para calcular receita/ticket.
+
+## Atualizacao 2026-07-17 - Analise de leads por CNAE/segmento
+
+Nova subarea:
+
+- `Comercial > Leads`
+- Rota: `/comercial/leads`
+- Arquivo: `src/pages/comercial/Leads.jsx`
+
+Objetivo:
+
+- Criar uma visao especializada para entender quais CNAEs/segmentos avancam melhor no funil.
+- A pagina usa os snapshots reais do Pipefy salvos no Supabase em `comercial_dashboard_snapshots`.
+- Nao usa mocks nem `localStorage` como fonte de dados.
+
+Metricas por CNAE/segmento:
+
+- total de leads analisados no periodo;
+- taxa de contato real;
+- taxa de diagnostica realizada;
+- taxa de proposta realizada;
+- taxa de contrato;
+- taxa de perda.
+
+Regra tecnica:
+
+- A pagina usa `mapLeadSegmentInsights()` em `src/services/comercialSnapshotMapper.js`.
+- As conversoes usam a mesma funcao central `buildCardConversionFlags()` da dashboard comercial para evitar divergencia de regra.
+- O filtro de periodo respeita a mesma ideia da dashboard:
+  - ao vivo: historico total disponivel no snapshot;
+  - semanal: semana domingo a sabado;
+  - mensal: mes selecionado.
+
+Campos esperados do Pipefy para agrupamento:
+
+- `Segmento da empresa (CNAE)`;
+- `Segmento da empresa`;
+- `Segmento CNAE`;
+- `CNAE`;
+- `Atividade principal`;
+- `Ramo de atividade`;
+- `Setor da empresa`.
+
+Observacao importante:
+
+- Em 2026-07-17, o snapshot analisado nao trazia campo de CNAE/segmento preenchido.
+- Enquanto esse campo nao existir ou nao estiver preenchido no Pipefy/n8n, a pagina agrupa os leads como `Sem CNAE informado`.
+- Para o ranking ficar gerencialmente util, o Pipefy precisa alimentar um campo consistente de CNAE/segmento no snapshot.

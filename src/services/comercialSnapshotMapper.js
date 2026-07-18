@@ -303,6 +303,160 @@ function getCardValue(card) {
   )
 }
 
+function getLeadSegment(card) {
+  const segment = getFieldValue(card, [
+    'segmento da empresa (cnae)',
+    'segmento da empresa',
+    'segmento cnae',
+    'cnae',
+    'atividade principal',
+    'atividade economica',
+    'atividade econômica',
+    'ramo de atividade',
+    'ramo da empresa',
+    'setor da empresa',
+  ])
+
+  return segment || 'Sem CNAE informado'
+}
+
+function getCardCompanyName(card) {
+  return card?.title ||
+    card?.name ||
+    getFieldValue(card, ['nome da empresa', 'empresa', 'razao social', 'razão social']) ||
+    'Empresa sem nome'
+}
+
+function buildCardConversionFlags(card, range) {
+  const leadCreated = cardCreatedInPeriod(card, range)
+  const contactAttempted = contactAttemptInPeriod(card, range)
+  const contactStage = contactStageInPeriod(card, range)
+
+  const diagnosticScheduled = eventReachedInPeriod(
+    card,
+    EVENT_LABELS.diagnosticScheduled,
+    PIPEFY_2026_STAGE_GROUPS.diagnosticScheduledOrLater,
+    range,
+    FUNNEL_RANKS.diagnosticScheduled,
+  )
+
+  const diagnosticStatus = getDiagnosticStatus(card)
+  const diagnosticDone = canCountStage(card, FUNNEL_RANKS.diagnosticDone) && (eventStatusInPeriod(
+    card,
+    diagnosticStatus,
+    EVENT_LABELS.diagnosticDone,
+    PIPEFY_2026_STAGE_GROUPS.diagnosticDoneOrLater,
+    range,
+    statusIsRealized,
+  ) || eventReachedInPeriod(
+    card,
+    EVENT_LABELS.diagnosticDone,
+    PIPEFY_2026_STAGE_GROUPS.diagnosticDoneOrLater,
+    range,
+    FUNNEL_RANKS.diagnosticDone,
+  ))
+
+  const diagnosticNoShow = isNoShowFor(card, 'diagnostica', range) || eventStatusInPeriod(
+    card,
+    diagnosticStatus,
+    EVENT_LABELS.diagnosticScheduled,
+    STAGE_KEYWORDS.diagnosticScheduled,
+    range,
+    statusIsNoShow,
+  )
+
+  const proposalScheduled = eventReachedInPeriod(
+    card,
+    EVENT_LABELS.proposalScheduled,
+    PIPEFY_2026_STAGE_GROUPS.proposalScheduledOrLater,
+    range,
+    FUNNEL_RANKS.proposalScheduled,
+  )
+
+  const proposalStatus = getProposalStatus(card)
+  const proposalDone = canCountStage(card, FUNNEL_RANKS.proposalDone) && (eventStatusInPeriod(
+    card,
+    proposalStatus,
+    EVENT_LABELS.proposalDone,
+    PIPEFY_2026_STAGE_GROUPS.proposalDoneOrLater,
+    range,
+    statusIsRealized,
+  ) || eventReachedInPeriod(
+    card,
+    EVENT_LABELS.proposalDone,
+    PIPEFY_2026_STAGE_GROUPS.proposalDoneOrLater,
+    range,
+    FUNNEL_RANKS.proposalDone,
+  ))
+
+  const proposalNoShow = isNoShowFor(card, 'proposta', range) || eventStatusInPeriod(
+    card,
+    proposalStatus,
+    EVENT_LABELS.proposalScheduled,
+    STAGE_KEYWORDS.proposalScheduled,
+    range,
+    statusIsNoShow,
+  )
+
+  const inNegotiation = eventReachedInPeriod(
+    card,
+    EVENT_LABELS.negotiation,
+    [...STAGE_KEYWORDS.negotiation, ...STAGE_KEYWORDS.contract],
+    range,
+    FUNNEL_RANKS.negotiation,
+  )
+
+  const contractClosed = contractWasClosed(card) && eventReachedInPeriod(
+    card,
+    EVENT_LABELS.contract,
+    STAGE_KEYWORDS.contract,
+    range,
+    FUNNEL_RANKS.contract,
+  )
+  const futureInterest = currentStageInPeriod(card, STAGE_KEYWORDS.futureInterest, range)
+  const pendingNoShow = currentStageInPeriod(card, STAGE_KEYWORDS.pendingScheduling, range)
+  const lost = currentStageInPeriod(card, STAGE_KEYWORDS.lost, range)
+  const successfulContact = futureInterest ||
+    diagnosticScheduled ||
+    diagnosticDone ||
+    proposalScheduled ||
+    proposalDone ||
+    inNegotiation ||
+    pendingNoShow ||
+    contractClosed
+
+  const worked = contactStage ||
+    contactAttempted ||
+    futureInterest ||
+    diagnosticScheduled ||
+    diagnosticDone ||
+    proposalScheduled ||
+    proposalDone ||
+    inNegotiation ||
+    pendingNoShow ||
+    contractClosed ||
+    lost
+
+  return {
+    leadCreated,
+    contactAttempted,
+    contactStage,
+    worked,
+    successfulContact,
+    diagnosticScheduled,
+    diagnosticDone,
+    diagnosticNoShow,
+    proposalScheduled,
+    proposalDone,
+    proposalNoShow,
+    inNegotiation,
+    contractClosed,
+    futureInterest,
+    pendingNoShow,
+    lost,
+  }
+}
+
 function getDiagnosticStatus(card) {
   return getFieldValue(card, ['status da diagnostica', 'status da diagnóstica'])
 }
@@ -786,114 +940,24 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
   let receitaTotal = 0
 
   for (const card of cards) {
-    const leadCreated = cardCreatedInPeriod(card, range)
-    const contactAttempted = contactAttemptInPeriod(card, range)
-    const contactStage = contactStageInPeriod(card, range)
-
-    const diagnosticScheduled = eventReachedInPeriod(
-      card,
-      EVENT_LABELS.diagnosticScheduled,
-      PIPEFY_2026_STAGE_GROUPS.diagnosticScheduledOrLater,
-      range,
-      FUNNEL_RANKS.diagnosticScheduled,
-    )
-
-    const diagnosticStatus = getDiagnosticStatus(card)
-    const diagnosticDone = canCountStage(card, FUNNEL_RANKS.diagnosticDone) && (eventStatusInPeriod(
-      card,
-      diagnosticStatus,
-      EVENT_LABELS.diagnosticDone,
-      PIPEFY_2026_STAGE_GROUPS.diagnosticDoneOrLater,
-      range,
-      statusIsRealized,
-    ) || eventReachedInPeriod(
-      card,
-      EVENT_LABELS.diagnosticDone,
-      PIPEFY_2026_STAGE_GROUPS.diagnosticDoneOrLater,
-      range,
-      FUNNEL_RANKS.diagnosticDone,
-    ))
-
-    const diagnosticNoShow = isNoShowFor(card, 'diagnostica', range) || eventStatusInPeriod(
-      card,
-      diagnosticStatus,
-      EVENT_LABELS.diagnosticScheduled,
-      STAGE_KEYWORDS.diagnosticScheduled,
-      range,
-      statusIsNoShow,
-    )
-
-    const proposalScheduled = eventReachedInPeriod(
-      card,
-      EVENT_LABELS.proposalScheduled,
-      PIPEFY_2026_STAGE_GROUPS.proposalScheduledOrLater,
-      range,
-      FUNNEL_RANKS.proposalScheduled,
-    )
-
-    const proposalStatus = getProposalStatus(card)
-    const proposalDone = canCountStage(card, FUNNEL_RANKS.proposalDone) && (eventStatusInPeriod(
-      card,
-      proposalStatus,
-      EVENT_LABELS.proposalDone,
-      PIPEFY_2026_STAGE_GROUPS.proposalDoneOrLater,
-      range,
-      statusIsRealized,
-    ) || eventReachedInPeriod(
-      card,
-      EVENT_LABELS.proposalDone,
-      PIPEFY_2026_STAGE_GROUPS.proposalDoneOrLater,
-      range,
-      FUNNEL_RANKS.proposalDone,
-    ))
-
-    const proposalNoShow = isNoShowFor(card, 'proposta', range) || eventStatusInPeriod(
-      card,
-      proposalStatus,
-      EVENT_LABELS.proposalScheduled,
-      STAGE_KEYWORDS.proposalScheduled,
-      range,
-      statusIsNoShow,
-    )
-
-    const inNegotiation = eventReachedInPeriod(
-      card,
-      EVENT_LABELS.negotiation,
-      [...STAGE_KEYWORDS.negotiation, ...STAGE_KEYWORDS.contract],
-      range,
-      FUNNEL_RANKS.negotiation,
-    )
-
-    const contractClosed = contractWasClosed(card) && eventReachedInPeriod(
-      card,
-      EVENT_LABELS.contract,
-      STAGE_KEYWORDS.contract,
-      range,
-      FUNNEL_RANKS.contract,
-    )
-    const futureInterest = currentStageInPeriod(card, STAGE_KEYWORDS.futureInterest, range)
-    const pendingNoShow = currentStageInPeriod(card, STAGE_KEYWORDS.pendingScheduling, range)
-    const lost = currentStageInPeriod(card, STAGE_KEYWORDS.lost, range)
-    const successfulContact = futureInterest ||
-      diagnosticScheduled ||
-      diagnosticDone ||
-      proposalScheduled ||
-      proposalDone ||
-      inNegotiation ||
-      pendingNoShow ||
-      contractClosed
-
-    const worked = contactStage ||
-      contactAttempted ||
-      futureInterest ||
-      diagnosticScheduled ||
-      diagnosticDone ||
-      proposalScheduled ||
-      proposalDone ||
-      inNegotiation ||
-      pendingNoShow ||
-      contractClosed ||
-      lost
+    const {
+      leadCreated,
+      contactAttempted,
+      contactStage,
+      worked,
+      successfulContact,
+      diagnosticScheduled,
+      diagnosticDone,
+      diagnosticNoShow,
+      proposalScheduled,
+      proposalDone,
+      proposalNoShow,
+      inNegotiation,
+      contractClosed,
+      futureInterest,
+      pendingNoShow,
+      lost,
+    } = buildCardConversionFlags(card, range)
 
     if (leadCreated) historico.leadsCadastrados += 1
     if (worked) historico.leadsTrabalhados += 1
@@ -984,6 +1048,101 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       contratosFechados: historico.contratosFechados,
       taxaConversao: historico.leadsCadastrados ? (historico.contratosFechados / historico.leadsCadastrados) * 100 : 0,
     },
+  }
+}
+
+export function mapLeadSegmentInsights(payload, { range = null } = {}) {
+  const cards = getCards(payload)
+  const groups = new Map()
+
+  for (const card of cards) {
+    const flags = buildCardConversionFlags(card, range)
+    if (!flags.leadCreated) continue
+
+    const segment = getLeadSegment(card)
+    const current = groups.get(segment) || {
+      id: normalize(segment) || 'sem-cnae',
+      segment,
+      total: 0,
+      worked: 0,
+      contactAttempts: 0,
+      contacted: 0,
+      diagnosticScheduled: 0,
+      diagnosticDone: 0,
+      proposalScheduled: 0,
+      proposalDone: 0,
+      negotiation: 0,
+      contracts: 0,
+      lost: 0,
+      pendingNoShow: 0,
+      companies: [],
+    }
+
+    current.total += 1
+    if (flags.worked) current.worked += 1
+    if (flags.contactAttempted || flags.contactStage) current.contactAttempts += 1
+    if (flags.successfulContact) current.contacted += 1
+    if (flags.diagnosticScheduled) current.diagnosticScheduled += 1
+    if (flags.diagnosticDone) current.diagnosticDone += 1
+    if (flags.proposalScheduled) current.proposalScheduled += 1
+    if (flags.proposalDone) current.proposalDone += 1
+    if (flags.inNegotiation) current.negotiation += 1
+    if (flags.contractClosed) current.contracts += 1
+    if (flags.lost) current.lost += 1
+    if (flags.pendingNoShow) current.pendingNoShow += 1
+    current.companies.push({
+      name: getCardCompanyName(card),
+      stage: getStageName(card) || 'Sem fase',
+      contacted: flags.successfulContact,
+      diagnosticDone: flags.diagnosticDone,
+      proposalDone: flags.proposalDone,
+      contractClosed: flags.contractClosed,
+    })
+
+    groups.set(segment, current)
+  }
+
+  const rows = [...groups.values()].map(row => ({
+    ...row,
+    workedRate: pct(row.worked, row.total),
+    contactAttemptRate: pct(row.contactAttempts, row.total),
+    contactRate: pct(row.contacted, row.total),
+    diagnosticDoneRate: pct(row.diagnosticDone, row.total),
+    proposalDoneRate: pct(row.proposalDone, row.total),
+    contractRate: pct(row.contracts, row.total),
+    lostRate: pct(row.lost, row.total),
+  }))
+
+  const totals = rows.reduce((acc, row) => ({
+    total: acc.total + row.total,
+    worked: acc.worked + row.worked,
+    contactAttempts: acc.contactAttempts + row.contactAttempts,
+    contacted: acc.contacted + row.contacted,
+    diagnosticDone: acc.diagnosticDone + row.diagnosticDone,
+    proposalDone: acc.proposalDone + row.proposalDone,
+    contracts: acc.contracts + row.contracts,
+    lost: acc.lost + row.lost,
+  }), {
+    total: 0,
+    worked: 0,
+    contactAttempts: 0,
+    contacted: 0,
+    diagnosticDone: 0,
+    proposalDone: 0,
+    contracts: 0,
+    lost: 0,
+  })
+
+  return {
+    rows,
+    totals: {
+      ...totals,
+      contactRate: pct(totals.contacted, totals.total),
+      diagnosticDoneRate: pct(totals.diagnosticDone, totals.total),
+      proposalDoneRate: pct(totals.proposalDone, totals.total),
+      contractRate: pct(totals.contracts, totals.total),
+    },
+    missingSegmentCount: rows.find(row => row.segment === 'Sem CNAE informado')?.total || 0,
   }
 }
 

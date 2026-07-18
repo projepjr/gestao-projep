@@ -25,6 +25,7 @@ export const ACCESS_MODULES = [
     available: true,
     subareas: [
       { key: 'comercial.dashboard', label: 'Dashboard', path: '/comercial', icon: 'dashboard' },
+      { key: 'comercial.leads', label: 'Leads', path: '/comercial/leads', icon: 'target' },
       { key: 'comercial.pipeline', label: 'Pipeline', path: '/comercial/pipeline', icon: 'kanban' },
       { key: 'comercial.calendario', label: 'Calendário', path: '/comercial/calendario', icon: 'calendar' },
       { key: 'comercial.ranking', label: 'Ranking', path: '/comercial/ranking', icon: 'trophy' },

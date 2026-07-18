@@ -32,6 +32,7 @@ const ICONS = {
   shield: Shield,
   dashboard: LayoutDashboard,
   kanban: Kanban,
+  target: Target,
   calendar: CalendarDays,
   trophy: Trophy,
   'file-text': FileText,
