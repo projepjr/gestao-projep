@@ -370,5 +370,7 @@ Atualizacao 2026-07-18 - Atualizacao manual de dados sincronizados:
 - O botao usa o componente `src/components/RefreshButton.jsx`.
 - Ao clicar, `Layout.jsx` chama `refreshData()` do `DataContext` para buscar dados mais recentes do Supabase e dispara o evento interno `projep:refresh-data`.
 - Paginas comerciais baseadas em snapshot do Pipefy (`Dashboard.jsx`, `Leads.jsx` e `Equipe.jsx`) escutam esse evento para recarregar `comercial_dashboard_snapshots`.
-- O botao global nao executa o workflow n8n diretamente; ele apenas puxa do Supabase o ultimo estado salvo pelas sincronizacoes existentes.
-- Tooltip do botao: `Atualizar site com as informacoes mais recentes`.
+- O botao global pode acionar um webhook publico do n8n antes de reler o Supabase, usando a variavel `VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL`.
+- A URL do webhook nao deve ficar fixa no codigo nem na memoria. Deve ser configurada nas variaveis de ambiente da Cloudflare Pages.
+- Se a variavel nao estiver configurada ou se o n8n falhar, o botao ainda tenta recarregar o estado atual do Supabase.
+- Tooltip do botao: `Atualizar dados recentes`.

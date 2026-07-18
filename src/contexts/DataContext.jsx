@@ -25,9 +25,11 @@ import {
   syncNotificationToSupabase,
   syncUsersToSupabase,
 } from '../services/supabaseBridge'
+import { triggerN8nRefresh } from '../services/n8nRefresh'
 
 const DataContext = createContext(null)
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 const matchesUserId = (id, member) => Boolean(member) && (
   idsEqual(id, member.id) ||
   idsEqual(id, member.supabaseId)
@@ -323,10 +325,20 @@ export function DataProvider({ children }) {
   const refreshData = useCallback(async () => {
     setRefreshingData(true)
     try {
+      try {
+        const refreshResult = await triggerN8nRefresh()
+        if (refreshResult.triggered) {
+          await wait(1500)
+        } else {
+          console.info('[n8n] Webhook de atualizacao global nao configurado. Atualizando apenas pelo Supabase.')
+        }
+      } catch (error) {
+        console.warn('[n8n] Falha ao acionar atualizacao global:', error.message || error)
+      }
       await pullRemoteState(db)
       await pullCommunicationState(db)
     } catch (error) {
-      console.warn('[Supabase] Falha ao atualizar dados manualmente:', error.message || error)
+      console.warn('[Atualizacao global] Falha ao atualizar dados:', error.message || error)
     } finally {
       setRefreshingData(false)
     }

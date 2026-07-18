@@ -345,7 +345,7 @@ export default function Layout({ children }) {
 
           <div className="flex items-center gap-2">
             <RefreshButton
-              label="Atualizar site com dados mais recentes do Supabase"
+              label="Atualizar dados recentes"
               loading={refreshingData}
               onClick={handleGlobalRefresh}
             />

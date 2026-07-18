@@ -36,7 +36,10 @@ Para o front-end Vite, configurar:
 ```env
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
+VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL=
 ```
+
+`VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL` e opcional e deve apontar para um webhook publico do n8n que atualiza Pipefy -> Supabase. Nao usar token privado nessa URL.
 
 Nao configurar variaveis com prefixo `NEXT_PUBLIC_`, pois o projeto nao e Next.js.
 
