@@ -367,6 +367,29 @@ const normalizeCommercialTeamConfig = equipe => ({
   closers: Array.isArray(equipe?.closers) ? equipe.closers : [],
 })
 
+const normalizeCommercialConfig = config => ({
+  equipe: normalizeCommercialTeamConfig(config?.equipe),
+  pipefyPipeId: `${config?.pipefyPipeId || config?.pipeId || '307256948'}`.trim(),
+  updatedAt: config?.updatedAt || new Date().toISOString(),
+})
+
+async function fetchCommercialConfigRow() {
+  if (!isSupabaseConfigured || !supabase) return null
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('description, created_at')
+    .eq('id', notificationUuid(COMMERCIAL_CONFIG_ROW_ID))
+    .maybeSingle()
+  logRemoteError('fetch commercial team config notification', error)
+  if (!data?.description) return null
+  try {
+    return JSON.parse(data.description)
+  } catch (error) {
+    console.warn('[Supabase] ConfiguraÃ§Ã£o comercial invÃ¡lida:', error.message || error)
+    return null
+  }
+}
+
 export async function createSupabaseAuthAccount(email, password, metadata = {}) {
   if (!isSupabaseConfigured || !supabase) return { success: false, enabled: false }
   const normalizedEmail = normalizeEmail(email)
@@ -451,9 +474,15 @@ export async function updateSupabaseAuthPassword(newPassword) {
   return { success: true, user: data?.user || sessionData.session.user || null }
 }
 
-export async function syncCommercialTeamConfig(equipe) {
+export async function syncCommercialTeamConfig(equipe, settings = {}) {
   if (!isSupabaseConfigured || !supabase) return
-  const payload = { equipe: normalizeCommercialTeamConfig(equipe), updatedAt: new Date().toISOString() }
+  const currentConfig = await fetchCommercialConfigRow()
+  const payload = normalizeCommercialConfig({
+    ...(currentConfig || {}),
+    ...settings,
+    equipe: normalizeCommercialTeamConfig(equipe),
+    updatedAt: new Date().toISOString(),
+  })
   const { error } = await supabase
     .from('notifications')
     .upsert({
@@ -480,9 +509,12 @@ export async function pullCommercialTeamConfig(db) {
   logRemoteError('fetch commercial team config notification', notificationError)
 
   let remoteEquipe = null
+  let pipefyPipeId = null
   if (notificationConfig?.description) {
     try {
-      remoteEquipe = JSON.parse(notificationConfig.description)?.equipe || null
+      const parsedConfig = JSON.parse(notificationConfig.description)
+      remoteEquipe = parsedConfig?.equipe || null
+      pipefyPipeId = parsedConfig?.pipefyPipeId || parsedConfig?.pipeId || null
     } catch (error) {
       console.warn('[Supabase] Configuração comercial inválida:', error.message || error)
     }
@@ -496,26 +528,39 @@ export async function pullCommercialTeamConfig(db) {
       .maybeSingle()
     logRemoteError('fetch commercial team config snapshot fallback', error)
     remoteEquipe = data?.payload?.equipe || null
+    pipefyPipeId = pipefyPipeId || data?.payload?.pipefyPipeId || data?.payload?.pipeId || null
   }
 
   if (remoteEquipe) {
     const normalized = normalizeCommercialTeamConfig(remoteEquipe)
+    const normalizedPipeId = `${pipefyPipeId || '307256948'}`.trim()
     db.mutate('comercial', current => ({
       ...current,
+      pipefyPipeId: normalizedPipeId,
+      integracaoPipefy: {
+        ...(current.integracaoPipefy || {}),
+        pipeId: normalizedPipeId,
+      },
       equipe: {
         ...(current.equipe || {}),
         ...normalized,
       },
     }))
-    return normalized
+    return { equipe: normalized, pipefyPipeId: normalizedPipeId }
   }
 
   const emptyEquipe = normalizeCommercialTeamConfig(null)
+  const normalizedPipeId = `${pipefyPipeId || '307256948'}`.trim()
   db.mutate('comercial', current => ({
     ...current,
+    pipefyPipeId: normalizedPipeId,
+    integracaoPipefy: {
+      ...(current.integracaoPipefy || {}),
+      pipeId: normalizedPipeId,
+    },
     equipe: emptyEquipe,
   }))
-  return emptyEquipe
+  return { equipe: emptyEquipe, pipefyPipeId: normalizedPipeId }
 }
 
 export async function bootstrapSupabase(db) {

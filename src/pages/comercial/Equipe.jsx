@@ -22,18 +22,18 @@ function extractSnapshotPipeIds(payload = {}) {
   ].flat().filter(Boolean).map(String)
 }
 
-function isComercialPipeSnapshot(snapshot) {
-  return extractSnapshotPipeIds(snapshot?.payload || {}).includes(PIPEFY_COMERCIAL_PIPE_ID)
+function isComercialPipeSnapshot(snapshot, pipeId = PIPEFY_COMERCIAL_PIPE_ID) {
+  return extractSnapshotPipeIds(snapshot?.payload || {}).includes(`${pipeId}`)
 }
 
 function hasUsableSnapshotPayload(snapshot) {
   return Boolean(snapshot?.payload && typeof snapshot.payload === 'object' && !Array.isArray(snapshot.payload))
 }
 
-function selectComercialSnapshot(snapshots) {
+function selectComercialSnapshot(snapshots, pipeId = PIPEFY_COMERCIAL_PIPE_ID) {
   const usableSnapshots = snapshots.filter(hasUsableSnapshotPayload)
   const snapshotsWithPipeId = usableSnapshots.filter(snapshot => extractSnapshotPipeIds(snapshot.payload).length > 0)
-  const explicitPipeSnapshot = usableSnapshots.find(isComercialPipeSnapshot)
+  const explicitPipeSnapshot = usableSnapshots.find(snapshot => isComercialPipeSnapshot(snapshot, pipeId))
 
   if (explicitPipeSnapshot) return explicitPipeSnapshot
   if (snapshotsWithPipeId.length > 0) return null
@@ -157,12 +157,14 @@ function TeamTable({ role, entries, members, onEdit, onRemove, onToggle }) {
 }
 
 export default function EquipeComercial() {
-  const { members, commercial, updateCommercialTeam } = useData()
+  const { members, commercial, updateCommercialTeam, updateCommercialPipeId } = useData()
   const [role, setRole] = useState('hunters')
   const [form, setForm] = useState(emptyForm)
   const [query, setQuery] = useState('')
   const [snapshot, setSnapshot] = useState(null)
   const [message, setMessage] = useState('')
+  const currentPipeId = `${commercial.pipefyPipeId || commercial.integracaoPipefy?.pipeId || PIPEFY_COMERCIAL_PIPE_ID}`.trim()
+  const [pipeIdDraft, setPipeIdDraft] = useState(currentPipeId)
 
   const loadSnapshot = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) return
@@ -174,11 +176,15 @@ export default function EquipeComercial() {
       .limit(SNAPSHOT_LOOKBACK_LIMIT)
     if (!error) {
       const snapshots = Array.isArray(data) ? data : []
-      setSnapshot(selectComercialSnapshot(snapshots))
+      setSnapshot(selectComercialSnapshot(snapshots, currentPipeId))
     } else {
       console.warn('[EquipeComercial] Falha ao carregar snapshot:', error.message || error)
     }
-  }, [])
+  }, [currentPipeId])
+
+  useEffect(() => {
+    setPipeIdDraft(currentPipeId)
+  }, [currentPipeId])
 
   useEffect(() => {
     loadSnapshot()
@@ -208,6 +214,15 @@ export default function EquipeComercial() {
   const resetForm = () => {
     setForm(emptyForm)
     setMessage('')
+  }
+
+  const savePipeId = () => {
+    const result = updateCommercialPipeId(pipeIdDraft)
+    if (result?.success === false) {
+      setMessage(result.error)
+      return
+    }
+    setMessage('Pipeline salvo. Use o botao de atualizar no topo para puxar os e-mails pelo n8n.')
   }
 
   const save = event => {
@@ -306,6 +321,32 @@ export default function EquipeComercial() {
         />
 
         <div className="space-y-5">
+          <div className="bg-[#111111] border border-[#1E1E1E] rounded-md p-5 space-y-3">
+            <div>
+              <h2 className="text-white font-bold text-sm uppercase tracking-wider">Pipeline Pipefy</h2>
+              <p className="text-gray-600 text-xs mt-0.5">
+                Informe o ID do pipeline que o n8n deve ler ao atualizar os e-mails encontrados.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={pipeIdDraft}
+                onChange={event => setPipeIdDraft(event.target.value.replace(/\D/g, ''))}
+                placeholder="Ex: 307256948"
+                className={INPUT}
+              />
+              <button
+                type="button"
+                onClick={savePipeId}
+                className="shrink-0 px-4 py-2.5 rounded bg-[#CE7028] hover:bg-[#FF882D] text-white text-sm font-semibold transition-colors"
+              >
+                Salvar
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-600">
+              Depois de salvar, use o botao global de atualizar no topo para o n8n buscar os e-mails deste pipeline.
+            </p>
+          </div>
           <form onSubmit={save} className="bg-[#111111] border border-[#1E1E1E] rounded-md p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>

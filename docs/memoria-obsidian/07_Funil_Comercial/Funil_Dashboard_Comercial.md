@@ -382,3 +382,18 @@ Correcao 2026-07-18 - Disparo real do n8n pelo botao global:
 - A Cloudflare Pages recebeu a variavel `VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL` em Production e Preview.
 - Apos teste manual do webhook, a tabela `comercial_dashboard_snapshots` recebeu novo snapshot `source = pipefy`, confirmando que o n8n atualizou o Supabase.
 - O site publicado precisa de novo deploy apos mudanca de variavel `VITE_`, porque Vite injeta variaveis publicas em tempo de build.
+
+Atualizacao 2026-07-20 - Pipeline configuravel para sincronizar equipe comercial:
+
+- A tela `Comercial > Equipe` passou a ter o campo `Pipeline Pipefy`, usado para salvar o ID do pipeline que deve alimentar a lista de e-mails encontrados no Pipefy.
+- O ID salvo fica na configuracao comercial remota (`notifications`, linha `commercial-team-links`) junto com os vinculos de hunters/closers.
+- O valor padrao operacional continua sendo `307256948`.
+- O botao global de atualizar envia `pipefyPipeId`/`pipeId` para o webhook do n8n.
+- O workflow `Site Projep` no n8n foi ajustado para:
+  - ler `pipefyPipeId`, `pipeId` ou `pipelineId` do corpo do webhook;
+  - usar `307256948` como fallback quando o gatilho for agenda ou quando nenhum ID valido for enviado;
+  - repassar o mesmo `pipeId` para a linha de reunioes/calendario;
+  - preservar `pipe.members`/`pipefyMembers` no snapshot salvo em `comercial_dashboard_snapshots`.
+- A query do Pipefy ja busca membros do pipe com e-mail; o front usa `extractPipefyPeopleFromSnapshot()` para listar esses e-mails na tela Equipe.
+- Teste feito em 2026-07-20: disparo manual do webhook com `pipeId = 307256948` gerou snapshot com `pipeId = 307256948` e `pipefyMembers = 14`.
+- Nao registrar URL do webhook, token Pipefy, chave Supabase service role ou qualquer segredo nesta memoria.

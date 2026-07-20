@@ -326,7 +326,12 @@ export function DataProvider({ children }) {
     setRefreshingData(true)
     try {
       try {
-        const refreshResult = await triggerN8nRefresh()
+        const currentCommercial = db.get('comercial') || {}
+        const pipefyPipeId = currentCommercial.pipefyPipeId || currentCommercial.integracaoPipefy?.pipeId
+        const refreshResult = await triggerN8nRefresh({
+          pipefyPipeId,
+          pipeId: pipefyPipeId,
+        })
         if (refreshResult.triggered) {
           await wait(1500)
         } else {
@@ -488,6 +493,29 @@ export function DataProvider({ children }) {
       }
     })
     void syncCommercialTeamConfig(nextEquipe)
+    return { success: true }
+  }
+
+  const updateCommercialPipeId = pipeId => {
+    if (!canUse('comercial.equipe')) return { success: false, error: 'VocÃª nÃ£o pode alterar a integraÃ§Ã£o comercial.' }
+    const normalizedPipeId = `${pipeId || ''}`.trim()
+    if (!/^\d+$/.test(normalizedPipeId)) {
+      return { success: false, error: 'Informe um ID de pipeline vÃ¡lido.' }
+    }
+
+    let nextEquipe = null
+    db.mutate('comercial', current => {
+      nextEquipe = current.equipe || { hunters: [], closers: [] }
+      return {
+        ...current,
+        pipefyPipeId: normalizedPipeId,
+        integracaoPipefy: {
+          ...(current.integracaoPipefy || {}),
+          pipeId: normalizedPipeId,
+        },
+      }
+    })
+    void syncCommercialTeamConfig(nextEquipe, { pipefyPipeId: normalizedPipeId })
     return { success: true }
   }
 
@@ -951,6 +979,7 @@ export function DataProvider({ children }) {
       deleteMember,
       commercial: resolvedCommercial,
       updateCommercialTeam,
+      updateCommercialPipeId,
       leads: resolvedCommercial.leads || [],
       addLead,
       updateLead,
