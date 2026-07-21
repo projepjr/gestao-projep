@@ -233,6 +233,7 @@ export function AuthProvider({ children }) {
         error: `Não foi possível criar suas credenciais de acesso: ${authResult.error || 'erro desconhecido'}`,
       }
     }
+    const now = new Date().toISOString()
     const newUser = {
       id: db.createId(),
       supabaseId: authResult.user?.id || undefined,
@@ -242,7 +243,8 @@ export function AuthProvider({ children }) {
       cargo: jobTitle || '',
       setorId: setor?.id || null,
       setor: setor?.nome || department || '',
-      dataCadastro: new Date().toISOString().split('T')[0],
+      dataCadastro: now.split('T')[0],
+      notificacoesDesde: now,
       fotoPerfil: null,
       telefone: '',
       avatar: initials,
@@ -331,8 +333,8 @@ export function AuthProvider({ children }) {
         titulo: 'Cadastro aprovado',
         descricao: 'Seu acesso à plataforma foi aprovado pela diretoria.',
         timestamp: new Date().toISOString(),
-        lida: false,
-        lidosPor: [],
+        lida: true,
+        lidosPor: [userId],
         tipo: 'sistema',
         link: '/perfil',
       }, ...(current.notificacoes || [])],

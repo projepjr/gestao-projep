@@ -16,7 +16,7 @@ import {
   Crown, Calculator, FolderKanban, Megaphone, TrendingUp,
   PanelLeftClose, PanelLeftOpen, MessageSquare, Shield,
   AlertCircle, FileCheck, Target, CheckCircle, UserCheck, CalendarDays,
-  Sun, Moon,
+  Sun, Moon, Trash2,
 } from 'lucide-react'
 import ProjepLogo, { ProjepSymbol } from './ProjepLogo'
 import UserAvatar from './UserAvatar'
@@ -100,6 +100,8 @@ export default function Layout({ children }) {
     refreshingData,
     markNotificationRead,
     markAllNotificationsRead,
+    deleteNotification,
+    clearAllNotifications,
   } = useData()
   const location  = useLocation()
   const navigate  = useNavigate()
@@ -124,22 +126,30 @@ export default function Layout({ children }) {
     window.dispatchEvent(new CustomEvent('projep:refresh-data'))
   }
 
+  const notificationBaseline = user?.notificacoesDesde || user?.createdAt || user?.dataCadastro
+  const isAfterNotificationBaseline = notification => {
+    if (notification.usuarioId != null || !notificationBaseline) return true
+    const notificationTime = new Date(notification.timestamp).getTime()
+    const baselineTime = new Date(notificationBaseline).getTime()
+    if (!Number.isFinite(notificationTime) || !Number.isFinite(baselineTime)) return true
+    return notificationTime >= baselineTime
+  }
+
   const notifications = storedNotifications
     .filter(notification => {
       const isRecipient = notification.usuarioId == null || matchesUserId(notification.usuarioId, user)
+      const isCurrentForUser = isAfterNotificationBaseline(notification)
       const matchesAudience = notification.audiencia !== 'diretoria' || ['presidente', 'diretor'].includes(user?.role)
       const matchesModule = !notification.modulo || hasModuleAccess(user, notification.modulo)
       const systemEnabled = user?.preferenciasNotificacao?.system !== false
       const isDirectMessage = notification.tipo === 'mensagem'
-      return isRecipient && matchesAudience && matchesModule && (systemEnabled || isDirectMessage)
+      return isRecipient && isCurrentForUser && matchesAudience && matchesModule && (systemEnabled || isDirectMessage)
     })
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .map(notification => ({
       id: notification.id,
       type: notification.tipo,
-      read: notification.usuarioId == null
-        ? (notification.lidosPor || []).some(id => matchesUserId(id, user))
-        : notification.lida,
+      read: notification.lida || (notification.lidosPor || []).some(id => matchesUserId(id, user)),
       title: notification.titulo,
       desc: notification.descricao,
       time: new Date(notification.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -155,6 +165,11 @@ export default function Layout({ children }) {
     }
     setShowNotifs(false)
   }
+  const handleDelete = (e, notificationId) => {
+    e.stopPropagation()
+    deleteNotification(notificationId)
+  }
+  const handleClearAll = () => clearAllNotifications(notifications.map(n => n.id))
   const unreadCount = notifications.filter(n => !n.read).length
   const chatUnreadCount = (storedMessages || []).filter(message => {
     if (!user?.id || matchesUserId(message.remetenteId, user)) return false
@@ -387,11 +402,19 @@ export default function Layout({ children }) {
                       <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
                     )}
                   </div>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-[10px] text-[#FF882D] hover:text-[#CE7028] font-semibold uppercase tracking-wider transition-colors">
-                      Marcar todas lidas
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} className="text-[10px] text-[#FF882D] hover:text-[#CE7028] font-semibold uppercase tracking-wider transition-colors">
+                        Marcar lidas
+                      </button>
+                    )}
+                    {notifications.length > 0 && (
+                      <button onClick={handleClearAll} className="text-[10px] text-gray-500 hover:text-red-400 font-semibold uppercase tracking-wider transition-colors flex items-center gap-1">
+                        <Trash2 className="w-3 h-3" />
+                        Limpar
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="max-h-[360px] overflow-y-auto">
@@ -405,7 +428,7 @@ export default function Layout({ children }) {
                         <div
                           key={n.id}
                           onClick={() => markRead(n)}
-                          className={`flex items-start gap-3 px-4 py-3.5 border-b border-[#1E1E1E]/50 hover:bg-white/3 transition-colors cursor-pointer ${!n.read ? 'bg-[#CE7028]/3' : ''}`}
+                          className={`group/notif flex items-start gap-3 px-4 py-3.5 border-b border-[#1E1E1E]/50 hover:bg-white/3 transition-colors cursor-pointer ${!n.read ? 'bg-[#CE7028]/3' : ''}`}
                         >
                           <div className={`w-8 h-8 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${config.cls}`}>
                             <NIcon className="w-3.5 h-3.5" />
@@ -417,7 +440,16 @@ export default function Layout({ children }) {
                             </div>
                             <p className="text-gray-500 text-xs mt-0.5 leading-relaxed line-clamp-2">{n.desc}</p>
                           </div>
-                          {!n.read && <div className="w-1.5 h-1.5 bg-[#CE7028] rounded-full flex-shrink-0 mt-1.5" />}
+                          <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                            {!n.read && <div className="w-1.5 h-1.5 bg-[#CE7028] rounded-full" />}
+                            <button
+                              onClick={e => handleDelete(e, n.id)}
+                              className="p-0.5 rounded text-gray-700 hover:text-red-400 hover:bg-red-950/30 transition-colors opacity-0 group-hover/notif:opacity-100"
+                              title="Apagar"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       )
                     })

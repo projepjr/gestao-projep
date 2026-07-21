@@ -210,6 +210,7 @@ function userFromProfile(profile, currentUsers = []) {
     role: profile.role || existing?.role || 'membro',
     senha: null,
     dataCadastro: existing?.dataCadastro || dateOnly(profile.created_at) || new Date().toISOString().split('T')[0],
+    notificacoesDesde: existing?.notificacoesDesde || profile.created_at || new Date().toISOString(),
     preferenciasNotificacao: existing?.preferenciasNotificacao || {
       email: true,
       system: true,
@@ -336,10 +337,13 @@ function messageFromRemote(row, profileIdToUserId = new Map()) {
 }
 
 function notificationToRemote(notification, profileId = null) {
+  const tipo = notification.tipo || 'sistema'
+  // Encode audience into type field so it survives the Supabase round-trip
+  const type = notification.audiencia === 'diretoria' ? `${tipo}:diretoria` : tipo
   return {
     id: notificationUuid(notification.id),
     profile_id: profileId || (notification.usuarioId ? userUuid(notification.usuarioId) : null),
-    type: notification.tipo || 'sistema',
+    type,
     title: notification.titulo,
     description: notification.descricao || null,
     link: notification.link || null,
@@ -349,10 +353,12 @@ function notificationToRemote(notification, profileId = null) {
 }
 
 function notificationFromRemote(row, profileIdToUserId = new Map()) {
+  const [tipo, audiencia] = (row.type || 'sistema').split(':')
   return {
     id: uuidToAppId(row.id, NS.notification) || row.id,
     usuarioId: row.profile_id ? profileIdToUserId.get(row.profile_id) || row.profile_id : null,
-    tipo: row.type || 'sistema',
+    tipo,
+    audiencia: audiencia || null,
     titulo: row.title,
     descricao: row.description || '',
     link: row.link || null,
@@ -742,11 +748,29 @@ export async function markRemoteNotificationRead(notificationId, read = true) {
   logRemoteError('mark notification read', error)
 }
 
+export async function deleteRemoteNotification(notificationId) {
+  if (!isSupabaseConfigured || !supabase || !notificationId) return
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', notificationUuid(notificationId))
+  logRemoteError('delete notification', error)
+}
+
 export async function pullCommunication(db, profileIdToUserId) {
   if (!isSupabaseConfigured || !supabase) return
+
+  // Filter notifications server-side: only fetch broadcast (null) or current-user targeted rows
+  const { data: authData } = await supabase.auth.getUser()
+  const currentProfileId = authData?.user?.id || null
+  let notifQuery = supabase.from('notifications').select('*').order('created_at', { ascending: false })
+  if (currentProfileId) {
+    notifQuery = notifQuery.or(`profile_id.is.null,profile_id.eq.${currentProfileId}`)
+  }
+
   const [{ data: remoteMessages, error: messageError }, { data: remoteNotifications, error: notificationError }] = await Promise.all([
     supabase.from('chat_messages').select('*').order('created_at', { ascending: true }),
-    supabase.from('notifications').select('*').order('created_at', { ascending: false }),
+    notifQuery,
   ])
   logRemoteError('fetch messages', messageError)
   logRemoteError('fetch notifications', notificationError)

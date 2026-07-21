@@ -2,6 +2,12 @@ import { ACCESS_MODULES } from './accessControl'
 
 export const ROLE_PRESETS = [
   {
+    value: 'sem-acesso',
+    label: 'Sem acesso (aguardando liberação)',
+    role: 'membro',
+    permissions: {},
+  },
+  {
     value: 'membro',
     label: 'Membro (somente Chat)',
     role: 'membro',
@@ -85,24 +91,5 @@ export function getAvailableRolePresets(user) {
 
 export function getSuggestedRolePreset(approver, pendingUser) {
   const options = getAvailableRolePresets(approver)
-  const sectorDefaults = {
-    comercial: 'hunter-comercial',
-    'gestao-pessoas': 'membro-gp',
-    projetos: 'projetos',
-    marketing: 'marketing',
-    'administrativo-financeiro': 'adm-fin',
-    diretoria: 'presidente',
-  }
-  const requestedDirector = `${pendingUser?.cargo || ''}`.toLocaleLowerCase('pt-BR').includes('diretor')
-  const directorDefaults = {
-    comercial: 'diretor-comercial',
-    'gestao-pessoas': 'diretor-gp',
-  }
-  const preferred = requestedDirector && approver?.role === 'presidente'
-    ? directorDefaults[pendingUser?.setorId]
-    : sectorDefaults[pendingUser?.setorId]
-
-  return options.find(option => option.value === preferred) ||
-    options.find(option => option.value === 'membro') ||
-    options[0] || null
+  return options.find(option => option.value === 'sem-acesso') || options[0] || null
 }

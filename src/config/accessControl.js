@@ -91,8 +91,7 @@ export function normalizePermissions(rawPermissions = {}, role = '') {
   const normalized = { subareas: {} }
 
   ACCESS_MODULES.forEach(module => {
-    const defaultEnabled = module.key === 'chat'
-    normalized[module.key] = isPresident ? true : (raw[module.key] ?? defaultEnabled)
+    normalized[module.key] = isPresident ? true : (raw[module.key] ?? false)
 
     module.subareas.forEach(subarea => {
       const explicit = raw.subareas?.[subarea.key]

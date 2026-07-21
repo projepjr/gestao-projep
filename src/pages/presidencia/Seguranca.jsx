@@ -81,7 +81,7 @@ export default function Seguranca() {
     setActionError('')
     const suggested = getSuggestedRolePreset(user, member)
     const preset = ROLE_PRESETS.find(item => item.value === (roleSelect[member.id] || suggested?.value))
-    const result = approveUser(member.id, preset?.permissions || { chat: true }, preset?.role || 'membro')
+    const result = approveUser(member.id, preset?.permissions || {}, preset?.role || 'membro')
     if (!result.success) return setActionError(result.error)
     setActions(current => [...current, { id: member.id, type: 'approved', name: member.nome }])
   }

@@ -54,7 +54,9 @@ Ao aprovar:
 - status vira `ativo`;
 - permissoes sao normalizadas;
 - perfil e permissoes sao salvos no Supabase;
-- uma notificacao de aprovacao e criada.
+- o usuario nao recebe permissao operacional automaticamente;
+- a liberacao de modulos e subareas deve ser feita pela Presidencia em `Presidencia > Seguranca`;
+- a notificacao de aprovacao nao deve gerar badge nao lido para o membro aprovado.
 
 ## Cadastro direto pelo GP
 
@@ -65,6 +67,7 @@ Ao cadastrar membro:
 - cria credencial no Supabase Auth;
 - salva perfil no banco;
 - pode usar dados temporarios;
+- o membro deve nascer sem acesso a modulos/subareas ate a Presidencia liberar;
 - senha temporaria padrao deve ser usada apenas para primeiro acesso e nao deve virar fonte principal em `localStorage`.
 
 ## Recuperacao de senha
@@ -96,4 +99,5 @@ Pelo historico recente do repo:
 - Erro `{}` na recuperacao foi tratado para exibir mensagem real ou amigavel.
 - Acesso rapido demo foi removido da tela de login.
 - Sessao foi isolada por aba para evitar troca inesperada de usuario entre abas.
-
+- Contas novas nao devem herdar notificacoes globais antigas; o sininho deve iniciar zerado para o novo membro.
+- Contas novas aprovadas ou cadastradas diretamente pelo GP nao devem receber acesso automatico por setor/cargo.

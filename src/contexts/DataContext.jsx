@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import db from '../data/db'
 import { hasSubareaAccess, normalizePermissions } from '../config/accessControl'
 import { resolveSetor } from '../data/setores'
@@ -13,6 +13,7 @@ import {
   bootstrapSupabase,
   createSupabaseAuthAccount,
   deleteMeetingFromSupabase,
+  deleteRemoteNotification,
   deleteUserFromSupabase,
   pullCommunicationState,
   markRemoteMessageRead,
@@ -246,6 +247,9 @@ export function DataProvider({ children }) {
   const [communication, setCommunication] = useState(() => db.get('comunicacao'))
   const [projectData, setProjectData] = useState(() => db.get('projetos'))
   const [refreshingData, setRefreshingData] = useState(false)
+  // Survives poll overwrites: IDs deleted/read locally but not yet confirmed by Supabase
+  const notifDeletedIds = useRef(new Set())
+  const notifReadIds = useRef(new Set())
 
   useEffect(() => {
     const unsubscribers = [
@@ -376,25 +380,18 @@ export function DataProvider({ children }) {
     }
     const canonicalSector = resolveSetor(member.setorId || member.setor)
     const cargo = `${member.cargo || ''}`.toLowerCase()
-    const setor = `${canonicalSector?.nome || member.setor || ''}`.toLowerCase()
     const role = cargo.includes('presidente')
       ? 'presidente'
       : cargo.includes('diretor') ? 'diretor' : (member.role || 'membro')
     if (user?.role !== 'presidente' && role !== 'membro') {
       return { success: false, error: 'Somente a presidência pode cadastrar diretores.' }
     }
-    const basePermissions = { chat: true }
-
-    if (setor.includes('comercial')) basePermissions.comercial = true
-    if (setor.includes('pessoas')) basePermissions.gestaoPessoas = true
-    if (setor.includes('projeto')) basePermissions.projetos = true
-    if (setor.includes('marketing')) basePermissions.marketing = true
-    if (setor.includes('admin') || setor.includes('finance')) basePermissions.adminFinanceiro = true
-    if (role === 'presidente') basePermissions.presidencia = true
+    const basePermissions = {}
 
     const created = db.insert('usuarios', null, {
       senha: authResult.enabled === false ? senha : null,
       dataCadastro: new Date().toISOString().split('T')[0],
+      notificacoesDesde: new Date().toISOString(),
       fotoPerfil: null,
       telefone: member.telefone || '',
       skills: [],
@@ -942,13 +939,15 @@ export function DataProvider({ children }) {
   }
 
   const markNotificationRead = (notificationId, userId) => {
+    notifReadIds.current.add(String(notificationId))
     const current = db.get('comunicacao')
     const notifications = (current.notificacoes || []).map(notification => {
       if (!idsEqual(notification.id, notificationId)) return notification
-      if (notification.usuarioId == null) {
-        return { ...notification, lidosPor: [...new Set([...(notification.lidosPor || []), userId])] }
+      return {
+        ...notification,
+        lida: true,
+        lidosPor: [...new Set([...(notification.lidosPor || []), userId])],
       }
-      return { ...notification, lida: true }
     })
     db.set('comunicacao', { ...current, notificacoes: notifications })
     void markRemoteNotificationRead(notificationId, true)
@@ -956,17 +955,41 @@ export function DataProvider({ children }) {
 
   const markAllNotificationsRead = userId => {
     const current = db.get('comunicacao')
+    const toMark = (current.notificacoes || []).filter(notification =>
+      notification.usuarioId == null || idBelongsToUser(notification.usuarioId, userId)
+    )
+    toMark.forEach(n => notifReadIds.current.add(String(n.id)))
     const notifications = (current.notificacoes || []).map(notification => {
       if (notification.usuarioId != null && !idBelongsToUser(notification.usuarioId, userId)) return notification
-      if (notification.usuarioId == null) {
-        return { ...notification, lidosPor: [...new Set([...(notification.lidosPor || []), userId])] }
+      return {
+        ...notification,
+        lida: true,
+        lidosPor: [...new Set([...(notification.lidosPor || []), userId])],
       }
-      return { ...notification, lida: true }
     })
     db.set('comunicacao', { ...current, notificacoes: notifications })
-    notifications
-      .filter(notification => notification.usuarioId == null || idBelongsToUser(notification.usuarioId, userId))
-      .forEach(notification => { void markRemoteNotificationRead(notification.id, true) })
+    toMark.forEach(notification => { void markRemoteNotificationRead(notification.id, true) })
+  }
+
+  const deleteNotification = notificationId => {
+    notifDeletedIds.current.add(String(notificationId))
+    const current = db.get('comunicacao')
+    db.set('comunicacao', {
+      ...current,
+      notificacoes: (current.notificacoes || []).filter(n => !idsEqual(n.id, notificationId)),
+    })
+    void deleteRemoteNotification(notificationId)
+  }
+
+  const clearAllNotifications = visibleIds => {
+    visibleIds.forEach(id => notifDeletedIds.current.add(String(id)))
+    const current = db.get('comunicacao')
+    const idSet = new Set(visibleIds.map(String))
+    db.set('comunicacao', {
+      ...current,
+      notificacoes: (current.notificacoes || []).filter(n => !idSet.has(String(n.id))),
+    })
+    visibleIds.forEach(id => { void deleteRemoteNotification(id) })
   }
 
   return (
@@ -1002,12 +1025,16 @@ export function DataProvider({ children }) {
       addFeedback,
       communication,
       messages: communication.mensagens || [],
-      notifications: communication.notificacoes || [],
+      notifications: (communication.notificacoes || [])
+        .filter(n => !notifDeletedIds.current.has(String(n.id)))
+        .map(n => notifReadIds.current.has(String(n.id)) ? { ...n, lida: true } : n),
       notices: communication.avisos || [],
       sendMessage,
       addNotification,
       markNotificationRead,
       markAllNotificationsRead,
+      deleteNotification,
+      clearAllNotifications,
       markConversationRead: markConversationReadInDb,
       projectData,
       projects: projectData.projetos || [],

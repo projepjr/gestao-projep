@@ -27,7 +27,7 @@ export default function Aprovacoes() {
     setError('')
     const roleKey = selectedRole(u)
     const opt = roleOptions.find(r => r.value === roleKey)
-    const result = await approveUser(u.id, opt?.permissions || { chat: true }, opt?.role || 'membro')
+    const result = await approveUser(u.id, opt?.permissions || {}, opt?.role || 'membro')
     if (!result.success) return setError(result.error)
     setConfirmed(prev => [...prev, { id: u.id, action: 'approved', nome: u.nome }])
   }
