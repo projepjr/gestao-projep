@@ -334,11 +334,11 @@ export default function Layout({ children }) {
       </aside>
 
       {/* ── Main content ──────────────────────────────────── */}
-      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${collapsed ? 'lg:ml-[68px]' : 'lg:ml-64'}`}>
+      <div className={`flex-1 flex flex-col min-h-screen min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ${collapsed ? 'lg:ml-[68px]' : 'lg:ml-64'}`}>
 
         {/* Header */}
-        <header className="sticky top-0 bg-[#0A0A0A]/95 backdrop-blur-sm border-b border-[#1E1E1E] z-10 px-6 flex items-center justify-between h-[64px]">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 bg-[#0A0A0A]/95 backdrop-blur-sm border-b border-[#1E1E1E] z-10 px-6 flex items-center justify-between h-[64px] w-full flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden p-2 rounded text-gray-500 hover:text-white hover:bg-[#1E1E1E] transition-all">
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -358,7 +358,7 @@ export default function Layout({ children }) {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             <RefreshButton
               label="Atualizar dados recentes"
               loading={refreshingData}
@@ -470,7 +470,7 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-6 overflow-x-auto">{children}</main>
       </div>
     </div>
   )

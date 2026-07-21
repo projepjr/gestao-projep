@@ -1,5 +1,12 @@
 import { ACCESS_MODULES } from './accessControl'
 
+const subareasFor = moduleKey => Object.fromEntries(
+  ACCESS_MODULES
+    .find(module => module.key === moduleKey)
+    ?.subareas
+    .map(subarea => [subarea.key, true]) || []
+)
+
 export const ROLE_PRESETS = [
   {
     value: 'sem-acesso',
@@ -17,7 +24,7 @@ export const ROLE_PRESETS = [
     value: 'diretor-comercial',
     label: 'Diretor Comercial',
     role: 'diretor',
-    permissions: { comercial: true, chat: true },
+    permissions: { comercial: true, chat: true, subareas: subareasFor('comercial') },
   },
   {
     value: 'hunter-comercial',
@@ -40,7 +47,7 @@ export const ROLE_PRESETS = [
     value: 'diretor-gp',
     label: 'Diretor de GP',
     role: 'diretor',
-    permissions: { gestaoPessoas: true, chat: true },
+    permissions: { gestaoPessoas: true, chat: true, subareas: subareasFor('gestaoPessoas') },
   },
   {
     value: 'membro-gp',
@@ -61,7 +68,7 @@ export const ROLE_PRESETS = [
     value: 'projetos',
     label: 'Projetos',
     role: 'membro',
-    permissions: { projetos: true, chat: true },
+    permissions: { projetos: true, chat: true, subareas: subareasFor('projetos') },
   },
   {
     value: 'marketing',

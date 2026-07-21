@@ -97,7 +97,7 @@ export function normalizePermissions(rawPermissions = {}, role = '') {
       const explicit = raw.subareas?.[subarea.key]
       normalized.subareas[subarea.key] = isPresident
         ? true
-        : (typeof explicit === 'boolean' ? explicit : Boolean(normalized[module.key]))
+        : (typeof explicit === 'boolean' ? explicit : false)
     })
   })
 

@@ -302,52 +302,7 @@ function normalize(tabela, data) {
   if (tabela === 'usuarios') {
     return asArray(data, REMOTE_PRIMARY ? [] : INITIAL_USUARIOS).map(user => {
       const canonicalSector = resolveSetor(user.setorId || user.setor)
-      let permissoes = normalizePermissions(user.permissoes, user.role)
-
-      // Migra contas gravadas antes das permissões por subárea existirem.
-      if (!user.permissoes?.subareas && user.role !== 'presidente') {
-        const cargo = `${user.cargo || ''}`.toLowerCase()
-        const sectorName = `${user.setor || ''}`.toLowerCase()
-
-        if (permissoes.comercial && !cargo.includes('diretor')) {
-          permissoes = {
-            ...permissoes,
-            subareas: {
-              ...permissoes.subareas,
-              'comercial.dashboard': false,
-              'comercial.pipeline': true,
-              'comercial.calendario': true,
-              'comercial.ranking': false,
-              'comercial.contratos': false,
-              'comercial.equipe': false,
-            },
-          }
-        }
-
-        if (permissoes.gestaoPessoas && !sectorName.includes('pessoas')) {
-          permissoes = {
-            ...permissoes,
-            subareas: {
-              ...permissoes.subareas,
-              'gestaoPessoas.dashboard': false,
-              'gestaoPessoas.membros': true,
-              'gestaoPessoas.processo': false,
-              'gestaoPessoas.aprovacoes': false,
-            },
-          }
-        } else if (permissoes.gestaoPessoas && !cargo.includes('diretor')) {
-          permissoes = {
-            ...permissoes,
-            subareas: {
-              ...permissoes.subareas,
-              'gestaoPessoas.dashboard': true,
-              'gestaoPessoas.membros': true,
-              'gestaoPessoas.processo': true,
-              'gestaoPessoas.aprovacoes': false,
-            },
-          }
-        }
-      }
+      const permissoes = normalizePermissions(user.permissoes, user.role)
 
       return {
         ...user,

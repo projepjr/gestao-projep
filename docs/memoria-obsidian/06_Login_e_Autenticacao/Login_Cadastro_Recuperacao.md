@@ -101,3 +101,5 @@ Pelo historico recente do repo:
 - Sessao foi isolada por aba para evitar troca inesperada de usuario entre abas.
 - Contas novas nao devem herdar notificacoes globais antigas; o sininho deve iniciar zerado para o novo membro.
 - Contas novas aprovadas ou cadastradas diretamente pelo GP nao devem receber acesso automatico por setor/cargo.
+- Permissao de modulo nao libera subareas automaticamente. Subareas como Pipeline e Calendario Comercial precisam ser liberadas explicitamente em Presidencia > Seguranca.
+- O sininho de notificacoes e o alternador claro/escuro devem permanecer visiveis no header mesmo quando o usuario nao tem notificacoes.
