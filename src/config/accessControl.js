@@ -95,9 +95,10 @@ export function normalizePermissions(rawPermissions = {}, role = '') {
 
     module.subareas.forEach(subarea => {
       const explicit = raw.subareas?.[subarea.key]
+      const presidencySecurityFallback = subarea.key === 'presidencia.seguranca' && raw.presidencia === true
       normalized.subareas[subarea.key] = isPresident
         ? true
-        : (typeof explicit === 'boolean' ? explicit : false)
+        : (typeof explicit === 'boolean' ? explicit : presidencySecurityFallback)
     })
   })
 

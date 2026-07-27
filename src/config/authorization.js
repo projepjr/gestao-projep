@@ -4,12 +4,16 @@ export function isPresident(user) {
   return user?.role === 'presidente'
 }
 
+export function hasPresidencySecurityAccess(user) {
+  return Boolean(user && hasSubareaAccess(user, 'presidencia.seguranca'))
+}
+
 export function isPeopleDirector(user) {
   return user?.role === 'diretor' && user?.setorId === 'gestao-pessoas'
 }
 
 export function canApproveUsers(user) {
-  return Boolean(isPresident(user) || (
+  return Boolean(isPresident(user) || hasPresidencySecurityAccess(user) || (
     user?.role === 'diretor' && hasSubareaAccess(user, 'gestaoPessoas.aprovacoes')
   ))
 }
@@ -32,7 +36,7 @@ export function canDeleteMember(actor, target) {
 }
 
 export function canManagePermissions(user) {
-  return isPresident(user)
+  return Boolean(isPresident(user) || hasPresidencySecurityAccess(user))
 }
 
 export function canPostAnnouncements(user) {

@@ -103,3 +103,4 @@ Pelo historico recente do repo:
 - Contas novas aprovadas ou cadastradas diretamente pelo GP nao devem receber acesso automatico por setor/cargo.
 - Permissao de modulo nao libera subareas automaticamente. Subareas como Pipeline e Calendario Comercial precisam ser liberadas explicitamente em Presidencia > Seguranca.
 - O sininho de notificacoes e o alternador claro/escuro devem permanecer visiveis no header mesmo quando o usuario nao tem notificacoes.
+- Excecao de Presidencia: liberar o modulo Presidencia libera a subarea Seguranca e permite administrar permissoes, mesmo que o cargo do usuario nao seja `presidente`.
