@@ -3,7 +3,7 @@ import { useData } from '../../contexts/DataContext'
 import { useAuth } from '../../contexts/AuthContext'
 import UserAvatar from '../../components/UserAvatar'
 import { SETORES } from '../../data/setores'
-import { canDeleteMember, canManageMembers, canSendFeedback } from '../../config/authorization'
+import { canDeleteMember, canManageMembers, canManagePermissions, canSendFeedback } from '../../config/authorization'
 import { Plus, X, Search, Users, Briefcase, Mail, Phone, Trash2, Edit2, MessageSquare, Star, Camera, Upload, RotateCcw } from 'lucide-react'
 
 const EMPTY = { nome: '', cargo: '', setor: '', email: '', senha: '', telefone: '', status: 'ativo', dataCadastro: '', skills: [], avatar: '', fotoPerfil: null, projects: 0, performance: 80, usarDadosTemporarios: true }
@@ -470,6 +470,7 @@ export default function Membros() {
   const [feedbackMember, setFeedbackMember] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const canManage = canManageMembers(user)
+  const canManageProtectedMembers = canManagePermissions(user)
   const canFeedback = canSendFeedback(user)
 
   const directoryMembers = members.filter(member => ['ativo', 'inativo', 'afastado'].includes(member.status))
@@ -527,7 +528,7 @@ export default function Membros() {
                     <MessageSquare className="w-3.5 h-3.5" />
                   </button>
                 )}
-                {canManage && (user.role === 'presidente' || !['presidente', 'diretor'].includes(member.role)) && (
+                {canManage && (canManageProtectedMembers || !['presidente', 'diretor'].includes(member.role)) && (
                   <button onClick={() => { setEditMember(member); setShowModal(true) }} className="p-1.5 rounded text-gray-600 hover:text-[#FF882D] hover:bg-[#CE7028]/10 transition-all" title="Editar membro">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>

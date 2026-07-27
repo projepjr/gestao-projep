@@ -300,7 +300,7 @@ export function AuthProvider({ children }) {
     if (!canApproveUsers(user)) {
       return { success: false, error: 'Você não tem permissão para aprovar usuários.' }
     }
-    if (role === 'presidente' && user.role !== 'presidente') {
+    if (role === 'presidente' && !canManagePermissions(user)) {
       return { success: false, error: 'Somente o presidente pode conceder esse cargo.' }
     }
 

@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext'
 import {
   canDeleteMember,
   canManageMembers,
+  canManagePermissions,
   canPostAnnouncements,
   canSendFeedback,
 } from '../config/authorization'
@@ -383,7 +384,7 @@ export function DataProvider({ children }) {
     const role = cargo.includes('presidente')
       ? 'presidente'
       : cargo.includes('diretor') ? 'diretor' : (member.role || 'membro')
-    if (user?.role !== 'presidente' && role !== 'membro') {
+    if (!canManagePermissions(user) && role !== 'membro') {
       return { success: false, error: 'Somente a presidência pode cadastrar diretores.' }
     }
     const basePermissions = {}
@@ -428,7 +429,7 @@ export function DataProvider({ children }) {
     if (!canManageMembers(user)) return { success: false, error: 'Você não pode editar membros.' }
     const target = db.get('usuarios').find(member => idsEqual(member.id, id))
     if (!target) return { success: false, error: 'Membro não encontrado.' }
-    if (user?.role !== 'presidente' && ['presidente', 'diretor'].includes(target.role)) {
+    if (!canManagePermissions(user) && ['presidente', 'diretor'].includes(target.role)) {
       return { success: false, error: 'Você não pode editar este membro.' }
     }
     const canonicalSector = resolveSetor(data.setorId || data.setor || target.setorId)

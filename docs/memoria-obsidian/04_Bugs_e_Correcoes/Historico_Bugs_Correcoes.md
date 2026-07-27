@@ -17,6 +17,10 @@ Este arquivo resume problemas ja corrigidos ou investigados no projeto, com base
 - Acesso rapido demo aparecia no login.
   - Correcao: bloco removido.
 
+- Usuario com acesso de Presidencia liberado na tela de Seguranca nao herdava todos os poderes administrativos.
+  - Causa: algumas acoes ainda verificavam apenas `role === 'presidente'`, ignorando a permissao efetiva de Presidencia.
+  - Correcao: `Presidencia`/`presidencia.seguranca` passou a funcionar como autoridade administrativa completa para rotas, permissoes, aprovacoes e gestao de membros, sem exigir que o cargo textual do usuario seja alterado.
+
 ## Sessao e sincronizacao
 
 - Conta ativa podia aparentar trocar entre abas/usuarios.

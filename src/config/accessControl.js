@@ -105,18 +105,30 @@ export function normalizePermissions(rawPermissions = {}, role = '') {
   return normalized
 }
 
+export function hasPresidencyFullAccess(user) {
+  if (!user) return false
+  if (user.role === 'presidente') return true
+
+  const permissions = user.permissoes || {}
+  return Boolean(
+    permissions.presidencia === true ||
+    permissions.subareas?.['presidencia.seguranca'] === true
+  )
+}
+
 export function hasModuleAccess(user, moduleKey) {
   if (!user) return false
+  if (hasPresidencyFullAccess(user)) return true
   const permissions = normalizePermissions(user.permissoes, user.role)
-  return Boolean(user.role === 'presidente' || permissions[moduleKey])
+  return Boolean(permissions[moduleKey])
 }
 
 export function hasSubareaAccess(user, subareaKey) {
   if (!user) return false
+  if (hasPresidencyFullAccess(user)) return true
   const moduleKey = subareaKey.split('.')[0]
   const permissions = normalizePermissions(user.permissoes, user.role)
   return Boolean(
-    user.role === 'presidente' ||
     (permissions[moduleKey] && permissions.subareas[subareaKey])
   )
 }
