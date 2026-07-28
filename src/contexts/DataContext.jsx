@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import db from '../data/db'
 import { hasSubareaAccess, normalizePermissions } from '../config/accessControl'
 import { resolveSetor } from '../data/setores'
@@ -253,7 +254,56 @@ export function DataProvider({ children }) {
   const [projectData, setProjectData] = useState(() => db.get('projetos'))
   const [configurations, setConfigurations] = useState(() => db.get('configuracoes'))
   const [refreshingData, setRefreshingData] = useState(false)
+  const [mondayProjects, setMondayProjects] = useState([])
   const refreshPromiseRef = useRef(null)
+
+  const loadMondayProjects = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) return
+    try {
+      const [projResp, itensResp] = await Promise.all([
+        supabase.from('monday_projetos').select('*'),
+        supabase.from('monday_itens').select('*'),
+      ])
+      if (projResp.error) { console.warn('[Monday] Erro ao buscar projetos:', projResp.error); return }
+      const itens = itensResp.data || []
+      const itensByProjeto = {}
+      itens.forEach(item => {
+        const key = String(item.projeto_id)
+        if (!itensByProjeto[key]) itensByProjeto[key] = []
+        itensByProjeto[key].push(item)
+      })
+      const mapped = (projResp.data || []).map(row => ({
+        id: row.id,
+        nome: row.nome,
+        saude: row.saude || 'verde',
+        percentualConcluido: row.percentual_concluido || 0,
+        status: row.status || 'em_andamento',
+        responsavelNome: row.gerente_nome || '',
+        clienteNome: '',
+        fase: '',
+        dataInicio: null,
+        dataFim: null,
+        observacoes: [],
+        historico: [],
+        etapas: [],
+        _fromMonday: true,
+        tarefas: (itensByProjeto[String(row.id)] || []).map(item => ({
+          id: `monday-item-${item.id}`,
+          nome: item.nome,
+          status: item.concluida ? 'concluida' : 'em_progresso',
+          responsavelNome: item.responsavel_nome || '',
+          dataVencimento: item.data_vencimento || null,
+          prioridade: 'media',
+          fase: item.grupo || '',
+          criadoEm: item.sync_at,
+          atualizadoEm: item.sync_at,
+        })),
+      }))
+      setMondayProjects(mapped)
+    } catch (err) {
+      console.warn('[Monday] Falha ao carregar dados:', err.message || err)
+    }
+  }, [])
   // Survives poll overwrites: IDs deleted/read locally but not yet confirmed by Supabase
   const notifDeletedIds = useRef(new Set())
   const notifReadIds = useRef(new Set())
@@ -273,6 +323,14 @@ export function DataProvider({ children }) {
   useEffect(() => {
     syncTaskDeadlineNotifications(projectData)
   }, [projectData])
+
+  useEffect(() => {
+    let mounted = true
+    const run = async () => { if (mounted) await loadMondayProjects() }
+    run()
+    const id = window.setInterval(run, REMOTE_SYNC_INTERVAL_MS)
+    return () => { mounted = false; window.clearInterval(id) }
+  }, [loadMondayProjects])
 
   useEffect(() => {
     let mounted = true
@@ -372,6 +430,7 @@ export function DataProvider({ children }) {
         }
         await pullRemoteState(db)
         await pullCommunicationState(db)
+        await loadMondayProjects()
         return { success: true, n8n: n8nResult, n8nError }
       } catch (error) {
         console.warn('[Atualizacao global] Falha ao atualizar dados:', error.message || error)
@@ -1199,7 +1258,7 @@ export function DataProvider({ children }) {
       clearAllNotifications,
       markConversationRead: markConversationReadInDb,
       projectData,
-      projects: projectData.projetos || [],
+      projects: [...(projectData.projetos || []), ...mondayProjects],
       revisoesSemana: projectData.revisoesSemana || [],
       knowledgeRecords: projectData.baseConhecimento || [],
       addKnowledgeRecord,
