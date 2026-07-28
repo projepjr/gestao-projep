@@ -21,6 +21,9 @@ const ProcessoSeletivo = lazy(() => import('./pages/gp/ProcessoSeletivo'))
 const Aprovacoes = lazy(() => import('./pages/gp/Aprovacoes'))
 const Seguranca = lazy(() => import('./pages/presidencia/Seguranca'))
 const BaseConhecimentoProjetos = lazy(() => import('./pages/projetos/BaseConhecimento'))
+const ProjetosList = lazy(() => import('./pages/projetos/Projetos'))
+const ProjetoDetalhe = lazy(() => import('./pages/projetos/ProjetoDetalhe'))
+const ProjetosCoordenador = lazy(() => import('./pages/projetos/Coordenador'))
 const Perfil = lazy(() => import('./pages/Perfil'))
 const Chat = lazy(() => import('./pages/Chat'))
 
@@ -77,8 +80,11 @@ function AppRoutes() {
       <Route path="/presidencia"           element={<ProtectedRoute requiredPath="/presidencia/seguranca"><Navigate to="/presidencia/seguranca" replace /></ProtectedRoute>} />
       <Route path="/presidencia/seguranca" element={<ProtectedRoute><Seguranca /></ProtectedRoute>} />
 
-      <Route path="/projetos"      element={<ProtectedRoute requiredPath="/projetos/base"><Navigate to="/projetos/base" replace /></ProtectedRoute>} />
-      <Route path="/projetos/base" element={<ProtectedRoute><BaseConhecimentoProjetos /></ProtectedRoute>} />
+      <Route path="/projetos"               element={<ProtectedRoute requiredPath="/projetos/gestao"><Navigate to="/projetos/gestao" replace /></ProtectedRoute>} />
+      <Route path="/projetos/gestao"        element={<ProtectedRoute><ProjetosList /></ProtectedRoute>} />
+      <Route path="/projetos/gestao/:id"    element={<ProtectedRoute requiredPath="/projetos/gestao"><ProjetoDetalhe /></ProtectedRoute>} />
+      <Route path="/projetos/coordenador"   element={<ProtectedRoute><ProjetosCoordenador /></ProtectedRoute>} />
+      <Route path="/projetos/base"          element={<ProtectedRoute><BaseConhecimentoProjetos /></ProtectedRoute>} />
 
       <Route path="/membros" element={<Navigate to="/chat" replace />} />
       <Route path="/chat"   element={<ProtectedRoute><Chat /></ProtectedRoute>} />

@@ -39,6 +39,8 @@ export const ACCESS_MODULES = [
     path: '/projetos',
     available: true,
     subareas: [
+      { key: 'projetos.gestao', label: 'Gestão', path: '/projetos/gestao', icon: 'folder-kanban' },
+      { key: 'projetos.coordenador', label: 'Coordenador', path: '/projetos/coordenador', icon: 'target' },
       { key: 'projetos.baseConhecimento', label: 'Base de Conhecimento', path: '/projetos/base', icon: 'file-text' },
     ],
   },
@@ -137,6 +139,7 @@ export function hasPathAccess(user, pathname) {
   if (!user) return false
   if (pathname === '/perfil') return true
   if (pathname === '/comercial/leads') return hasSubareaAccess(user, 'comercial.dashboard')
+  if (pathname.startsWith('/projetos/gestao/')) return hasSubareaAccess(user, 'projetos.gestao')
   const access = ROUTE_ACCESS.get(pathname)
   if (!access) return false
   return access.subareaKey

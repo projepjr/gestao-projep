@@ -447,6 +447,35 @@ export async function sendSupabasePasswordReset(email) {
   return { success: true }
 }
 
+export async function requestSupabaseAuthEmailChange(email) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, enabled: false }
+  const normalizedEmail = normalizeEmail(email)
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const emailRedirectTo = origin ? `${origin}/perfil` : undefined
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError) {
+    console.error('[Supabase] Erro completo ao buscar sessao para alterar email:', sessionError)
+    logRemoteError('get auth session for email change', sessionError)
+    return { success: false, error: describeSupabaseError(sessionError), rawError: sessionError }
+  }
+  if (!sessionData?.session) {
+    return { success: false, error: 'Sessao expirada. Faca login novamente antes de alterar o email.' }
+  }
+
+  const { data, error } = await supabase.auth.updateUser(
+    { email: normalizedEmail },
+    emailRedirectTo ? { emailRedirectTo } : undefined
+  )
+  if (error) {
+    console.error('[Supabase] Erro completo ao solicitar alteracao de email:', error)
+    logRemoteError('request auth email change', error)
+    return { success: false, error: describeSupabaseError(error), rawError: error }
+  }
+
+  return { success: true, user: data?.user || sessionData.session.user || null }
+}
+
 export async function signOutFromSupabase() {
   if (!isSupabaseConfigured || !supabase) return
   await supabase.auth.signOut().catch(() => {})

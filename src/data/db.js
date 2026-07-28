@@ -52,6 +52,7 @@ const EMPTY_REMOTE = {
     projetos: [],
     baseConhecimento: [],
     baseConhecimentoSeedVersion: null,
+    revisoesSemana: [],
   },
 }
 
@@ -222,9 +223,16 @@ function normalizeProjects(data) {
   const base = REMOTE_PRIMARY ? EMPTY_REMOTE.projetos : INITIAL_PROJETOS
   const projects = asArray(current.projetos ?? current.projects, base.projetos)
     .map(project => ({
+      saude: 'verde',
+      percentualConcluido: 0,
+      fase: '',
+      descricao: '',
       ...project,
       membros: asArray(project?.membros),
       tarefas: asArray(project?.tarefas),
+      etapas: asArray(project?.etapas),
+      observacoes: asArray(project?.observacoes),
+      historico: asArray(project?.historico),
     }))
   const storedKnowledge = current.baseConhecimento ? asArray(current.baseConhecimento) : []
   const shouldApplyKnowledgeSeed = current.baseConhecimentoSeedVersion !== KNOWLEDGE_SEED_VERSION
@@ -260,6 +268,7 @@ function normalizeProjects(data) {
     projetos: projects,
     baseConhecimento,
     baseConhecimentoSeedVersion: KNOWLEDGE_SEED_VERSION,
+    revisoesSemana: asArray(current.revisoesSemana),
   }
 }
 

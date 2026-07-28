@@ -813,6 +813,112 @@ export function DataProvider({ children }) {
     return { success: true }
   }
 
+  // ── Projetos (gestao) ─────────────────────────────────────────
+  const updateProjectsList = updater => db.mutate('projetos', current => ({
+    ...current,
+    projetos: typeof updater === 'function' ? updater(current.projetos || []) : updater,
+  }))
+  const updateRevisoesList = updater => db.mutate('projetos', current => ({
+    ...current,
+    revisoesSemana: typeof updater === 'function' ? updater(current.revisoesSemana || []) : updater,
+  }))
+
+  const addProject = data => {
+    if (!canUse('projetos.gestao')) return { success: false, error: 'Você não tem permissão para criar projetos.' }
+    const project = {
+      saude: 'verde', percentualConcluido: 0, fase: '', descricao: '',
+      membros: [], tarefas: [], etapas: [], observacoes: [], historico: [],
+      ...data,
+      id: db.createId(),
+      criadoEm: new Date().toISOString(),
+    }
+    updateProjectsList(current => [...current, project])
+    return { success: true, project }
+  }
+
+  const updateProject = (id, data) => {
+    if (!canUse('projetos.gestao')) return { success: false, error: 'Você não tem permissão para editar projetos.' }
+    updateProjectsList(current => current.map(p => idsEqual(p.id, id) ? { ...p, ...data } : p))
+    return { success: true }
+  }
+
+  const deleteProject = id => {
+    if (!canUse('projetos.gestao')) return { success: false, error: 'Você não tem permissão para excluir projetos.' }
+    updateProjectsList(current => current.filter(p => !idsEqual(p.id, id)))
+    return { success: true }
+  }
+
+  const mutateProject = (id, fn) => {
+    updateProjectsList(current => current.map(p => idsEqual(p.id, id) ? fn(p) : p))
+  }
+
+  const addTarefa = (projectId, data) => {
+    const tarefa = { status: 'pendente', prioridade: 'media', subtarefas: [], ...data, id: db.createId() }
+    mutateProject(projectId, p => ({ ...p, tarefas: [...(p.tarefas || []), tarefa] }))
+    return { success: true, tarefa }
+  }
+  const updateTarefa = (projectId, tarefaId, data) => {
+    mutateProject(projectId, p => ({
+      ...p, tarefas: (p.tarefas || []).map(t => idsEqual(t.id, tarefaId) ? { ...t, ...data } : t),
+    }))
+    return { success: true }
+  }
+  const deleteTarefa = (projectId, tarefaId) => {
+    mutateProject(projectId, p => ({ ...p, tarefas: (p.tarefas || []).filter(t => !idsEqual(t.id, tarefaId)) }))
+    return { success: true }
+  }
+
+  const addEtapa = (projectId, data) => {
+    const etapa = { ...data, id: db.createId() }
+    mutateProject(projectId, p => ({ ...p, etapas: [...(p.etapas || []), etapa] }))
+    return { success: true, etapa }
+  }
+  const updateEtapa = (projectId, etapaId, data) => {
+    mutateProject(projectId, p => ({
+      ...p, etapas: (p.etapas || []).map(e => idsEqual(e.id, etapaId) ? { ...e, ...data } : e),
+    }))
+    return { success: true }
+  }
+  const deleteEtapa = (projectId, etapaId) => {
+    mutateProject(projectId, p => ({ ...p, etapas: (p.etapas || []).filter(e => !idsEqual(e.id, etapaId)) }))
+    return { success: true }
+  }
+
+  const addObservacao = (projectId, data) => {
+    const obs = { conteudo: '', itens: [], ...data, id: db.createId(), criadoEm: new Date().toISOString() }
+    mutateProject(projectId, p => ({ ...p, observacoes: [...(p.observacoes || []), obs] }))
+    return { success: true, obs }
+  }
+  const updateObservacao = (projectId, obsId, data) => {
+    mutateProject(projectId, p => ({
+      ...p, observacoes: (p.observacoes || []).map(o => idsEqual(o.id, obsId) ? { ...o, ...data, editadoEm: new Date().toISOString() } : o),
+    }))
+    return { success: true }
+  }
+  const deleteObservacao = (projectId, obsId) => {
+    mutateProject(projectId, p => ({ ...p, observacoes: (p.observacoes || []).filter(o => !idsEqual(o.id, obsId)) }))
+    return { success: true }
+  }
+
+  const addHistoricoEntry = (projectId, entry) => {
+    const log = { ...entry, id: db.createId(), criadoEm: new Date().toISOString() }
+    mutateProject(projectId, p => ({ ...p, historico: [log, ...(p.historico || [])] }))
+  }
+
+  const addRevisaoSemana = data => {
+    const revisao = { ...data, id: db.createId(), criadoEm: new Date().toISOString() }
+    updateRevisoesList(current => [revisao, ...current])
+    return { success: true, revisao }
+  }
+  const updateRevisaoSemana = (id, data) => {
+    updateRevisoesList(current => current.map(r => idsEqual(r.id, id) ? { ...r, ...data } : r))
+    return { success: true }
+  }
+  const deleteRevisaoSemana = id => {
+    updateRevisoesList(current => current.filter(r => !idsEqual(r.id, id)))
+    return { success: true }
+  }
+
   const updatePeopleList = (key, updater) => db.mutate('gestaoPessoas', current => ({
     ...current,
     [key]: typeof updater === 'function' ? updater(current[key] || []) : updater,
@@ -1050,10 +1156,17 @@ export function DataProvider({ children }) {
       markConversationRead: markConversationReadInDb,
       projectData,
       projects: projectData.projetos || [],
+      revisoesSemana: projectData.revisoesSemana || [],
       knowledgeRecords: projectData.baseConhecimento || [],
       addKnowledgeRecord,
       updateKnowledgeRecord,
       deleteKnowledgeRecord,
+      addProject, updateProject, deleteProject,
+      addTarefa, updateTarefa, deleteTarefa,
+      addEtapa, updateEtapa, deleteEtapa,
+      addObservacao, updateObservacao, deleteObservacao,
+      addHistoricoEntry,
+      addRevisaoSemana, updateRevisaoSemana, deleteRevisaoSemana,
     }}>
       {children}
     </DataContext.Provider>
