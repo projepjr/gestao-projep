@@ -359,9 +359,13 @@ export function AuthProvider({ children }) {
     }
     const target = findUserByIdentity(db.get('usuarios'), userId)
     if (!target) return { success: false, error: 'Usuário não encontrado.' }
-    db.update('usuarios', null, target.id, {
+    const updatedUsers = db.update('usuarios', null, target.id, {
       permissoes: normalizePermissions(permissions, target.role),
     })
+    const updatedTarget = findUserByIdentity(updatedUsers, target)
+    if (updatedTarget && sameUserIdentity(updatedTarget, user)) {
+      setUser(persistSession(updatedTarget))
+    }
     syncUserById(target.id)
     return { success: true }
   }

@@ -321,7 +321,14 @@ export function DataProvider({ children }) {
   }, [])
 
   const resolvedCommercial = resolveCommercialUsers(commercial, members)
-  const canUse = subareaKey => hasSubareaAccess(user, subareaKey)
+  const currentUser = user
+    ? db.get('usuarios').find(member =>
+      matchesUserId(user.id, member) ||
+      matchesUserId(user.supabaseId, member) ||
+      (member.email && user.email && member.email.trim().toLowerCase() === user.email.trim().toLowerCase())
+    ) || user
+    : user
+  const canUse = subareaKey => hasSubareaAccess(currentUser, subareaKey)
   const syncUserById = userId => {
     const target = db.get('usuarios').find(member => idsEqual(member.id, userId))
     if (target) void syncUsersToSupabase([target])

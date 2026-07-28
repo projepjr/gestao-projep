@@ -21,6 +21,10 @@ Este arquivo resume problemas ja corrigidos ou investigados no projeto, com base
   - Causa: algumas acoes ainda verificavam apenas `role === 'presidente'`, ignorando a permissao efetiva de Presidencia.
   - Correcao: `Presidencia`/`presidencia.seguranca` passou a funcionar como autoridade administrativa completa para rotas, permissoes, aprovacoes e gestao de membros, sem exigir que o cargo textual do usuario seja alterado.
 
+- Usuario com permissao de Presidencia podia continuar sem alguns poderes apos a liberacao.
+  - Causa: algumas checagens podiam receber uma versao antiga do usuario em sessao ou permissoes locais antigas antes da sincronizacao remota terminar.
+  - Correcao: autorizacoes administrativas passaram a resolver o usuario vivo pela base atual antes de validar autoridade, `hasPresidencyFullAccess` passou a normalizar permissoes antes da leitura, e alteracoes de permissao do proprio usuario atualizam a sessao imediatamente.
+
 ## Sessao e sincronizacao
 
 - Conta ativa podia aparentar trocar entre abas/usuarios.

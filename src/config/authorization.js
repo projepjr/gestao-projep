@@ -1,19 +1,35 @@
 import { hasPresidencyFullAccess, hasSubareaAccess } from './accessControl'
+import db from '../data/db'
+
+const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
+
+function resolveLiveUser(user) {
+  if (!user) return null
+  return db.get('usuarios').find(item =>
+    idsEqual(item.id, user.id) ||
+    idsEqual(item.supabaseId, user.supabaseId) ||
+    idsEqual(item.id, user.supabaseId) ||
+    idsEqual(item.supabaseId, user.id) ||
+    (item.email && user.email && item.email.trim().toLowerCase() === user.email.trim().toLowerCase())
+  ) || user
+}
 
 export function isPresident(user) {
-  return user?.role === 'presidente'
+  return hasPresidentAuthority(user)
 }
 
 export function hasPresidencySecurityAccess(user) {
-  return Boolean(hasPresidencyFullAccess(user) || (user && hasSubareaAccess(user, 'presidencia.seguranca')))
+  const liveUser = resolveLiveUser(user)
+  return Boolean(hasPresidencyFullAccess(liveUser) || (liveUser && hasSubareaAccess(liveUser, 'presidencia.seguranca')))
 }
 
 export function hasPresidentAuthority(user) {
-  return hasPresidencyFullAccess(user)
+  return hasPresidencyFullAccess(resolveLiveUser(user))
 }
 
 export function isPeopleDirector(user) {
-  return user?.role === 'diretor' && user?.setorId === 'gestao-pessoas'
+  const liveUser = resolveLiveUser(user)
+  return liveUser?.role === 'diretor' && liveUser?.setorId === 'gestao-pessoas'
 }
 
 export function canApproveUsers(user) {

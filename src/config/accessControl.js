@@ -109,7 +109,7 @@ export function hasPresidencyFullAccess(user) {
   if (!user) return false
   if (user.role === 'presidente') return true
 
-  const permissions = user.permissoes || {}
+  const permissions = normalizePermissions(user.permissoes, user.role)
   return Boolean(
     permissions.presidencia === true ||
     permissions.subareas?.['presidencia.seguranca'] === true
