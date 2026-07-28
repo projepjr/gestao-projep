@@ -10,6 +10,7 @@ import {
   hasPathAccess,
   hasSubareaAccess,
 } from '../config/accessControl'
+import { hasPresidentAuthority } from '../config/authorization'
 import {
   Users, LayoutDashboard, Kanban, Trophy, FileText,
   LogOut, Menu, X, ChevronRight, Bell, Lock,
@@ -139,7 +140,7 @@ export default function Layout({ children }) {
     .filter(notification => {
       const isRecipient = notification.usuarioId == null || matchesUserId(notification.usuarioId, user)
       const isCurrentForUser = isAfterNotificationBaseline(notification)
-      const matchesAudience = notification.audiencia !== 'diretoria' || ['presidente', 'diretor'].includes(user?.role)
+      const matchesAudience = notification.audiencia !== 'diretoria' || hasPresidentAuthority(user) || user?.role === 'diretor'
       const matchesModule = !notification.modulo || hasModuleAccess(user, notification.modulo)
       const systemEnabled = user?.preferenciasNotificacao?.system !== false
       const isDirectMessage = notification.tipo === 'mensagem'

@@ -362,7 +362,7 @@ export function DataProvider({ children }) {
   }, [])
 
   const addMember = async member => {
-    if (!canManageMembers(user)) return { success: false, error: 'Você não pode cadastrar membros.' }
+    if (!canManageMembers(currentUser)) return { success: false, error: 'Você não pode cadastrar membros.' }
     const temporaryCredentials = member.usarDadosTemporarios ? createTemporaryCredentials(member.nome) : null
     const email = (temporaryCredentials?.email || member.email)?.trim().toLowerCase()
     const senha = temporaryCredentials?.senha || member.senha
@@ -391,7 +391,7 @@ export function DataProvider({ children }) {
     const role = cargo.includes('presidente')
       ? 'presidente'
       : cargo.includes('diretor') ? 'diretor' : (member.role || 'membro')
-    if (!canManagePermissions(user) && role !== 'membro') {
+    if (!canManagePermissions(currentUser) && role !== 'membro') {
       return { success: false, error: 'Somente a presidência pode cadastrar diretores.' }
     }
     const basePermissions = {}
@@ -433,10 +433,10 @@ export function DataProvider({ children }) {
     }
   }
   const updateMember = (id, data) => {
-    if (!canManageMembers(user)) return { success: false, error: 'Você não pode editar membros.' }
+    if (!canManageMembers(currentUser)) return { success: false, error: 'Você não pode editar membros.' }
     const target = db.get('usuarios').find(member => idsEqual(member.id, id))
     if (!target) return { success: false, error: 'Membro não encontrado.' }
-    if (!canManagePermissions(user) && ['presidente', 'diretor'].includes(target.role)) {
+    if (!canManagePermissions(currentUser) && ['presidente', 'diretor'].includes(target.role)) {
       return { success: false, error: 'Você não pode editar este membro.' }
     }
     const canonicalSector = resolveSetor(data.setorId || data.setor || target.setorId)
@@ -460,7 +460,7 @@ export function DataProvider({ children }) {
   }
   const deleteMember = id => {
     const target = db.get('usuarios').find(member => idsEqual(member.id, id))
-    if (!canDeleteMember(user, target)) return { success: false, error: 'Você não pode remover este membro.' }
+    if (!canDeleteMember(currentUser, target)) return { success: false, error: 'Você não pode remover este membro.' }
     db.removeUser(id)
     void syncCommercialTeamConfig(db.get('comercial')?.equipe)
     void deleteUserFromSupabase(id)
@@ -831,7 +831,7 @@ export function DataProvider({ children }) {
   }
 
   const addFeedback = ({ memberId, evaluatorId, text, stars = 5 }) => {
-    if (!canSendFeedback(user) || !idsEqual(evaluatorId, user?.id)) {
+    if (!canSendFeedback(currentUser) || !matchesUserId(evaluatorId, currentUser)) {
       return { success: false, error: 'Você não pode enviar feedbacks.' }
     }
     const evaluations = [...(db.get('gestaoPessoas').avaliacoes || [])]
@@ -892,7 +892,7 @@ export function DataProvider({ children }) {
   const sendMessage = ({ senderId, receiverId = null, channelId = null, content, type = 'direta' }) => {
     const text = content?.trim()
     if (!user || !idsEqual(senderId, user.id) || !text) return { success: false, error: 'Mensagem inválida.' }
-    if (channelId === 'avisos' && !canPostAnnouncements(user)) {
+    if (channelId === 'avisos' && !canPostAnnouncements(currentUser)) {
       return { success: false, error: 'Somente a diretoria pode publicar avisos.' }
     }
     if (receiverId && !db.get('usuarios').some(member => idsEqual(member.id, receiverId) && member.status === 'ativo')) {

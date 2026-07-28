@@ -1,4 +1,5 @@
-import { ACCESS_MODULES, hasPresidencyFullAccess } from './accessControl'
+import { ACCESS_MODULES } from './accessControl'
+import { hasPresidentAuthority } from './authorization'
 
 const subareasFor = moduleKey => Object.fromEntries(
   ACCESS_MODULES
@@ -91,7 +92,7 @@ export const ROLE_PRESETS = [
 ]
 
 export function getAvailableRolePresets(user) {
-  return hasPresidencyFullAccess(user)
+  return hasPresidentAuthority(user)
     ? ROLE_PRESETS
     : ROLE_PRESETS.filter(preset => preset.role !== 'presidente' && preset.role !== 'diretor')
 }

@@ -3,7 +3,7 @@ import db from '../data/db'
 
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 
-function resolveLiveUser(user) {
+export function resolveAuthorizedUser(user) {
   if (!user) return null
   return db.get('usuarios').find(item =>
     idsEqual(item.id, user.id) ||
@@ -13,6 +13,8 @@ function resolveLiveUser(user) {
     (item.email && user.email && item.email.trim().toLowerCase() === user.email.trim().toLowerCase())
   ) || user
 }
+
+const resolveLiveUser = resolveAuthorizedUser
 
 export function isPresident(user) {
   return hasPresidentAuthority(user)
@@ -33,32 +35,37 @@ export function isPeopleDirector(user) {
 }
 
 export function canApproveUsers(user) {
-  return Boolean(hasPresidentAuthority(user) || (
-    user?.role === 'diretor' && hasSubareaAccess(user, 'gestaoPessoas.aprovacoes')
+  const liveUser = resolveLiveUser(user)
+  return Boolean(hasPresidencyFullAccess(liveUser) || (
+    liveUser?.role === 'diretor' && hasSubareaAccess(liveUser, 'gestaoPessoas.aprovacoes')
   ))
 }
 
 export function canManageMembers(user) {
-  return Boolean(hasPresidentAuthority(user) || isPeopleDirector(user))
+  const liveUser = resolveLiveUser(user)
+  return Boolean(hasPresidencyFullAccess(liveUser) || isPeopleDirector(liveUser))
 }
 
 export function canSendFeedback(user) {
-  return Boolean(hasPresidentAuthority(user) || (
-    user?.setorId === 'gestao-pessoas' && hasSubareaAccess(user, 'gestaoPessoas.membros')
+  const liveUser = resolveLiveUser(user)
+  return Boolean(hasPresidencyFullAccess(liveUser) || (
+    liveUser?.setorId === 'gestao-pessoas' && hasSubareaAccess(liveUser, 'gestaoPessoas.membros')
   ))
 }
 
 export function canDeleteMember(actor, target) {
-  if (!actor || !target || actor.id === target.id) return false
-  if (hasPresidentAuthority(actor)) return target.role !== 'presidente'
-  if (!isPeopleDirector(actor)) return false
+  const liveActor = resolveLiveUser(actor)
+  if (!liveActor || !target || idsEqual(liveActor.id, target.id) || idsEqual(liveActor.supabaseId, target.supabaseId)) return false
+  if (hasPresidencyFullAccess(liveActor)) return target.role !== 'presidente'
+  if (!isPeopleDirector(liveActor)) return false
   return target.role !== 'presidente' && target.role !== 'diretor'
 }
 
 export function canManagePermissions(user) {
-  return hasPresidentAuthority(user)
+  return hasPresidencyFullAccess(resolveLiveUser(user))
 }
 
 export function canPostAnnouncements(user) {
-  return hasPresidentAuthority(user) || user?.role === 'diretor'
+  const liveUser = resolveLiveUser(user)
+  return hasPresidencyFullAccess(liveUser) || liveUser?.role === 'diretor'
 }

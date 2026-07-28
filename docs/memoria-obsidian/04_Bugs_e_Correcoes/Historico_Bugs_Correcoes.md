@@ -25,6 +25,10 @@ Este arquivo resume problemas ja corrigidos ou investigados no projeto, com base
   - Causa: algumas checagens podiam receber uma versao antiga do usuario em sessao ou permissoes locais antigas antes da sincronizacao remota terminar.
   - Correcao: autorizacoes administrativas passaram a resolver o usuario vivo pela base atual antes de validar autoridade, `hasPresidencyFullAccess` passou a normalizar permissoes antes da leitura, e alteracoes de permissao do proprio usuario atualizam a sessao imediatamente.
 
+- Usuario com permissao de Presidencia ainda podia nao herdar todas as acoes internas de presidente.
+  - Causa: algumas acoes protegidas em GP/comunicacao ainda validavam o usuario original da sessao, enquanto a permissao atualizada ja estava salva na base de usuarios. Alem disso, notificacoes de diretoria e presets de cargo ainda dependiam parcialmente do cargo textual.
+  - Correcao: validacoes de cadastro, edicao, remocao de membros, feedbacks, avisos, notificacoes de diretoria e presets de aprovacao passaram a usar a autoridade efetiva de Presidencia resolvida a partir do usuario vivo do banco local sincronizado com Supabase.
+
 ## Sessao e sincronizacao
 
 - Conta ativa podia aparentar trocar entre abas/usuarios.
