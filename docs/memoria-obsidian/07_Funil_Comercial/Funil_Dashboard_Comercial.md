@@ -433,3 +433,19 @@ Complemento da migracao em 2026-07-28:
 - Os `178` cards migrados receberam `Origem comercial do lead = Casa dos dados`.
 - A verificacao posterior confirmou `178/178` cards com os dois campos atualizados.
 - Campos operacionais de contato continuaram vazios.
+
+## Atualizacao 2026-07-28 - Filtro de empresas no n8n de cadastro de leads
+
+Workflow ajustado no n8n:
+
+- ID do workflow: `25CnVWVO1E8QlEV5`.
+- Nome: `Automação Pipefy Site Projep`.
+- Node alterado: `If`.
+
+Regra atual:
+
+- O filtro de cadastro de leads no Pipefy passou a avaliar campos de nome e atividade da planilha, como razao social, nome fantasia, atividade principal/secundaria e natureza juridica.
+- Antes de aplicar a regex, o texto e normalizado para remover acentos e reduzir falhas por grafia.
+- Empresas com termos como `holding`, `holdings`, `participacoes`, `consultoria`, `consultor`, `assessoria`, `administrador`, `administradora`, `administracao`, `gestao empresarial`, `contabilidade`, `auditoria`, `mentoria`, `coach`, `treinamento`, `corretora`, `intermediacao`, `representacao comercial`, `escritorio`, `servicos combinados de escritorio`, `preparacao de documentos`, `atividades auxiliares` e `servicos administrativos` sao bloqueadas antes da criacao do card no Pipefy.
+- O workflow permaneceu ativo apos a alteracao.
+- Nenhum token, API key ou credencial foi salvo no repositorio.
