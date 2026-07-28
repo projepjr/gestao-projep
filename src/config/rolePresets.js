@@ -1,6 +1,15 @@
 import { ACCESS_MODULES } from './accessControl'
 import { hasPresidentAuthority } from './authorization'
 
+const SECTOR_MODULES = [
+  { value: 'presidencia', key: 'presidencia', label: 'Presidência', role: 'presidente', presidentOnly: true },
+  { value: 'admin-financeiro', key: 'adminFinanceiro', label: 'Adm e Fin', role: 'membro' },
+  { value: 'comercial', key: 'comercial', label: 'Comercial', role: 'membro' },
+  { value: 'projetos', key: 'projetos', label: 'Projetos', role: 'membro' },
+  { value: 'marketing', key: 'marketing', label: 'Marketing', role: 'membro' },
+  { value: 'gestao-pessoas', key: 'gestaoPessoas', label: 'Gestão de Pessoas', role: 'membro' },
+]
+
 const subareasFor = moduleKey => Object.fromEntries(
   ACCESS_MODULES
     .find(module => module.key === moduleKey)
@@ -8,93 +17,30 @@ const subareasFor = moduleKey => Object.fromEntries(
     .map(subarea => [subarea.key, true]) || []
 )
 
+const sectorPermissions = moduleKey => ({
+  [moduleKey]: true,
+  subareas: subareasFor(moduleKey),
+})
+
 export const ROLE_PRESETS = [
   {
     value: 'sem-acesso',
-    label: 'Sem acesso (aguardando liberação)',
+    label: 'Sem acesso',
     role: 'membro',
     permissions: {},
   },
-  {
-    value: 'membro',
-    label: 'Membro (somente Chat)',
-    role: 'membro',
-    permissions: { chat: true },
-  },
-  {
-    value: 'diretor-comercial',
-    label: 'Diretor Comercial',
-    role: 'diretor',
-    permissions: { comercial: true, chat: true, subareas: subareasFor('comercial') },
-  },
-  {
-    value: 'hunter-comercial',
-    label: 'Hunter Comercial',
-    role: 'membro',
-    permissions: {
-      comercial: true,
-      chat: true,
-      subareas: {
-        'comercial.dashboard': false,
-        'comercial.pipeline': true,
-        'comercial.calendario': true,
-        'comercial.ranking': false,
-        'comercial.contratos': false,
-        'comercial.equipe': false,
-      },
-    },
-  },
-  {
-    value: 'diretor-gp',
-    label: 'Diretor de GP',
-    role: 'diretor',
-    permissions: { gestaoPessoas: true, chat: true, subareas: subareasFor('gestaoPessoas') },
-  },
-  {
-    value: 'membro-gp',
-    label: 'Membro de GP',
-    role: 'membro',
-    permissions: {
-      gestaoPessoas: true,
-      chat: true,
-      subareas: {
-        'gestaoPessoas.dashboard': true,
-        'gestaoPessoas.membros': true,
-        'gestaoPessoas.processo': true,
-        'gestaoPessoas.aprovacoes': false,
-      },
-    },
-  },
-  {
-    value: 'projetos',
-    label: 'Projetos',
-    role: 'membro',
-    permissions: { projetos: true, chat: true, subareas: subareasFor('projetos') },
-  },
-  {
-    value: 'marketing',
-    label: 'Marketing',
-    role: 'membro',
-    permissions: { marketing: true, chat: true },
-  },
-  {
-    value: 'adm-fin',
-    label: 'Adm e Fin',
-    role: 'membro',
-    permissions: { adminFinanceiro: true, chat: true },
-  },
-  {
-    value: 'presidente',
-    label: 'Presidente',
-    role: 'presidente',
-    permissions: Object.fromEntries(ACCESS_MODULES.map(module => [module.key, true])),
-  },
+  ...SECTOR_MODULES.map(sector => ({
+    value: sector.value,
+    label: sector.label,
+    role: sector.role,
+    permissions: sectorPermissions(sector.key),
+    presidentOnly: sector.presidentOnly || false,
+  })),
 ]
 
 export function getAvailableRolePresets(user) {
-  return hasPresidentAuthority(user)
-    ? ROLE_PRESETS
-    : ROLE_PRESETS.filter(preset => preset.role !== 'presidente' && preset.role !== 'diretor')
+  const canGrantPresidency = hasPresidentAuthority(user)
+  return ROLE_PRESETS.filter(preset => !preset.presidentOnly || canGrantPresidency)
 }
 
 export function getSuggestedRolePreset(approver, pendingUser) {
