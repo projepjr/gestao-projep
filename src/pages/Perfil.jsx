@@ -6,7 +6,7 @@ import {
   Camera, Mail, Phone, Calendar, Star, Pin, Bell, Lock,
   CheckCircle, Clock, AlertCircle, TrendingUp, Briefcase,
   MessageSquare, Megaphone, ChevronLeft, Eye, EyeOff,
-  ToggleLeft, ToggleRight, Target, X, Pencil, Check,
+  ToggleLeft, ToggleRight, Target, X, Pencil, Check, Trash2,
 } from 'lucide-react'
 
 // ─── Line Chart ────────────────────────────────────────────
@@ -264,14 +264,18 @@ function PasswordModal({ onClose, onChangePassword }) {
   const [form, setForm] = useState({ current: '', next: '', confirm: '' })
   const [show, setShow] = useState(false)
   const [msg,  setMsg]  = useState(null)
+  const [loading, setLoading] = useState(false)
   const FIELD = "w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors"
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (form.next !== form.confirm) { setMsg({ type: 'error', text: 'As senhas não coincidem' }); return }
     if (form.next.length < 6)       { setMsg({ type: 'error', text: 'Mínimo de 6 caracteres' });  return }
-    const result = onChangePassword(form.current, form.next)
-    if (!result.success) { setMsg({ type: 'error', text: result.error }); return }
+    setLoading(true)
+    setMsg(null)
+    const result = await onChangePassword(form.current, form.next)
+    setLoading(false)
+    if (!result.success) { setMsg({ type: 'error', text: result.error || 'Nao foi possivel alterar a senha.' }); return }
     setMsg({ type: 'success', text: 'Senha alterada com sucesso!' })
     setTimeout(onClose, 1200)
   }
@@ -300,9 +304,108 @@ function PasswordModal({ onClose, onChangePassword }) {
           {msg && <p className={`text-xs px-3 py-2 rounded border ${msg.type === 'error' ? 'bg-red-950/40 border-red-900/40 text-red-400' : 'bg-green-950/40 border-green-900/40 text-green-400'}`}>{msg.text}</p>}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded border border-[#1E1E1E] text-gray-500 hover:text-white text-sm transition-all">Cancelar</button>
-            <button type="submit" className="flex-1 py-2.5 rounded bg-[#CE7028] hover:bg-[#B5611F] text-white font-semibold text-sm transition-colors">Alterar</button>
+            <button type="submit" disabled={loading} className="flex-1 py-2.5 rounded bg-[#CE7028] hover:bg-[#B5611F] disabled:opacity-60 text-white font-semibold text-sm transition-colors">
+              {loading ? 'Alterando...' : 'Alterar'}
+            </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function DeleteAccountModal({ onClose, onValidatePassword, onDeleteAccount }) {
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [step, setStep] = useState('password')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const FIELD = "w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+
+  const validatePassword = async e => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const result = await onValidatePassword(password)
+    setLoading(false)
+    if (!result.success) {
+      setError(result.error || 'Senha incorreta.')
+      return
+    }
+    setStep('confirm')
+  }
+
+  const confirmDelete = async () => {
+    setLoading(true)
+    setError('')
+    const result = await onDeleteAccount(password)
+    setLoading(false)
+    if (!result.success) {
+      setStep('password')
+      setError(result.error || 'Nao foi possivel excluir sua conta.')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#111111] border border-red-950/60 rounded-md w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E1E1E]">
+          <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-red-400" /> Excluir minha conta
+          </h3>
+          <button onClick={onClose} className="text-gray-600 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+
+        {step === 'password' ? (
+          <form onSubmit={validatePassword} className="p-5 space-y-4">
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Para continuar, confirme sua senha atual. A confirmacao final aparece depois disso.
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Senha atual</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className={FIELD}
+                  autoFocus
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+            {error && <p className="text-xs px-3 py-2 rounded border bg-red-950/40 border-red-900/40 text-red-400">{error}</p>}
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded border border-[#1E1E1E] text-gray-500 hover:text-white text-sm transition-all">Cancelar</button>
+              <button type="submit" disabled={loading} className="flex-1 py-2.5 rounded bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold text-sm transition-colors">
+                {loading ? 'Verificando...' : 'OK'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="p-5 space-y-4">
+            <div className="p-4 rounded border border-red-900/50 bg-red-950/30">
+              <p className="text-white text-sm font-semibold mb-1">Tem certeza que deseja excluir sua conta?</p>
+              <p className="text-red-200/80 text-xs leading-relaxed">
+                Isso remove seu acesso ao sistema e nao tem volta. Seus vinculos em projetos, reunioes e equipes serao limpos quando possivel.
+              </p>
+            </div>
+            {error && <p className="text-xs px-3 py-2 rounded border bg-red-950/40 border-red-900/40 text-red-400">{error}</p>}
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded border border-[#1E1E1E] text-gray-500 hover:text-white text-sm transition-all">Cancelar</button>
+              <button type="button" onClick={confirmDelete} disabled={loading} className="flex-1 py-2.5 rounded bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold text-sm transition-colors">
+                {loading ? 'Excluindo...' : 'Sim, excluir'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -322,7 +425,14 @@ const PROJECT_STATUS = {
 // ─── Main ──────────────────────────────────────────────────
 
 export default function Perfil() {
-  const { user, updateUserPhoto, updateCurrentUser, changePassword } = useAuth()
+  const {
+    user,
+    updateUserPhoto,
+    updateCurrentUser,
+    changePassword,
+    validateCurrentPassword,
+    deleteCurrentUser,
+  } = useAuth()
   const {
     members,
     evaluations,
@@ -350,6 +460,7 @@ export default function Perfil() {
   }
 
   const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
   const [cropSrc,           setCropSrc]           = useState(null)
   const [photoError,        setPhotoError]        = useState('')
 
@@ -596,6 +707,10 @@ export default function Perfil() {
               className="w-full mt-4 flex items-center justify-center gap-2 px-3 py-2.5 rounded border border-[#1E1E1E] text-gray-400 hover:text-white hover:border-[#2A2A2A] text-sm transition-all">
               <Lock className="w-4 h-4" /> Alterar Senha
             </button>
+            <button onClick={() => setShowDeleteAccountModal(true)}
+              className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 rounded border border-transparent text-red-500/70 hover:text-red-400 hover:border-red-950/60 hover:bg-red-950/20 text-xs transition-all">
+              <Trash2 className="w-3.5 h-3.5" /> Excluir minha conta
+            </button>
           </div>
         </div>
 
@@ -763,6 +878,17 @@ export default function Perfil() {
       {/* Modals */}
       {cropSrc          && <PhotoCropModal src={cropSrc} onSave={handleCropSave} onClose={() => setCropSrc(null)} />}
       {showPasswordModal && <PasswordModal onClose={() => setShowPasswordModal(false)} onChangePassword={changePassword} />}
+      {showDeleteAccountModal && (
+        <DeleteAccountModal
+          onClose={() => setShowDeleteAccountModal(false)}
+          onValidatePassword={validateCurrentPassword}
+          onDeleteAccount={async password => {
+            const result = await deleteCurrentUser(password)
+            if (result.success) navigate('/login', { replace: true })
+            return result
+          }}
+        />
+      )}
     </div>
   )
 }

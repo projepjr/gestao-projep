@@ -104,3 +104,16 @@ Pelo historico recente do repo:
 - Permissao de modulo nao libera subareas automaticamente. Subareas como Pipeline e Calendario Comercial precisam ser liberadas explicitamente em Presidencia > Seguranca.
 - O sininho de notificacoes e o alternador claro/escuro devem permanecer visiveis no header mesmo quando o usuario nao tem notificacoes.
 - Excecao de Presidencia: liberar o modulo Presidencia libera a subarea Seguranca e permite administrar permissoes, mesmo que o cargo do usuario nao seja `presidente`.
+
+## Exclusao da propria conta
+
+Arquivo principal: `src/pages/Perfil.jsx`, com logica em `src/contexts/AuthContext.jsx`.
+
+Cada usuario pode solicitar a exclusao da propria conta pelo perfil:
+
+1. Clica em `Excluir minha conta`, abaixo de `Alterar Senha`.
+2. Confirma a senha atual.
+3. Depois da senha correta, confirma uma mensagem irreversivel.
+4. O perfil e removido do Supabase/app, vinculos operacionais sao limpos quando possivel e a sessao e encerrada.
+
+Essa exclusao propria nao muda a regra administrativa: excluir outro membro continua respeitando `canDeleteMember`, incluindo o bloqueio de remocao de contas de Presidencia por terceiros.

@@ -415,6 +415,23 @@ export function AuthProvider({ children }) {
     return updateCurrentUser({ fotoPerfil: photo })
   }
 
+  const validateCurrentPassword = async currentPassword => {
+    if (!user) return { success: false, error: 'Usuario nao autenticado' }
+    if (!currentPassword) return { success: false, error: 'Informe sua senha atual.' }
+
+    const remoteLogin = await signInWithSupabaseAuth(user.email, currentPassword)
+    if (remoteLogin.enabled !== false) {
+      if (!remoteLogin.success) return { success: false, error: 'Senha atual incorreta' }
+      return { success: true }
+    }
+
+    const stored = db.get('usuarios').find(item => idsEqual(item.id, user.id))
+    if (!stored || stored.senha !== currentPassword) {
+      return { success: false, error: 'Senha atual incorreta' }
+    }
+    return { success: true }
+  }
+
   const requestPasswordReset = async email => {
     const normalizedEmail = normalizeEmail(email)
     const result = await sendSupabasePasswordReset(normalizedEmail)
@@ -446,9 +463,11 @@ export function AuthProvider({ children }) {
     if (newPassword.length < 6) return { success: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' }
     if (newPassword === currentPassword) return { success: false, error: 'A nova senha deve ser diferente da senha atual.' }
 
+    const validation = await validateCurrentPassword(currentPassword)
+    if (!validation.success) return validation
+
     const remoteLogin = await signInWithSupabaseAuth(user.email, currentPassword)
     if (remoteLogin.enabled !== false) {
-      if (!remoteLogin.success) return { success: false, error: 'Senha atual incorreta' }
       const result = await updateSupabaseAuthPassword(newPassword)
       if (!result.success) return result
       db.update('usuarios', null, user.id, { senha: null })
@@ -456,11 +475,24 @@ export function AuthProvider({ children }) {
       return { success: true }
     }
 
-    const stored = db.get('usuarios').find(item => idsEqual(item.id, user.id))
-    if (!stored || stored.senha !== currentPassword) {
-      return { success: false, error: 'Senha atual incorreta' }
-    }
     db.update('usuarios', null, user.id, { senha: newPassword })
+    return { success: true }
+  }
+
+  const deleteCurrentUser = async currentPassword => {
+    if (!user) return { success: false, error: 'Usuario nao autenticado' }
+    const validation = await validateCurrentPassword(currentPassword)
+    if (!validation.success) return validation
+
+    const target = findUserByIdentity(db.get('usuarios'), user)
+    if (!target) return { success: false, error: 'Usuario nao encontrado.' }
+
+    await deleteUserFromSupabase(target.id)
+    db.removeUser(target.id)
+    void syncCommercialTeamConfig(db.get('comercial')?.equipe)
+    await signOutFromSupabase()
+    setUser(null)
+    persistSession(null)
     return { success: true }
   }
 
@@ -479,6 +511,8 @@ export function AuthProvider({ children }) {
       updateUserPhoto,
       updateUserPermissoes,
       deleteUser,
+      validateCurrentPassword,
+      deleteCurrentUser,
       requestPasswordReset,
       confirmPasswordReset,
       changePassword,
