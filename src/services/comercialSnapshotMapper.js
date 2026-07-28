@@ -416,7 +416,7 @@ function buildCardConversionFlags(card, range) {
   )
   const futureInterest = currentStageInPeriod(card, STAGE_KEYWORDS.futureInterest, range)
   const pendingNoShow = currentStageInPeriod(card, STAGE_KEYWORDS.pendingScheduling, range)
-  const lost = currentStageInPeriod(card, STAGE_KEYWORDS.lost, range)
+  const lost = lostInPeriod(card, range)
   const successfulContact = futureInterest ||
     diagnosticScheduled ||
     diagnosticDone ||
@@ -551,6 +551,7 @@ const EVENT_LABELS = {
   ],
   negotiation: ['data de entrada em negociacao', 'data de entrada em negociação'],
   contract: ['data de fechamento do contrato', 'data da assinatura do contrato', 'data do fechamento'],
+  lost: ['data da perda', 'data de perda', 'data que foi perdido', 'data em que foi perdido'],
   noShow: ['data do no-show', 'data do no show'],
 }
 
@@ -657,6 +658,15 @@ function currentStageInPeriod(card, stageKeywords, range) {
   if (!currentStageMatches(card, stageKeywords)) return false
   if (!range?.inicio || !range?.fim) return true
   return enteredStageInRange(card, stageKeywords, range)
+}
+
+function lostInPeriod(card, range) {
+  const isLostStage = currentStageMatches(card, STAGE_KEYWORDS.lost)
+  const hasLostDate = hasFieldValue(card, EVENT_LABELS.lost)
+
+  if (!isLostStage && !hasLostDate) return false
+  if (range?.inicio && range?.fim) return hasFieldDateInRange(card, EVENT_LABELS.lost, range)
+  return isLostStage || hasLostDate
 }
 
 function hasFieldValue(card, keywords) {
@@ -917,6 +927,7 @@ function createHunterRows(members, commercial) {
     id: person.id,
     userId: person.userId,
     nome: person.nome,
+    leadsCadastrados: 0,
     leadsTrabalhados: 0,
     leadsContatados: 0,
     diagnosticasAgendadas: 0,
@@ -927,6 +938,7 @@ function createHunterRows(members, commercial) {
     reunioesMarcadas: 0,
     reunioesRealizadas: 0,
     noShows: 0,
+    perdidos: 0,
   }))
 }
 
@@ -1082,6 +1094,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
 
     const hunter = findOrCreateRow(hunters, getResponsibleTeamMember(card, 'hunter', hunterIndex))
     if (hunter) {
+      if (leadCreated) hunter.leadsCadastrados += 1
       if (worked) hunter.leadsTrabalhados += 1
       if (successfulContact) {
         hunter.leadsContatados += 1
@@ -1094,6 +1107,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       if (proposalScheduled) hunter.propostasAgendadas += 1
       if (proposalDone) hunter.propostasRealizadas += 1
       if (diagnosticNoShow) hunter.noShows += 1
+      if (lost) hunter.perdidos += 1
     }
 
     if (diagnosticScheduledForHunterInPeriod(card, range)) {

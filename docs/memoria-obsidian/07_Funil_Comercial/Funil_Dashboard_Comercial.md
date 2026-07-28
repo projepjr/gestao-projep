@@ -109,6 +109,14 @@ Nota de atualizacao da regra de agendamento:
 - A mesma logica fica preparada para `Proposta Agendada`: data/hora da proposta preenchida + `Data de entrada` no periodo + responsavel especifico de proposta quando existir.
 - Isso evita contar card em `Pendentes / No-show` apenas porque tambem possui `Data de entrada`.
 
+Atualizacao de indicadores por Hunter em 2026-07-28:
+
+- A tabela de Hunters passou a mostrar tambem `Leads Cad.` e `Perdidos`.
+- `Leads Cad.` conta leads cadastrados no periodo filtrado e atribuidos ao Hunter responsavel.
+- `Perdidos` conta leads do Hunter marcados como perdidos no periodo.
+- Em filtros semanal/mensal, `Perdidos` deve usar preferencialmente `Data da perda`; no modo ao vivo/total, tambem considera cards atualmente na fase de perda.
+- Esses dois indicadores sao apenas de lista/tabela e nao entram no grafico de barras, para evitar poluir a comparacao visual.
+
 Campos observados:
 
 - `pipefyName`

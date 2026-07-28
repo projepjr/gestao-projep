@@ -550,13 +550,15 @@ function ComplementaryMetrics({ funil, historico }) {
 // Hunters com tooltips nas colunas
 const HUNTER_COLS = [
   { label: 'Hunter', tip: null },
+  { label: 'Leads Cad.', tip: 'Leads que entraram no pipeline no periodo e estao sob responsabilidade deste Hunter.' },
   { label: 'Leads Trab.', tip: 'Leads do período que tiveram algum andamento feito por este Hunter.' },
   { label: 'Leads Cont.', tip: 'Leads que responderam ou avançaram para uma etapa que indica contato real com este Hunter.' },
   { label: 'Diag. Ag.', tip: 'Diagnosticas que este Hunter marcou no periodo, pela data de entrada do agendamento.' },
   { label: 'Diag. Real.', tip: 'Diagnósticas que realmente aconteceram sob responsabilidade deste Hunter.' },
   { label: 'Prop. Ag.', tip: 'Propostas agendadas relacionadas aos leads deste Hunter no periodo.' },
   { label: 'Prop. Real.', tip: 'Leads deste Hunter que chegaram a uma proposta apresentada.' },
-  { label: 'No-shows', tip: 'Bolos em diagnósticas. Essa responsabilidade fica com o Hunter.' },
+  { label: 'No-shows', tip: 'Bolos em diagnosticas. Essa responsabilidade fica com o Hunter.' },
+  { label: 'Perdidos', tip: 'Leads deste Hunter que foram marcados como perdidos no periodo.' },
   { label: 'Taxa Conv.', tip: 'Mostra quantos leads trabalhados pelo Hunter chegaram até uma proposta apresentada.' },
 ]
 const MEDIA_TIP_H = 'Média geral dos Hunters configurados para este período.'
@@ -602,12 +604,13 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
           <tbody>
             {hunters.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-6 text-center text-gray-600">
+                <td colSpan={11} className="py-6 text-center text-gray-600">
                   Nenhum hunter configurado. Cadastre vínculos em Comercial &gt; Equipe.
                 </td>
               </tr>
             )}
             {hunters.map((h) => {
+              const leadsCadastrados = h.leadsCadastrados || 0
               const leadsTrabalhados = h.leadsTrabalhados || 0
               const leadsContatados = h.leadsContatados || h.contatadas || 0
               const diagnosticasAgendadas = h.diagnosticasAgendadas || h.reunioesMarcadas || 0
@@ -618,6 +621,7 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
               return (
                 <tr key={h.id} className="border-b border-[#0D0D0D] hover:bg-[#0D0D0D]/60 transition-colors">
                   <td className="py-2.5 pr-4 font-semibold text-white whitespace-nowrap">{h.nome}</td>
+                  <td className="py-2.5 pr-4 text-gray-300">{leadsCadastrados}</td>
                   <td className="py-2.5 pr-4 text-gray-300">{leadsTrabalhados}</td>
                   <td className="py-2.5 pr-4 text-gray-300">{leadsContatados}</td>
                   <td className="py-2.5 pr-4 text-gray-300">{diagnosticasAgendadas}</td>
@@ -626,6 +630,9 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
                   <td className="py-2.5 pr-4 text-gray-300">{propostasRealizadas}</td>
                   <td className="py-2.5 pr-4">
                     <span className={h.noShows > 0 ? 'text-red-400' : 'text-gray-500'}>{h.noShows || 0}</span>
+                  </td>
+                  <td className="py-2.5 pr-4">
+                    <span className={h.perdidos > 0 ? 'text-red-400' : 'text-gray-500'}>{h.perdidos || 0}</span>
                   </td>
                   <td className="py-2.5 pr-4">
                     <span className={`font-bold ${taxa >= 30 ? 'text-green-400' : taxa >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
@@ -642,7 +649,7 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
                   <InfoTooltip text={MEDIA_TIP_H} />
                 </span>
               </td>
-              {['leadsTrabalhados', 'leadsContatados', 'diagnosticasAgendadas', 'diagnosticasRealizadas', 'propostasAgendadas', 'propostasRealizadas', 'noShows'].map((k) => (
+              {['leadsCadastrados', 'leadsTrabalhados', 'leadsContatados', 'diagnosticasAgendadas', 'diagnosticasRealizadas', 'propostasAgendadas', 'propostasRealizadas', 'noShows', 'perdidos'].map((k) => (
                 <td key={k} className="py-2.5 pr-4 text-gray-500 font-semibold">{avg(hunters, k).toFixed(1)}</td>
               ))}
               <td className="py-2.5 pr-4 text-gray-500 font-bold">
