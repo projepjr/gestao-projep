@@ -551,7 +551,18 @@ const EVENT_LABELS = {
   ],
   negotiation: ['data de entrada em negociacao', 'data de entrada em negociação'],
   contract: ['data de fechamento do contrato', 'data da assinatura do contrato', 'data do fechamento'],
-  lost: ['data da perda', 'data de perda', 'data que foi perdido', 'data em que foi perdido'],
+  lost: [
+    'data da perda',
+    'data de perda',
+    'data que foi perdido',
+    'data em que foi perdido',
+    'data de entrada na fase perdidos',
+    'data de entrada na fase perdido',
+    'data de entrada em perdidos',
+    'data de entrada em perdido',
+    'data de entrada do card na fase perdidos',
+    'data de entrada do card em perdidos',
+  ],
   noShow: ['data do no-show', 'data do no show'],
 }
 
@@ -577,6 +588,18 @@ const PROPOSAL_SCHEDULER_LABELS = [
   'responsaveis pela proposta',
   'closer',
   'fechador',
+]
+
+const LOSS_RESPONSIBLE_LABELS = [
+  'responsavel pela perda',
+  'responsável pela perda',
+  'responsavel da perda',
+  'responsável da perda',
+  'responsavel pelo perdido',
+  'responsável pelo perdido',
+  'quem perdeu',
+  'quem moveu para perdidos',
+  'quem marcou como perdido',
 ]
 
 const STAGE_KEYWORDS = {
@@ -922,6 +945,16 @@ function getProposalSchedulerTeamMember(card, teamIndex) {
   return null
 }
 
+function getLossResponsibleTeamMember(card, teamIndex) {
+  const values = getFieldValues(card, LOSS_RESPONSIBLE_LABELS)
+
+  for (const value of values) {
+    const member = matchTeamValue(value, teamIndex)
+    if (member) return member
+  }
+  return null
+}
+
 function createHunterRows(members, commercial) {
   return buildBasePeople('hunter', members, commercial).map(person => ({
     id: person.id,
@@ -1107,7 +1140,15 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       if (proposalScheduled) hunter.propostasAgendadas += 1
       if (proposalDone) hunter.propostasRealizadas += 1
       if (diagnosticNoShow) hunter.noShows += 1
-      if (lost) hunter.perdidos += 1
+    }
+
+    if (lost) {
+      const lossHunter = findOrCreateRow(
+        hunters,
+        getLossResponsibleTeamMember(card, hunterIndex) ||
+          getResponsibleTeamMember(card, 'hunter', hunterIndex),
+      )
+      if (lossHunter) lossHunter.perdidos += 1
     }
 
     if (diagnosticScheduledForHunterInPeriod(card, range)) {

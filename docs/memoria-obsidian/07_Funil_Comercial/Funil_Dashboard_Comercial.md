@@ -117,6 +117,14 @@ Atualizacao de indicadores por Hunter em 2026-07-28:
 - Em filtros semanal/mensal, `Perdidos` deve usar preferencialmente `Data da perda`; no modo ao vivo/total, tambem considera cards atualmente na fase de perda.
 - Esses dois indicadores sao apenas de lista/tabela e nao entram no grafico de barras, para evitar poluir a comparacao visual.
 
+Atualizacao da regra de `Perdidos` em 2026-07-28:
+
+- O Pipefy passou a ter campos especificos na fase `Perdidos`: `Responsavel pela perda` e `Data de entrada na fase perdidos`.
+- A dashboard deve reconhecer `Data de entrada na fase perdidos` como data valida para filtros semanal/mensal.
+- A coluna `Perdidos` dos Hunters deve ser atribuida primeiro ao campo `Responsavel pela perda`.
+- Se esse campo estiver vazio ou nao bater com a associacao da equipe comercial, o mapper usa o responsavel Hunter geral do card como fallback.
+- Essa regra evita que perdas fiquem zeradas quando o card tem data/responsavel especificos da fase de perda.
+
 Campos observados:
 
 - `pipefyName`
