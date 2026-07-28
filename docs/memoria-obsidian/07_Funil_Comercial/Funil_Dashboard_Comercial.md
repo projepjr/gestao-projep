@@ -305,6 +305,26 @@ Motivo:
 - A fase `Nao contatados` existe justamente para leads em que houve tentativa, mas ainda nao houve contato efetivo.
 - Portanto, ela nao pode alimentar o indicador `Leads Contatados`.
 
+## Atualizacao 2026-07-28 - Grafico comparativo de Hunters
+
+Regra aplicada na dashboard comercial:
+
+- A `Taxa Conv.` dos Hunters passou a medir quantos leads trabalhados chegaram ate uma diagnostica realizada.
+- Formula operacional: diagnosticas realizadas do Hunter / leads trabalhados pelo Hunter.
+- A taxa deixou de usar proposta apresentada como destino, pois proposta ja depende de etapas posteriores ao trabalho principal do Hunter.
+- O grafico dos Hunters passou a comparar uma metrica por vez entre os Hunters.
+- Metricas disponiveis no seletor do grafico:
+  - Leads trabalhados;
+  - Leads contatados;
+  - Diagnosticas agendadas;
+  - Diagnosticas realizadas;
+  - Propostas agendadas;
+  - Propostas realizadas;
+  - No-shows;
+  - Perdidos;
+  - Taxa de conversao.
+- O grafico mostra uma linha de media da metrica selecionada para facilitar a leitura de quem esta acima ou abaixo do desempenho medio.
+
 ## Atualizacao 2026-07-17 - Tooltips e KPIs superiores
 
 Regra de interface:

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, Legend,
+  ResponsiveContainer, CartesianGrid, Legend, ReferenceLine,
 } from 'recharts'
 import {
   ChevronLeft, ChevronRight, Radio, Calendar, BarChart2,
@@ -559,23 +559,50 @@ const HUNTER_COLS = [
   { label: 'Prop. Real.', tip: 'Leads deste Hunter que chegaram a uma proposta apresentada.' },
   { label: 'No-shows', tip: 'Bolos em diagnosticas. Essa responsabilidade fica com o Hunter.' },
   { label: 'Perdidos', tip: 'Leads deste Hunter que foram marcados como perdidos no periodo.' },
-  { label: 'Taxa Conv.', tip: 'Mostra quantos leads trabalhados pelo Hunter chegaram até uma proposta apresentada.' },
+  { label: 'Taxa Conv.', tip: 'Mostra quantos leads trabalhados pelo Hunter chegaram ate uma diagnostica realizada.' },
 ]
 const MEDIA_TIP_H = 'Média geral dos Hunters configurados para este período.'
 
+const HUNTER_CHART_METRICS = [
+  { key: 'leadsTrabalhados', label: 'Leads Trab.', color: '#044947', type: 'number', getValue: (h) => h.leadsTrabalhados || 0 },
+  { key: 'leadsContatados', label: 'Leads Cont.', color: '#2A6B68', type: 'number', getValue: (h) => h.leadsContatados || h.contatadas || 0 },
+  { key: 'diagnosticasAgendadas', label: 'Diag. Ag.', color: '#3B82F6', type: 'number', getValue: (h) => h.diagnosticasAgendadas || h.reunioesMarcadas || 0 },
+  { key: 'diagnosticasRealizadas', label: 'Diag. Real.', color: '#8B5CF6', type: 'number', getValue: (h) => h.diagnosticasRealizadas || h.reunioesRealizadas || 0 },
+  { key: 'propostasAgendadas', label: 'Prop. Ag.', color: '#F59E0B', type: 'number', getValue: (h) => h.propostasAgendadas || 0 },
+  { key: 'propostasRealizadas', label: 'Prop. Real.', color: '#CE7028', type: 'number', getValue: (h) => h.propostasRealizadas || 0 },
+  { key: 'noShows', label: 'No-shows', color: '#EF4444', type: 'number', getValue: (h) => h.noShows || 0 },
+  { key: 'perdidos', label: 'Perdidos', color: '#DC2626', type: 'number', getValue: (h) => h.perdidos || 0 },
+  {
+    key: 'taxaConversao',
+    label: 'Taxa Conv.',
+    color: '#22C55E',
+    type: 'percent',
+    getValue: (h) => pct(h.diagnosticasRealizadas || h.reunioesRealizadas || 0, h.leadsTrabalhados || 0),
+  },
+]
+
+const formatHunterMetricValue = (value, type) => {
+  const number = Number(value || 0)
+  if (type === 'percent') return `${Math.round(number)}%`
+  return Number.isInteger(number) ? String(number) : number.toFixed(1)
+}
+
 function HuntersSection({ hunters, prevHunters, prevLabel }) {
+  const [selectedMetricKey, setSelectedMetricKey] = useState('leadsTrabalhados')
   const sumKey = (arr, key) => arr.reduce((s, h) => s + (h[key] || 0), 0)
-  const currTotal = sumKey(hunters, 'propostasRealizadas')
-  const prevTotal = prevHunters ? sumKey(prevHunters, 'propostasRealizadas') : null
+  const currTotal = sumKey(hunters, 'diagnosticasRealizadas')
+  const prevTotal = prevHunters ? sumKey(prevHunters, 'diagnosticasRealizadas') : null
+  const selectedMetric = HUNTER_CHART_METRICS.find((metric) => metric.key === selectedMetricKey) || HUNTER_CHART_METRICS[0]
 
   const chartData = hunters.map((h) => ({
     nome: h.nome.split(' ')[0],
-    'Leads Trab.': h.leadsTrabalhados || 0,
-    'Leads Cont.': h.leadsContatados || h.contatadas || 0,
-    'Diag. Ag.': h.diagnosticasAgendadas || h.reunioesMarcadas || 0,
-    'Diag. Real.': h.diagnosticasRealizadas || h.reunioesRealizadas || 0,
-    'Prop. Real.': h.propostasRealizadas || 0,
+    hunter: h.nome,
+    valor: selectedMetric.getValue(h),
   }))
+  const chartAverage = chartData.length
+    ? chartData.reduce((sum, item) => sum + item.valor, 0) / chartData.length
+    : 0
+  const formattedAverage = formatHunterMetricValue(chartAverage, selectedMetric.type)
 
   return (
     <div className="bg-[#111111] border border-[#1E1E1E] rounded-md p-5 space-y-5">
@@ -617,7 +644,7 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
               const diagnosticasRealizadas = h.diagnosticasRealizadas || h.reunioesRealizadas || 0
               const propostasAgendadas = h.propostasAgendadas || 0
               const propostasRealizadas = h.propostasRealizadas || 0
-              const taxa = pct(propostasRealizadas, leadsTrabalhados)
+              const taxa = pct(diagnosticasRealizadas, leadsTrabalhados)
               return (
                 <tr key={h.id} className="border-b border-[#0D0D0D] hover:bg-[#0D0D0D]/60 transition-colors">
                   <td className="py-2.5 pr-4 font-semibold text-white whitespace-nowrap">{h.nome}</td>
@@ -653,26 +680,71 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
                 <td key={k} className="py-2.5 pr-4 text-gray-500 font-semibold">{avg(hunters, k).toFixed(1)}</td>
               ))}
               <td className="py-2.5 pr-4 text-gray-500 font-bold">
-                {pct(sumKey(hunters, 'propostasRealizadas'), sumKey(hunters, 'leadsTrabalhados'))}%
+                {pct(sumKey(hunters, 'diagnosticasRealizadas'), sumKey(hunters, 'leadsTrabalhados'))}%
               </td>
             </tr>}
           </tbody>
         </table>
       </div>
 
+      <div className="flex flex-col gap-3 border-t border-[#1E1E1E] pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Comparativo por Hunter</p>
+          <p className="text-xs text-gray-600 mt-1">
+            Escolha uma metrica para comparar os Hunters e ver quem esta acima ou abaixo da media.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Metrica</span>
+          <select
+            value={selectedMetricKey}
+            onChange={(event) => setSelectedMetricKey(event.target.value)}
+            className="bg-[#0D0D0D] border border-[#1E1E1E] rounded-md px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#CE7028]"
+          >
+            {HUNTER_CHART_METRICS.map((metric) => (
+              <option key={metric.key} value={metric.key}>{metric.label}</option>
+            ))}
+          </select>
+          <span className="rounded-full border border-[#CE7028]/40 bg-[#CE7028]/10 px-2.5 py-1 text-[10px] font-bold text-[#CE7028]">
+            Media: {formattedAverage}
+          </span>
+        </div>
+      </div>
+
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+          <BarChart data={chartData} margin={{ top: 22, right: 16, left: -24, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1A1A1A" vertical={false} />
             <XAxis dataKey="nome" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} axisLine={false} tickLine={false} />
-            <Tooltip content={<ChartTooltip />} cursor={{ fill: '#1A1A1A' }} />
+            <Tooltip
+              cursor={{ fill: '#1A1A1A' }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null
+                const item = payload[0]?.payload
+                return (
+                  <div className="bg-[#111111] border border-[#1E1E1E] rounded-md p-3 shadow-xl">
+                    <p className="text-white font-bold text-xs mb-2">{item.hunter}</p>
+                    <p className="text-xs text-gray-400">
+                      {selectedMetric.label}:{' '}
+                      <span className="text-white font-bold">
+                        {formatHunterMetricValue(item.valor, selectedMetric.type)}
+                      </span>
+                    </p>
+                    <p className="text-xs text-[#CE7028] mt-1">Media: {formattedAverage}</p>
+                  </div>
+                )
+              }}
+            />
             <Legend wrapperStyle={{ fontSize: '10px', color: '#6B7280' }} />
-            <Bar dataKey="Leads Trab." fill="#044947" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Leads Cont." fill="#2A6B68" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Diag. Ag." fill="#3B82F6" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Diag. Real." fill="#8B5CF6" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Prop. Real." fill="#CE7028" radius={[2, 2, 0, 0]} />
+            <ReferenceLine
+              y={chartAverage}
+              stroke="#CE7028"
+              strokeDasharray="4 4"
+              ifOverflow="extendDomain"
+              label={{ value: `Media ${formattedAverage}`, position: 'insideTopRight', fill: '#CE7028', fontSize: 10 }}
+            />
+            <Bar dataKey="valor" name={selectedMetric.label} fill={selectedMetric.color} radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
