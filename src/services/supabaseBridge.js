@@ -9,6 +9,7 @@ const NS = {
   notification: '8004',
 }
 const COMMERCIAL_CONFIG_ROW_ID = 'commercial-team-links'
+const NAVIGATION_CONFIG_ROW_ID = 'navigation-sidebar-order'
 const COMMERCIAL_CONFIG_SOURCE = 'app_config'
 const MODULE_PERMISSION_KEY = '__module__'
 const REMOVED_DEMO_EMAILS = [
@@ -379,6 +380,24 @@ const normalizeCommercialConfig = config => ({
   updatedAt: config?.updatedAt || new Date().toISOString(),
 })
 
+const normalizeNavigationConfig = config => {
+  const sidebarOrder = config?.sidebarOrder && typeof config.sidebarOrder === 'object' && !Array.isArray(config.sidebarOrder)
+    ? config.sidebarOrder
+    : {}
+
+  return {
+    sidebarOrder: Object.fromEntries(
+      Object.entries(sidebarOrder)
+        .map(([sectorId, order]) => [
+          sectorId,
+          Array.isArray(order) ? order.map(item => `${item}`).filter(Boolean) : [],
+        ])
+        .filter(([, order]) => order.length > 0),
+    ),
+    updatedAt: config?.updatedAt || new Date().toISOString(),
+  }
+}
+
 async function fetchCommercialConfigRow() {
   if (!isSupabaseConfigured || !supabase) return null
   const { data, error } = await supabase
@@ -392,6 +411,23 @@ async function fetchCommercialConfigRow() {
     return JSON.parse(data.description)
   } catch (error) {
     console.warn('[Supabase] ConfiguraÃ§Ã£o comercial invÃ¡lida:', error.message || error)
+    return null
+  }
+}
+
+async function fetchNavigationConfigRow() {
+  if (!isSupabaseConfigured || !supabase) return null
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('description, created_at')
+    .eq('id', notificationUuid(NAVIGATION_CONFIG_ROW_ID))
+    .maybeSingle()
+  logRemoteError('fetch navigation config notification', error)
+  if (!data?.description) return null
+  try {
+    return JSON.parse(data.description)
+  } catch (error) {
+    console.warn('[Supabase] Configuracao de navegacao invalida:', error.message || error)
     return null
   }
 }
@@ -533,6 +569,41 @@ export async function syncCommercialTeamConfig(equipe, settings = {}) {
   logRemoteError('upsert commercial team config', error)
 }
 
+export async function syncNavigationConfig(navigation = {}) {
+  if (!isSupabaseConfigured || !supabase) return
+  const currentConfig = await fetchNavigationConfigRow()
+  const payload = normalizeNavigationConfig({
+    ...(currentConfig || {}),
+    ...(navigation || {}),
+    updatedAt: new Date().toISOString(),
+  })
+  const { error } = await supabase
+    .from('notifications')
+    .upsert({
+      id: notificationUuid(NAVIGATION_CONFIG_ROW_ID),
+      profile_id: null,
+      type: COMMERCIAL_CONFIG_SOURCE,
+      title: NAVIGATION_CONFIG_ROW_ID,
+      description: JSON.stringify(payload),
+      link: null,
+      is_read: true,
+      created_at: payload.updatedAt,
+    }, { onConflict: 'id' })
+  logRemoteError('upsert navigation config', error)
+}
+
+export async function pullNavigationConfig(db) {
+  if (!isSupabaseConfigured || !supabase) return null
+
+  const remoteConfig = await fetchNavigationConfigRow()
+  const navigation = normalizeNavigationConfig(remoteConfig || {})
+  db.mutate('configuracoes', current => ({
+    ...current,
+    navigation,
+  }))
+  return navigation
+}
+
 export async function pullCommercialTeamConfig(db) {
   if (!isSupabaseConfigured || !supabase) return null
 
@@ -615,6 +686,7 @@ export async function bootstrapSupabase(db) {
 
   const profileIdToUserId = profileIdToUserIdMap(mergedUsers)
   await pullCommercialTeamConfig(db)
+  await pullNavigationConfig(db)
   await pullCommunication(db, profileIdToUserId)
   await pullMeetings(db, profileIdToUserId)
 
@@ -843,6 +915,7 @@ export async function pullRemoteState(db) {
   const profileIdToUserId = profileIdToUserIdMap(mergedUsers)
   await Promise.all([
     pullCommercialTeamConfig(db),
+    pullNavigationConfig(db),
     pullCommunication(db, profileIdToUserId),
     pullMeetings(db, profileIdToUserId),
   ])

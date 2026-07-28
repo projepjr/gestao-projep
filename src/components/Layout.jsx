@@ -18,6 +18,7 @@ import {
   PanelLeftClose, PanelLeftOpen, MessageSquare, Shield,
   AlertCircle, FileCheck, Target, CheckCircle, UserCheck, CalendarDays,
   Sun, Moon, Trash2, BarChart2, History, CalendarRange, Download,
+  Pencil, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import ProjepLogo, { ProjepSymbol } from './ProjepLogo'
 import UserAvatar from './UserAvatar'
@@ -95,6 +96,7 @@ export default function Layout({ children }) {
   const [mobileOpen,    setMobileOpen]    = useState(false)
   const [collapsed,     setCollapsed]     = useState(false)
   const [showNotifs,    setShowNotifs]    = useState(false)
+  const [editingSectorId, setEditingSectorId] = useState(null)
 
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -107,6 +109,8 @@ export default function Layout({ children }) {
     markAllNotificationsRead,
     deleteNotification,
     clearAllNotifications,
+    navigation,
+    updateSidebarOrder,
   } = useData()
   const location  = useLocation()
   const navigate  = useNavigate()
@@ -190,6 +194,41 @@ export default function Layout({ children }) {
     return false
   }).length
   const activeSector = SECTORS.find(s => s.path && location.pathname.startsWith(s.path))
+  const sidebarOrder = navigation?.sidebarOrder || {}
+  const normalizeText = value => `${value || ''}`
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  const canEditSectorOrder = sector => {
+    if (!sector?.subItems?.length || sector.comingSoon) return false
+    if (hasPresidentAuthority(user)) return true
+    if (sector.id === 'chat') return false
+    const cargo = normalizeText(user?.cargo)
+    const isDirector = user?.role === 'diretor' || cargo.includes('diretor')
+    return Boolean(isDirector && hasModuleAccess(user, sector.id))
+  }
+  const getOrderedSubItems = sector => {
+    const order = sidebarOrder[sector.id] || []
+    const byKey = new Map((sector.subItems || []).map(item => [item.key, item]))
+    const ordered = order.map(key => byKey.get(key)).filter(Boolean)
+    const missing = (sector.subItems || []).filter(item => !order.includes(item.key))
+    return [...ordered, ...missing]
+  }
+  const moveVisibleSubItem = (sector, visibleItems, index, direction) => {
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= visibleItems.length) return
+
+    const swappedVisibleKeys = visibleItems.map(item => item.key)
+    ;[swappedVisibleKeys[index], swappedVisibleKeys[targetIndex]] = [swappedVisibleKeys[targetIndex], swappedVisibleKeys[index]]
+
+    const visibleKeySet = new Set(visibleItems.map(item => item.key))
+    let nextVisibleIndex = 0
+    const fullOrder = getOrderedSubItems(sector).map(item => item.key)
+    const nextOrder = fullOrder.map(key => (
+      visibleKeySet.has(key) ? swappedVisibleKeys[nextVisibleIndex++] : key
+    ))
+    updateSidebarOrder(sector.id, nextOrder)
+  }
 
   return (
     <div className="app-shell min-h-screen bg-[#0A0A0A] flex">
@@ -231,12 +270,15 @@ export default function Layout({ children }) {
               const hasAccess = hasModuleAccess(user, sector.id)
               const isActive = activeSector?.id === sector.id
               const isDisabled = sector.comingSoon || !hasAccess
-              const visibleSubItems = sector.subItems?.filter(item => hasSubareaAccess(user, item.key)) || []
+              const orderedSubItems = getOrderedSubItems(sector)
+              const visibleSubItems = orderedSubItems.filter(item => hasSubareaAccess(user, item.key))
               const destination = visibleSubItems[0]?.path || sector.path
+              const canEditOrder = canEditSectorOrder(sector)
+              const isEditingOrder = editingSectorId === sector.id
 
               const sectorRow = (
                 <div className={`
-                  relative flex items-center transition-all duration-150 select-none
+                  relative flex items-center transition-all duration-150 select-none group/sector
                   ${collapsed ? 'justify-center w-10 h-10 mx-auto rounded' : 'gap-3 px-3 py-2.5 rounded'}
                   ${isActive && !isDisabled
                     ? 'bg-[#CE7028] text-white'
@@ -263,6 +305,21 @@ export default function Layout({ children }) {
                         <span className="text-[10px] font-semibold bg-white/10 text-white/40 px-1.5 py-0.5 rounded flex-shrink-0 leading-none">Em breve</span>
                       )}
                       {!hasAccess && !sector.comingSoon && <Lock className="w-3 h-3 text-white/20 flex-shrink-0" />}
+                      {canEditOrder && (
+                        <button
+                          type="button"
+                          onClick={event => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            setEditingSectorId(current => current === sector.id ? null : sector.id)
+                          }}
+                          className={`p-1 rounded hover:bg-white/15 hover:text-white transition-all ${isEditingOrder ? 'opacity-100 text-white' : 'opacity-0 group-hover/sector:opacity-100 text-white/60'}`}
+                          title={isEditingOrder ? 'Concluir edição da ordem' : 'Editar ordem das subpáginas'}
+                          aria-label={isEditingOrder ? 'Concluir edição da ordem' : 'Editar ordem das subpáginas'}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
                       {isActive && !isDisabled && <ChevronRight className="w-3 h-3 flex-shrink-0 text-white/70" />}
                     </>
                   )}
@@ -284,17 +341,61 @@ export default function Layout({ children }) {
                       : <Link to={destination} onClick={() => setMobileOpen(false)}>{sectorRow}</Link>
                   )}
 
-                  {!collapsed && isActive && !isDisabled && visibleSubItems.length > 0 && (
+                  {!collapsed && (isActive || isEditingOrder) && !isDisabled && visibleSubItems.length > 0 && (
                     <div className="ml-3 mt-0.5 mb-1 pl-3 border-l border-white/10 space-y-0.5">
-                      {visibleSubItems.map(item => {
+                      {isEditingOrder && (
+                        <div className="flex items-center justify-between px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/35">
+                          <span>Editando ordem</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingSectorId(null)}
+                            className="text-[#FF882D] hover:text-white font-semibold transition-colors"
+                          >
+                            Concluir
+                          </button>
+                        </div>
+                      )}
+                      {visibleSubItems.map((item, itemIndex) => {
                         const SubIcon = item.icon
                         const subActive = location.pathname === item.path
-                        return (
+                        const itemContent = (
+                          <>
+                            <SubIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="flex-1 truncate">{item.label}</span>
+                          </>
+                        )
+                        return isEditingOrder ? (
+                          <div
+                            key={item.path}
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded text-xs font-medium transition-all ${subActive ? 'bg-white/10 text-white' : 'text-white/55 bg-white/[0.03]'}`}
+                          >
+                            {itemContent}
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveVisibleSubItem(sector, visibleSubItems, itemIndex, -1)}
+                                disabled={itemIndex === 0}
+                                className="p-1 rounded text-white/45 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-white/45 transition-all"
+                                title="Mover para cima"
+                              >
+                                <ArrowUp className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveVisibleSubItem(sector, visibleSubItems, itemIndex, 1)}
+                                disabled={itemIndex === visibleSubItems.length - 1}
+                                className="p-1 rounded text-white/45 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-white/45 transition-all"
+                                title="Mover para baixo"
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
                           <Link key={item.path} to={item.path} onClick={() => setMobileOpen(false)}
                             className={`flex items-center gap-2.5 px-3 py-2 rounded text-xs font-medium transition-all ${subActive ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'}`}
                           >
-                            <SubIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                            {item.label}
+                            {itemContent}
                           </Link>
                         )
                       })}

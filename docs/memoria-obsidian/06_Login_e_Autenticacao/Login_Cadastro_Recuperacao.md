@@ -90,6 +90,32 @@ Se este e-mail estiver cadastrado, enviamos um link de recuperação.
 
 O site nao deve mostrar codigo de recuperacao diretamente na tela.
 
+## Alteracao de email
+
+Arquivos principais:
+
+- `src/pages/Perfil.jsx`
+- `src/contexts/AuthContext.jsx`
+- `src/services/supabaseBridge.js`
+
+Regra oficial:
+
+- O email nao deve ser alterado diretamente em `profiles`/`usuarios` pela tela de perfil.
+- O perfil deve solicitar senha atual e chamar `supabase.auth.updateUser({ email })`.
+- O Supabase Auth envia o email de confirmacao usando o mesmo SMTP configurado para recuperacao de senha (Brevo SMTP).
+- O email do perfil so deve ser sincronizado depois que o Supabase Auth confirmar a troca.
+- No login, se a autenticacao pelo Supabase retornar um usuario cujo `supabaseId` ja existe no perfil, mas o email do perfil ainda esta antigo, o app reconcilia o perfil com o email confirmado.
+
+Motivo:
+
+Editar apenas o email do perfil desassocia a identidade visual do app da credencial real do Supabase Auth. Isso quebra login, troca de senha e exclusao de conta, porque a senha continua vinculada ao email antigo no Auth.
+
+Migracao manual de email de outra conta:
+
+- O front-end com `VITE_SUPABASE_PUBLISHABLE_KEY` nao deve alterar email Auth de outro usuario.
+- Para corrigir uma conta de outra pessoa, usar o painel do Supabase Auth ou uma rotina server-side segura com service role fora do front-end.
+- Nunca salvar `service_role` no codigo, memoria ou variaveis publicas do Vite.
+
 ## Bugs corrigidos ou investigados
 
 Pelo historico recente do repo:
@@ -104,6 +130,7 @@ Pelo historico recente do repo:
 - Permissao de modulo nao libera subareas automaticamente. Subareas como Pipeline e Calendario Comercial precisam ser liberadas explicitamente em Presidencia > Seguranca.
 - O sininho de notificacoes e o alternador claro/escuro devem permanecer visiveis no header mesmo quando o usuario nao tem notificacoes.
 - Excecao de Presidencia: liberar o modulo Presidencia libera a subarea Seguranca e permite administrar permissoes, mesmo que o cargo do usuario nao seja `presidente`.
+- Edicao direta de email pelo perfil podia quebrar a conta ao atualizar o email no perfil, mas nao no Supabase Auth. O fluxo correto passou a exigir senha e confirmacao por email via Supabase Auth/Brevo.
 
 ## Exclusao da propria conta
 

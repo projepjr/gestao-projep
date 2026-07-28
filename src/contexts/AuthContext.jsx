@@ -11,6 +11,7 @@ import {
   createSupabaseAuthAccount,
   deleteUserFromSupabase,
   pullUsersFromSupabase,
+  requestSupabaseAuthEmailChange,
   sendSupabasePasswordReset,
   signInWithSupabaseAuth,
   signOutFromSupabase,
@@ -162,6 +163,26 @@ export function AuthProvider({ children }) {
         normalizeEmail(item.email) === normalizedEmail ||
         (item.emailAliases || []).some(alias => normalizeEmail(alias) === normalizedEmail)
       )
+
+      if (found && remoteLogin.user?.id && normalizeEmail(found.email) !== normalizedEmail) {
+        const reconciled = {
+          ...found,
+          email: normalizedEmail,
+          supabaseId: remoteLogin.user.id,
+          senha: null,
+          precisaAtualizarDados: false,
+          emailTemporario: false,
+        }
+        db.update('usuarios', null, found.id, {
+          email: normalizedEmail,
+          supabaseId: remoteLogin.user.id,
+          senha: null,
+          precisaAtualizarDados: false,
+          emailTemporario: false,
+        })
+        syncUserById(found.id)
+        found = reconciled
+      }
     }
 
     if (!found && remoteLogin.enabled === false) {
@@ -384,7 +405,7 @@ export function AuthProvider({ children }) {
   const updateCurrentUser = data => {
     if (!user) return { success: false, error: 'Usuário não autenticado.' }
     const allowedFields = new Set([
-      'nome', 'email', 'telefone', 'fotoPerfil', 'preferenciasNotificacao',
+      'nome', 'telefone', 'fotoPerfil', 'preferenciasNotificacao',
       'precisaAtualizarDados', 'emailTemporario',
     ])
     const sanitized = Object.fromEntries(
@@ -396,14 +417,6 @@ export function AuthProvider({ children }) {
       if (sanitized.nome.length < 3) return { success: false, error: 'Informe um nome válido.' }
       sanitized.avatar = sanitized.nome.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()
     }
-    if (typeof sanitized.email === 'string') {
-      sanitized.email = sanitized.email.trim().toLowerCase()
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitized.email)) {
-        return { success: false, error: 'Informe um email válido.' }
-      }
-      const duplicate = db.get('usuarios').some(item => !idsEqual(item.id, user.id) && matchesEmail(item, sanitized.email))
-      if (duplicate) return { success: false, error: 'Este email já está sendo usado por outro membro.' }
-    }
     if (typeof sanitized.telefone === 'string') sanitized.telefone = sanitized.telefone.trim()
 
     db.update('usuarios', null, user.id, sanitized)
@@ -413,6 +426,32 @@ export function AuthProvider({ children }) {
 
   const updateUserPhoto = photo => {
     return updateCurrentUser({ fotoPerfil: photo })
+  }
+
+  const requestEmailChange = async (newEmail, currentPassword) => {
+    if (!user) return { success: false, error: 'Usuario nao autenticado' }
+    const normalizedEmail = normalizeEmail(newEmail)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return { success: false, error: 'Informe um email valido.' }
+    }
+    if (normalizeEmail(user.email) === normalizedEmail) {
+      return { success: false, error: 'Este ja e o email atual da sua conta.' }
+    }
+    const duplicate = db.get('usuarios').some(item =>
+      !sameUserIdentity(item, user) && matchesEmail(item, normalizedEmail)
+    )
+    if (duplicate) return { success: false, error: 'Este email ja esta sendo usado por outro membro.' }
+
+    const validation = await validateCurrentPassword(currentPassword)
+    if (!validation.success) return validation
+
+    const result = await requestSupabaseAuthEmailChange(normalizedEmail)
+    if (result.enabled === false) {
+      return { success: false, error: 'Alteracao de email requer Supabase configurado.' }
+    }
+    if (!result.success) return result
+
+    return { success: true }
   }
 
   const validateCurrentPassword = async currentPassword => {
@@ -508,6 +547,7 @@ export function AuthProvider({ children }) {
       approveUser,
       rejectUser,
       updateCurrentUser,
+      requestEmailChange,
       updateUserPhoto,
       updateUserPermissoes,
       deleteUser,

@@ -24,6 +24,7 @@ import {
   syncCommercialTeamConfig,
   syncMeetingToSupabase,
   syncMessageToSupabase,
+  syncNavigationConfig,
   syncNotificationToSupabase,
   syncUsersToSupabase,
 } from '../services/supabaseBridge'
@@ -249,6 +250,7 @@ export function DataProvider({ children }) {
   const [people, setPeople] = useState(() => db.get('gestaoPessoas'))
   const [communication, setCommunication] = useState(() => db.get('comunicacao'))
   const [projectData, setProjectData] = useState(() => db.get('projetos'))
+  const [configurations, setConfigurations] = useState(() => db.get('configuracoes'))
   const [refreshingData, setRefreshingData] = useState(false)
   // Survives poll overwrites: IDs deleted/read locally but not yet confirmed by Supabase
   const notifDeletedIds = useRef(new Set())
@@ -261,6 +263,7 @@ export function DataProvider({ children }) {
       db.subscribe('gestaoPessoas', setPeople),
       db.subscribe('comunicacao', setCommunication),
       db.subscribe('projetos', setProjectData),
+      db.subscribe('configuracoes', setConfigurations),
     ]
     return () => unsubscribers.forEach(unsubscribe => unsubscribe())
   }, [])
@@ -525,6 +528,33 @@ export function DataProvider({ children }) {
       }
     })
     void syncCommercialTeamConfig(nextEquipe, { pipefyPipeId: normalizedPipeId })
+    return { success: true }
+  }
+
+  const updateSidebarOrder = (sectorId, order) => {
+    const normalizedSectorId = `${sectorId || ''}`.trim()
+    const normalizedOrder = Array.isArray(order)
+      ? order.map(item => `${item}`).filter(Boolean)
+      : []
+    if (!normalizedSectorId || !normalizedOrder.length) {
+      return { success: false, error: 'Ordem de navegação inválida.' }
+    }
+
+    let nextNavigation = null
+    db.mutate('configuracoes', current => {
+      nextNavigation = {
+        ...(current.navigation || {}),
+        sidebarOrder: {
+          ...(current.navigation?.sidebarOrder || {}),
+          [normalizedSectorId]: normalizedOrder,
+        },
+      }
+      return {
+        ...current,
+        navigation: nextNavigation,
+      }
+    })
+    void syncNavigationConfig(nextNavigation)
     return { success: true }
   }
 
@@ -1121,6 +1151,8 @@ export function DataProvider({ children }) {
       commercial: resolvedCommercial,
       updateCommercialTeam,
       updateCommercialPipeId,
+      navigation: configurations.navigation || { sidebarOrder: {} },
+      updateSidebarOrder,
       leads: resolvedCommercial.leads || [],
       addLead,
       updateLead,

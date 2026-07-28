@@ -314,6 +314,88 @@ function PasswordModal({ onClose, onChangePassword }) {
   )
 }
 
+function EmailChangeModal({ currentEmail, onClose, onRequestEmailChange }) {
+  const [form, setForm] = useState({ email: '', password: '' })
+  const [showPassword, setShowPassword] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const FIELD = "w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors"
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    setLoading(true)
+    setMsg(null)
+    const result = await onRequestEmailChange(form.email, form.password)
+    setLoading(false)
+    if (!result.success) {
+      setMsg({ type: 'error', text: result.error || 'Nao foi possivel solicitar a alteracao de email.' })
+      return
+    }
+    setMsg({
+      type: 'success',
+      text: 'Enviamos uma confirmacao para o novo email. O login so muda depois que voce confirmar pelo link.',
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#111111] border border-[#1E1E1E] rounded-md w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E1E1E]">
+          <h3 className="text-white font-semibold text-sm">Alterar Email</h3>
+          <button onClick={onClose} className="text-gray-600 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="rounded border border-[#1E1E1E] bg-[#0D0D0D] p-3">
+            <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold mb-1">Email atual</p>
+            <p className="text-gray-300 text-sm break-all">{currentEmail || 'Nao informado'}</p>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Novo email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+              className={FIELD}
+              placeholder="novo@email.com"
+              autoFocus
+              required
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Senha atual</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
+                className={FIELD}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300"
+              >
+                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-600 text-xs leading-relaxed">
+            Por seguranca, o email do perfil nao muda agora. Primeiro voce confirma pelo link enviado ao novo endereco.
+          </p>
+          {msg && <p className={`text-xs px-3 py-2 rounded border ${msg.type === 'error' ? 'bg-red-950/40 border-red-900/40 text-red-400' : 'bg-green-950/40 border-green-900/40 text-green-400'}`}>{msg.text}</p>}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded border border-[#1E1E1E] text-gray-500 hover:text-white text-sm transition-all">Cancelar</button>
+            <button type="submit" disabled={loading} className="flex-1 py-2.5 rounded bg-[#CE7028] hover:bg-[#B5611F] disabled:opacity-60 text-white font-semibold text-sm transition-colors">
+              {loading ? 'Enviando...' : 'Enviar confirmacao'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function DeleteAccountModal({ onClose, onValidatePassword, onDeleteAccount }) {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -429,6 +511,7 @@ export default function Perfil() {
     user,
     updateUserPhoto,
     updateCurrentUser,
+    requestEmailChange,
     changePassword,
     validateCurrentPassword,
     deleteCurrentUser,
@@ -460,6 +543,7 @@ export default function Perfil() {
   }
 
   const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [showEmailChangeModal, setShowEmailChangeModal] = useState(false)
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
   const [cropSrc,           setCropSrc]           = useState(null)
   const [photoError,        setPhotoError]        = useState('')
@@ -659,16 +743,19 @@ export default function Perfil() {
                 </div>
               </div>
 
-              <EditableField
-                icon={Mail} label="Email"
-                value={user?.email || ''}
-                onSave={val => updateCurrentUser({
-                  email: val,
-                  precisaAtualizarDados: false,
-                  emailTemporario: false,
-                })}
-                type="email"
-              />
+              <div className="flex items-center gap-2 group/field">
+                <Mail className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <span className="text-gray-400 text-xs truncate flex-1">{user?.email || <span className="text-gray-600 italic">NÃ£o informado</span>}</span>
+                  <button
+                    onClick={() => setShowEmailChangeModal(true)}
+                    className="p-1 text-gray-700 hover:text-[#CE7028] opacity-100 sm:opacity-0 sm:group-hover/field:opacity-100 transition-all"
+                    title="Solicitar alteracao de email"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
 
               <EditableField
                 icon={Phone} label="WhatsApp"
@@ -878,6 +965,13 @@ export default function Perfil() {
       {/* Modals */}
       {cropSrc          && <PhotoCropModal src={cropSrc} onSave={handleCropSave} onClose={() => setCropSrc(null)} />}
       {showPasswordModal && <PasswordModal onClose={() => setShowPasswordModal(false)} onChangePassword={changePassword} />}
+      {showEmailChangeModal && (
+        <EmailChangeModal
+          currentEmail={user?.email || ''}
+          onClose={() => setShowEmailChangeModal(false)}
+          onRequestEmailChange={requestEmailChange}
+        />
+      )}
       {showDeleteAccountModal && (
         <DeleteAccountModal
           onClose={() => setShowDeleteAccountModal(false)}

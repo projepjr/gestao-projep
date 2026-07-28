@@ -74,3 +74,19 @@ Nao permitido no front-end:
 - token n8n;
 - credenciais SMTP/Brevo;
 - senhas de usuarios.
+
+## Ordem global da sidebar
+
+Decisao: a ordem das subpaginas da sidebar e uma configuracao global do sistema, nao uma preferencia local do navegador.
+
+Implementacao:
+
+- a estrutura oficial de setores e subareas continua em `src/config/accessControl.js`;
+- a ordem customizada fica em `configuracoes.navigation.sidebarOrder`;
+- a sincronizacao remota usa a tabela `notifications` com `type = app_config`, seguindo o mesmo padrao usado pela configuracao da equipe comercial;
+- `src/components/Layout.jsx` aplica a ordem salva sem duplicar a lista de modulos;
+- diretores podem editar a ordem dos setores aos quais possuem acesso;
+- usuarios com autoridade de Presidencia podem editar qualquer setor editavel;
+- Chat fica fora da regra comum: por ser uma area global, sua edicao deve continuar restrita a Presidencia.
+
+Regra: nao salvar essa ordem em `localStorage` como fonte oficial, porque a mudanca precisa aparecer igual para todos os usuarios.

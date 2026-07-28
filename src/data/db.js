@@ -16,6 +16,7 @@ const KEYS = {
   gestaoPessoas: 'ej_db_gp_v2',
   comunicacao:   'ej_db_comunicacao_v2',
   projetos:      'ej_db_projetos_v1',
+  configuracoes:  'ej_db_configuracoes_v1',
 }
 
 const INITIAL = {
@@ -24,6 +25,7 @@ const INITIAL = {
   gestaoPessoas: INITIAL_GESTAO_PESSOAS,
   comunicacao:   INITIAL_COMUNICACAO,
   projetos:      INITIAL_PROJETOS,
+  configuracoes:  { navigation: { sidebarOrder: {} } },
 }
 
 const EMPTY_REMOTE = {
@@ -53,6 +55,9 @@ const EMPTY_REMOTE = {
     baseConhecimento: [],
     baseConhecimentoSeedVersion: null,
     revisoesSemana: [],
+  },
+  configuracoes: {
+    navigation: { sidebarOrder: {} },
   },
 }
 
@@ -272,6 +277,24 @@ function normalizeProjects(data) {
   }
 }
 
+function normalizeConfigurations(data) {
+  const current = isRecord(data) ? data : {}
+  const base = REMOTE_PRIMARY ? EMPTY_REMOTE.configuracoes : INITIAL.configuracoes
+  const sidebarOrder = isRecord(current.navigation?.sidebarOrder)
+    ? current.navigation.sidebarOrder
+    : base.navigation.sidebarOrder
+
+  return {
+    ...base,
+    ...current,
+    navigation: {
+      ...(base.navigation || {}),
+      ...(current.navigation || {}),
+      sidebarOrder,
+    },
+  }
+}
+
 // ── Persistência ─────────────────────────────────────────────
 
 function read(tabela) {
@@ -330,6 +353,7 @@ function normalize(tabela, data) {
   if (tabela === 'gestaoPessoas') return normalizePeople(data)
   if (tabela === 'comunicacao') return normalizeCommunication(data)
   if (tabela === 'projetos') return normalizeProjects(data)
+  if (tabela === 'configuracoes') return normalizeConfigurations(data)
   return data
 }
 
