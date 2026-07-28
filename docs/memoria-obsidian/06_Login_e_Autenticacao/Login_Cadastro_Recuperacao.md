@@ -132,6 +132,7 @@ Pelo historico recente do repo:
 - O sininho de notificacoes e o alternador claro/escuro devem permanecer visiveis no header mesmo quando o usuario nao tem notificacoes.
 - Excecao de Presidencia: liberar o modulo Presidencia libera a subarea Seguranca e permite administrar permissoes, mesmo que o cargo do usuario nao seja `presidente`.
 - Edicao direta de email pelo perfil podia quebrar a conta ao atualizar o email no perfil, mas nao no Supabase Auth. O fluxo correto passou a exigir senha e confirmacao por email via Supabase Auth/Brevo.
+- Cadastro podia acusar email ja existente por causa de usuarios antigos reidratados do cache local. O fluxo de cadastro passou a sincronizar `profiles`/`permissions` do Supabase antes da verificacao de duplicidade, mantendo o banco remoto como fonte principal.
 
 ## Exclusao da propria conta
 

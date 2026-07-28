@@ -232,6 +232,13 @@ export function AuthProvider({ children }) {
   const register = async ({ name, email, password, department, jobTitle }) => {
     let currentUsers = db.get('usuarios')
     const normalizedEmail = normalizeEmail(email)
+    try {
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      currentUsers = await Promise.race([pullUsersFromSupabase(db), timeout])
+    } catch (error) {
+      console.warn('[Supabase] Nao foi possivel sincronizar usuarios antes do cadastro:', error.message || error)
+    }
+
     const existing = currentUsers.find(item => matchesEmail(item, normalizedEmail))
     if (existing && existing.status !== 'rejeitado') {
       return { success: false, error: 'Este email já está cadastrado no sistema' }
