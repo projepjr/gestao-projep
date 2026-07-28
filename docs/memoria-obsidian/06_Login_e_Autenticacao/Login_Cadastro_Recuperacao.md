@@ -101,10 +101,11 @@ Arquivos principais:
 Regra oficial:
 
 - O email nao deve ser alterado diretamente em `profiles`/`usuarios` pela tela de perfil.
-- O perfil deve solicitar senha atual e chamar `supabase.auth.updateUser({ email })`.
+- O perfil deve solicitar senha atual antes de qualquer disparo, mostrar uma confirmacao explicita no site e so entao chamar `supabase.auth.updateUser({ email })`.
 - O Supabase Auth envia o email de confirmacao usando o mesmo SMTP configurado para recuperacao de senha (Brevo SMTP).
 - O email do perfil so deve ser sincronizado depois que o Supabase Auth confirmar a troca.
 - No login, se a autenticacao pelo Supabase retornar um usuario cujo `supabaseId` ja existe no perfil, mas o email do perfil ainda esta antigo, o app reconcilia o perfil com o email confirmado.
+- A confirmacao e enviada apenas para o novo email. Nao ha confirmacao pelo email antigo neste fluxo.
 
 Motivo:
 

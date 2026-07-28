@@ -314,27 +314,48 @@ function PasswordModal({ onClose, onChangePassword }) {
   )
 }
 
-function EmailChangeModal({ currentEmail, onClose, onRequestEmailChange }) {
+function EmailChangeModal({ currentEmail, onClose, onValidatePassword, onRequestEmailChange }) {
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
+  const [step, setStep] = useState('form')
   const [msg, setMsg] = useState(null)
   const [loading, setLoading] = useState(false)
   const FIELD = "w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors"
+  const normalizedNewEmail = form.email.trim().toLowerCase()
 
   const handleSubmit = async e => {
     e.preventDefault()
     setLoading(true)
     setMsg(null)
+    const validation = await onValidatePassword(form.password)
+    setLoading(false)
+    if (!validation.success) {
+      setMsg({ type: 'error', text: validation.error || 'Senha atual incorreta.' })
+      return
+    }
+    setStep('confirm')
+  }
+
+  const confirmEmailChange = async () => {
+    setLoading(true)
+    setMsg(null)
     const result = await onRequestEmailChange(form.email, form.password)
     setLoading(false)
     if (!result.success) {
+      setStep('form')
       setMsg({ type: 'error', text: result.error || 'Nao foi possivel solicitar a alteracao de email.' })
       return
     }
     setMsg({
       type: 'success',
-      text: 'Enviamos uma confirmacao para o novo email. O login so muda depois que voce confirmar pelo link.',
+      text: 'Enviamos uma confirmacao para o novo email pelo Brevo. O login so muda depois que voce confirmar pelo link.',
     })
+  }
+
+  const updateField = (key, value) => {
+    setForm(prev => ({ ...prev, [key]: value }))
+    setMsg(null)
+    if (step !== 'form') setStep('form')
   }
 
   return (
@@ -354,7 +375,7 @@ function EmailChangeModal({ currentEmail, onClose, onRequestEmailChange }) {
             <input
               type="email"
               value={form.email}
-              onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+              onChange={e => updateField('email', e.target.value)}
               className={FIELD}
               placeholder="novo@email.com"
               autoFocus
@@ -367,7 +388,7 @@ function EmailChangeModal({ currentEmail, onClose, onRequestEmailChange }) {
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={form.password}
-                onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
+                onChange={e => updateField('password', e.target.value)}
                 className={FIELD}
                 required
               />
@@ -381,14 +402,29 @@ function EmailChangeModal({ currentEmail, onClose, onRequestEmailChange }) {
             </div>
           </div>
           <p className="text-gray-600 text-xs leading-relaxed">
-            Por seguranca, o email do perfil nao muda agora. Primeiro voce confirma pelo link enviado ao novo endereco.
+            Por seguranca, vamos validar sua senha primeiro. Depois voce confirma a solicitacao aqui e recebe o link no novo email.
           </p>
+          {step === 'confirm' && (
+            <div className="rounded border border-[#CE7028]/30 bg-[#CE7028]/10 p-3">
+              <p className="text-white text-sm font-semibold mb-1">Confirmar troca de email?</p>
+              <p className="text-gray-400 text-xs leading-relaxed">
+                Vamos enviar um link de confirmacao para <span className="text-[#FF882D] break-all">{normalizedNewEmail}</span>.
+                Seu login continua usando o email atual ate voce confirmar esse link.
+              </p>
+            </div>
+          )}
           {msg && <p className={`text-xs px-3 py-2 rounded border ${msg.type === 'error' ? 'bg-red-950/40 border-red-900/40 text-red-400' : 'bg-green-950/40 border-green-900/40 text-green-400'}`}>{msg.text}</p>}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded border border-[#1E1E1E] text-gray-500 hover:text-white text-sm transition-all">Cancelar</button>
-            <button type="submit" disabled={loading} className="flex-1 py-2.5 rounded bg-[#CE7028] hover:bg-[#B5611F] disabled:opacity-60 text-white font-semibold text-sm transition-colors">
-              {loading ? 'Enviando...' : 'Enviar confirmacao'}
-            </button>
+            {step === 'confirm' ? (
+              <button type="button" onClick={confirmEmailChange} disabled={loading} className="flex-1 py-2.5 rounded bg-[#CE7028] hover:bg-[#B5611F] disabled:opacity-60 text-white font-semibold text-sm transition-colors">
+                {loading ? 'Enviando...' : 'Sim, enviar link'}
+              </button>
+            ) : (
+              <button type="submit" disabled={loading} className="flex-1 py-2.5 rounded bg-[#CE7028] hover:bg-[#B5611F] disabled:opacity-60 text-white font-semibold text-sm transition-colors">
+                {loading ? 'Validando...' : 'Continuar'}
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -969,6 +1005,7 @@ export default function Perfil() {
         <EmailChangeModal
           currentEmail={user?.email || ''}
           onClose={() => setShowEmailChangeModal(false)}
+          onValidatePassword={validateCurrentPassword}
           onRequestEmailChange={requestEmailChange}
         />
       )}
