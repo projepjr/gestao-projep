@@ -17,7 +17,7 @@ import {
   Crown, Calculator, FolderKanban, Megaphone, TrendingUp,
   PanelLeftClose, PanelLeftOpen, MessageSquare, Shield,
   AlertCircle, FileCheck, Target, CheckCircle, UserCheck, CalendarDays,
-  Sun, Moon, Trash2,
+  Sun, Moon, Trash2, BarChart2, History, CalendarRange, Download,
 } from 'lucide-react'
 import ProjepLogo, { ProjepSymbol } from './ProjepLogo'
 import UserAvatar from './UserAvatar'
@@ -39,6 +39,10 @@ const ICONS = {
   trophy: Trophy,
   'file-text': FileText,
   'user-check': UserCheck,
+  'bar-chart-2': BarChart2,
+  history: History,
+  'calendar-range': CalendarRange,
+  download: Download,
 }
 
 const NOTIF_ICONS = {

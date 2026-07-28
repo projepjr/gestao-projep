@@ -39,9 +39,15 @@ export const ACCESS_MODULES = [
     path: '/projetos',
     available: true,
     subareas: [
-      { key: 'projetos.gestao', label: 'Gestão', path: '/projetos/gestao', icon: 'folder-kanban' },
-      { key: 'projetos.coordenador', label: 'Coordenador', path: '/projetos/coordenador', icon: 'target' },
-      { key: 'projetos.baseConhecimento', label: 'Base de Conhecimento', path: '/projetos/base', icon: 'file-text' },
+      { key: 'projetos.dashboard',        label: 'Dashboard',            path: '/projetos/dashboard',    icon: 'dashboard' },
+      { key: 'projetos.gestao',           label: 'Gestão',               path: '/projetos/gestao',       icon: 'folder-kanban' },
+      { key: 'projetos.cronograma',       label: 'Cronograma',           path: '/projetos/cronograma',   icon: 'calendar-range' },
+      { key: 'projetos.indicadores',      label: 'Indicadores',          path: '/projetos/indicadores',  icon: 'bar-chart-2' },
+      { key: 'projetos.observacoes',      label: 'Observações',          path: '/projetos/observacoes',  icon: 'message-square' },
+      { key: 'projetos.historico',        label: 'Histórico',            path: '/projetos/historico',    icon: 'history' },
+      { key: 'projetos.relatorios',       label: 'Relatórios',           path: '/projetos/relatorios',   icon: 'file-text' },
+      { key: 'projetos.coordenador',      label: 'Coordenador',          path: '/projetos/coordenador',  icon: 'target' },
+      { key: 'projetos.baseConhecimento', label: 'Base de Conhecimento', path: '/projetos/base',         icon: 'file-text' },
     ],
   },
   {
@@ -95,12 +101,13 @@ export function normalizePermissions(rawPermissions = {}, role = '') {
   ACCESS_MODULES.forEach(module => {
     normalized[module.key] = isPresident ? true : (raw[module.key] ?? false)
 
+    const parentGranted = raw[module.key] === true
     module.subareas.forEach(subarea => {
       const explicit = raw.subareas?.[subarea.key]
       const presidencySecurityFallback = subarea.key === 'presidencia.seguranca' && raw.presidencia === true
       normalized.subareas[subarea.key] = isPresident
         ? true
-        : (typeof explicit === 'boolean' ? explicit : presidencySecurityFallback)
+        : (typeof explicit === 'boolean' ? explicit : (parentGranted || presidencySecurityFallback))
     })
   })
 

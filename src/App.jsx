@@ -24,6 +24,12 @@ const BaseConhecimentoProjetos = lazy(() => import('./pages/projetos/BaseConheci
 const ProjetosList = lazy(() => import('./pages/projetos/Projetos'))
 const ProjetoDetalhe = lazy(() => import('./pages/projetos/ProjetoDetalhe'))
 const ProjetosCoordenador = lazy(() => import('./pages/projetos/Coordenador'))
+const ProjetosDashboard = lazy(() => import('./pages/projetos/Dashboard'))
+const ProjetosCronograma = lazy(() => import('./pages/projetos/Cronograma'))
+const ProjetosHistorico = lazy(() => import('./pages/projetos/Historico'))
+const ProjetosIndicadores = lazy(() => import('./pages/projetos/Indicadores'))
+const ProjetosObservacoes = lazy(() => import('./pages/projetos/Observacoes'))
+const ProjetosRelatorios = lazy(() => import('./pages/projetos/Relatorios'))
 const Perfil = lazy(() => import('./pages/Perfil'))
 const Chat = lazy(() => import('./pages/Chat'))
 
@@ -80,9 +86,15 @@ function AppRoutes() {
       <Route path="/presidencia"           element={<ProtectedRoute requiredPath="/presidencia/seguranca"><Navigate to="/presidencia/seguranca" replace /></ProtectedRoute>} />
       <Route path="/presidencia/seguranca" element={<ProtectedRoute><Seguranca /></ProtectedRoute>} />
 
-      <Route path="/projetos"               element={<ProtectedRoute requiredPath="/projetos/gestao"><Navigate to="/projetos/gestao" replace /></ProtectedRoute>} />
+      <Route path="/projetos"                element={<ProtectedRoute requiredPath="/projetos/dashboard"><Navigate to="/projetos/dashboard" replace /></ProtectedRoute>} />
+      <Route path="/projetos/dashboard"     element={<ProtectedRoute><ProjetosDashboard /></ProtectedRoute>} />
       <Route path="/projetos/gestao"        element={<ProtectedRoute><ProjetosList /></ProtectedRoute>} />
       <Route path="/projetos/gestao/:id"    element={<ProtectedRoute requiredPath="/projetos/gestao"><ProjetoDetalhe /></ProtectedRoute>} />
+      <Route path="/projetos/cronograma"    element={<ProtectedRoute><ProjetosCronograma /></ProtectedRoute>} />
+      <Route path="/projetos/indicadores"   element={<ProtectedRoute><ProjetosIndicadores /></ProtectedRoute>} />
+      <Route path="/projetos/observacoes"   element={<ProtectedRoute><ProjetosObservacoes /></ProtectedRoute>} />
+      <Route path="/projetos/historico"     element={<ProtectedRoute><ProjetosHistorico /></ProtectedRoute>} />
+      <Route path="/projetos/relatorios"    element={<ProtectedRoute><ProjetosRelatorios /></ProtectedRoute>} />
       <Route path="/projetos/coordenador"   element={<ProtectedRoute><ProjetosCoordenador /></ProtectedRoute>} />
       <Route path="/projetos/base"          element={<ProtectedRoute><BaseConhecimentoProjetos /></ProtectedRoute>} />
 
