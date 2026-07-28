@@ -32,6 +32,8 @@ import { triggerN8nRefresh } from '../services/n8nRefresh'
 const DataContext = createContext(null)
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+const REMOTE_SYNC_INTERVAL_MS = 60 * 1000
+const COMMUNICATION_SYNC_INTERVAL_MS = 15 * 1000
 const matchesUserId = (id, member) => Boolean(member) && (
   idsEqual(id, member.id) ||
   idsEqual(id, member.supabaseId)
@@ -301,8 +303,10 @@ export function DataProvider({ children }) {
         if (mounted && result?.enabled) console.info('[Supabase] Sincronização inicial concluída.')
       })
       .catch(error => console.warn('[Supabase] Falha na sincronização inicial:', error.message || error))
-    const intervalId = window.setInterval(syncRemote, 5000)
-    const communicationIntervalId = window.setInterval(syncCommunicationRemote, 1500)
+    // Supabase Realtime is the main sync path. Polling stays as a safety net, so
+    // the app does not re-render global state every few seconds while idle.
+    const intervalId = window.setInterval(syncRemote, REMOTE_SYNC_INTERVAL_MS)
+    const communicationIntervalId = window.setInterval(syncCommunicationRemote, COMMUNICATION_SYNC_INTERVAL_MS)
     const handleFocus = () => { void syncRemote(); void syncCommunicationRemote() }
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') void syncRemote()

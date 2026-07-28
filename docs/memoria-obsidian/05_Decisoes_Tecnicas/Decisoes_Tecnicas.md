@@ -21,6 +21,12 @@ Isso inclui:
 
 `localStorage` ainda existe em `src/data/db.js`, mas deve ser tratado como cache/fallback/compatibilidade, nao como fonte principal para dados criticos.
 
+## Sincronizacao e performance
+
+Decisao: Supabase Realtime deve ser o caminho principal para atualizar mensagens, notificacoes, permissoes e dados compartilhados entre navegadores.
+
+Polling automatico deve existir apenas como fallback de seguranca, em intervalos moderados. Evitar buscas completas em intervalos muito curtos, porque cada sincronizacao pode atualizar o estado global do React e gerar travamentos perceptiveis conforme a base cresce.
+
 ## Auth
 
 Decisao: Supabase Auth e a fonte principal para login e recuperacao de senha.
@@ -68,4 +74,3 @@ Nao permitido no front-end:
 - token n8n;
 - credenciais SMTP/Brevo;
 - senhas de usuarios.
-
