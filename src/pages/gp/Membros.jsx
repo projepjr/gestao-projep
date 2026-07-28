@@ -335,11 +335,6 @@ function Modal({ member, onClose, onSave }) {
                 className={`${INPUT_CLS} ${member?.id || (form.usarDadosTemporarios && !member?.id) ? 'opacity-60 cursor-not-allowed' : ''}`}
                 placeholder={form.usarDadosTemporarios && !member?.id ? 'Será gerado automaticamente' : ''}
               />
-              {member?.id && (
-                <p className="mt-1.5 text-[11px] leading-relaxed text-gray-600">
-                  O email vem do cadastro no Supabase e só pode ser alterado pelo fluxo seguro do perfil.
-                </p>
-              )}
             </div>
             {!member?.id && !form.usarDadosTemporarios && (
               <div>
