@@ -112,6 +112,13 @@ Motivo:
 
 Editar apenas o email do perfil desassocia a identidade visual do app da credencial real do Supabase Auth. Isso quebra login, troca de senha e exclusao de conta, porque a senha continua vinculada ao email antigo no Auth.
 
+Regra na gestao de membros:
+
+- Na tela de GP > Membros, o modal de edicao nao pode alterar email de membro existente.
+- O campo de email deve ser exibido como informativo e bloqueado.
+- `DataContext.updateMember` deve ignorar `email` em atualizacoes de membros existentes, mesmo que algum payload tente enviar esse campo.
+- Cargo e area continuam editaveis nessa tela; email segue vinculado ao Supabase Auth e ao fluxo seguro do perfil.
+
 Migracao manual de email de outra conta:
 
 - O front-end com `VITE_SUPABASE_PUBLISHABLE_KEY` nao deve alterar email Auth de outro usuario.

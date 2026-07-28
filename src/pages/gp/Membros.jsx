@@ -325,7 +325,21 @@ function Modal({ member, onClose, onSave }) {
             )}
             <div>
               <label className={LABEL_CLS}>Email</label>
-              <input required={!form.usarDadosTemporarios} disabled={form.usarDadosTemporarios && !member?.id} type="email" value={form.email} onChange={e => set('email', e.target.value)} className={`${INPUT_CLS} ${form.usarDadosTemporarios && !member?.id ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder={form.usarDadosTemporarios && !member?.id ? 'Será gerado automaticamente' : ''} />
+              <input
+                required={!form.usarDadosTemporarios && !member?.id}
+                readOnly={Boolean(member?.id)}
+                disabled={form.usarDadosTemporarios && !member?.id}
+                type="email"
+                value={form.email}
+                onChange={e => set('email', e.target.value)}
+                className={`${INPUT_CLS} ${member?.id || (form.usarDadosTemporarios && !member?.id) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                placeholder={form.usarDadosTemporarios && !member?.id ? 'Será gerado automaticamente' : ''}
+              />
+              {member?.id && (
+                <p className="mt-1.5 text-[11px] leading-relaxed text-gray-600">
+                  O email vem do cadastro no Supabase e só pode ser alterado pelo fluxo seguro do perfil.
+                </p>
+              )}
             </div>
             {!member?.id && !form.usarDadosTemporarios && (
               <div>

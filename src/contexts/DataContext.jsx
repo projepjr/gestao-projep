@@ -448,17 +448,9 @@ export function DataProvider({ children }) {
       return { success: false, error: 'Você não pode editar este membro.' }
     }
     const canonicalSector = resolveSetor(data.setorId || data.setor || target.setorId)
-    const email = data.email?.trim().toLowerCase()
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return { success: false, error: 'Informe um email válido.' }
-    }
-    if (emailInUse(email, id)) {
-      return { success: false, error: 'Já existe um membro com este email.' }
-    }
-    const allowed = ['nome', 'cargo', 'email', 'telefone', 'fotoPerfil', 'status', 'dataCadastro', 'skills', 'projects', 'performance']
+    const allowed = ['nome', 'cargo', 'telefone', 'fotoPerfil', 'status', 'dataCadastro', 'skills', 'projects', 'performance']
     const fields = Object.fromEntries(Object.entries(data).filter(([key]) => allowed.includes(key)))
     fields.nome = fields.nome?.trim()
-    fields.email = email
     fields.avatar = fields.nome?.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || target.avatar
     fields.setorId = canonicalSector?.id || target.setorId
     fields.setor = canonicalSector?.nome || target.setor
