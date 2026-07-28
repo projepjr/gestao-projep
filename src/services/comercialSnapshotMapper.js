@@ -656,7 +656,6 @@ function contactStageInPeriod(card, range) {
 }
 
 function diagnosticScheduledForHunterInPeriod(card, range) {
-  if (!currentStageMatches(card, STAGE_KEYWORDS.diagnosticScheduled)) return false
   return fieldEventInPeriod(card, EVENT_LABELS.diagnosticScheduled, range)
 }
 

@@ -90,6 +90,14 @@ Atualizacao em 2026-07-28:
 - Se esse campo especifico nao existir/preencher, a contagem usa o responsavel Hunter ja associado como fallback.
 - Motivo da decisao: evitar que cards que ja avancaram, voltaram ou ficaram em outra fase inflem a coluna `Diag. Ag.` por pessoa.
 
+Retificacao da mesma data:
+
+- A regra acima foi ajustada: `Diag. Ag.` dos Hunters deve contar pela data/hora da diagnostica agendada, mesmo quando o card ja avancou para uma fase posterior.
+- Semanal/mensal: a data da diagnostica agendada precisa estar dentro do periodo filtrado.
+- Ao vivo/total: basta a data da diagnostica agendada estar preenchida.
+- A coluna nao deve contar apenas porque o card passou pela fase; precisa existir data preenchida.
+- O responsavel continua sendo priorizado pelo campo `Quem marcou o diagnostico`, com fallback para o responsavel Hunter associado.
+
 Campos observados:
 
 - `pipefyName`
