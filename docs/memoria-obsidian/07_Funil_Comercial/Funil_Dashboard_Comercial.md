@@ -375,6 +375,13 @@ Atualizacao 2026-07-18 - Atualizacao manual de dados sincronizados:
 - Se a variavel nao estiver configurada ou se o n8n falhar, o botao ainda tenta recarregar o estado atual do Supabase.
 - Tooltip do botao: `Atualizar dados recentes`.
 
+Correcao 2026-07-28 - Estabilidade do botao global de atualizacao:
+
+- O disparo do webhook do n8n passou a ter timeout no front-end para evitar que o botao fique carregando indefinidamente quando o n8n demora ou falha.
+- O `DataContext.refreshData()` passou a impedir disparos simultaneos; cliques repetidos durante uma atualizacao reaproveitam a mesma promessa em andamento.
+- Depois que o ciclo termina, o `Layout` dispara o evento interno `projep:refresh-data` e recarrega automaticamente a pagina para forcar o React a reler os dados persistidos no Supabase.
+- A recarga automatica e usada porque algumas paginas baseadas em snapshots podem continuar com estado antigo mesmo apos o n8n salvar novos dados no Supabase.
+
 Correcao 2026-07-18 - Disparo real do n8n pelo botao global:
 
 - O workflow ativo `Site Projep` no n8n nao tinha Webhook Trigger; possuia apenas gatilho de agenda.

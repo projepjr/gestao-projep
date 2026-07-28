@@ -253,6 +253,7 @@ export function DataProvider({ children }) {
   const [projectData, setProjectData] = useState(() => db.get('projetos'))
   const [configurations, setConfigurations] = useState(() => db.get('configuracoes'))
   const [refreshingData, setRefreshingData] = useState(false)
+  const refreshPromiseRef = useRef(null)
   // Survives poll overwrites: IDs deleted/read locally but not yet confirmed by Supabase
   const notifDeletedIds = useRef(new Set())
   const notifReadIds = useRef(new Set())
@@ -343,30 +344,46 @@ export function DataProvider({ children }) {
   }
 
   const refreshData = useCallback(async () => {
-    setRefreshingData(true)
-    try {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current
+
+    const refreshPromise = (async () => {
+      let n8nResult = { triggered: false }
+      let n8nError = null
+
+      setRefreshingData(true)
       try {
-        const currentCommercial = db.get('comercial') || {}
-        const pipefyPipeId = currentCommercial.pipefyPipeId || currentCommercial.integracaoPipefy?.pipeId
-        const refreshResult = await triggerN8nRefresh({
-          pipefyPipeId,
-          pipeId: pipefyPipeId,
-        })
-        if (refreshResult.triggered) {
-          await wait(1500)
-        } else {
-          console.info('[n8n] Webhook de atualizacao global nao configurado. Atualizando apenas pelo Supabase.')
+        try {
+          const currentCommercial = db.get('comercial') || {}
+          const pipefyPipeId = currentCommercial.pipefyPipeId || currentCommercial.integracaoPipefy?.pipeId
+          n8nResult = await triggerN8nRefresh({
+            pipefyPipeId,
+            pipeId: pipefyPipeId,
+          }, {
+            timeoutMs: 45_000,
+          })
+          if (n8nResult.triggered) {
+            await wait(2000)
+          } else {
+            console.info('[n8n] Webhook de atualizacao global nao configurado. Atualizando apenas pelo Supabase.')
+          }
+        } catch (error) {
+          n8nError = error
+          console.warn('[n8n] Falha ao acionar atualizacao global:', error.message || error)
         }
+        await pullRemoteState(db)
+        await pullCommunicationState(db)
+        return { success: true, n8n: n8nResult, n8nError }
       } catch (error) {
-        console.warn('[n8n] Falha ao acionar atualizacao global:', error.message || error)
+        console.warn('[Atualizacao global] Falha ao atualizar dados:', error.message || error)
+        return { success: false, n8n: n8nResult, n8nError, error }
+      } finally {
+        setRefreshingData(false)
+        refreshPromiseRef.current = null
       }
-      await pullRemoteState(db)
-      await pullCommunicationState(db)
-    } catch (error) {
-      console.warn('[Atualizacao global] Falha ao atualizar dados:', error.message || error)
-    } finally {
-      setRefreshingData(false)
-    }
+    })()
+
+    refreshPromiseRef.current = refreshPromise
+    return refreshPromise
   }, [])
 
   const addMember = async member => {

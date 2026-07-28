@@ -132,9 +132,17 @@ export default function Layout({ children }) {
   }, [])
 
   const handleLogout = () => { logout(); navigate('/login') }
-  const handleGlobalRefresh = () => {
-    void refreshData()
-    window.dispatchEvent(new CustomEvent('projep:refresh-data'))
+  const handleGlobalRefresh = async () => {
+    if (refreshingData) return
+
+    const result = await refreshData()
+    window.dispatchEvent(new CustomEvent('projep:refresh-data', {
+      detail: { source: 'global-refresh', result },
+    }))
+
+    window.setTimeout(() => {
+      window.location.reload()
+    }, 800)
   }
 
   const notificationBaseline = user?.notificacoesDesde || user?.createdAt || user?.dataCadastro
