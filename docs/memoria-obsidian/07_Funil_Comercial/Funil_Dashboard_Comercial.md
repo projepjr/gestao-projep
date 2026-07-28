@@ -426,3 +426,10 @@ Regra aplicada na copia:
 - Os campos operacionais da fase `Leads Cadastrados`, como `Data da primeira ligacao / contato` e `Canal de Prospeccao`, nao foram preenchidos automaticamente, por decisao operacional do usuario.
 - A copia foi idempotente: cards com mesmo CNPJ ou mesmo titulo ja existentes no pipeline novo foram ignorados para evitar duplicidade.
 - Nenhum token ou credencial foi salvo no repositorio.
+
+Complemento da migracao em 2026-07-28:
+
+- Os `178` cards migrados em `Leads Cadastrados` receberam `Data de cadastro = 28/07/2026`.
+- Os `178` cards migrados receberam `Origem comercial do lead = Casa dos dados`.
+- A verificacao posterior confirmou `178/178` cards com os dois campos atualizados.
+- Campos operacionais de contato continuaram vazios.
