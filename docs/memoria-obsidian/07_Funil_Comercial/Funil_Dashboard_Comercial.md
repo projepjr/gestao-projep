@@ -397,3 +397,32 @@ Atualizacao 2026-07-20 - Pipeline configuravel para sincronizar equipe comercial
 - A query do Pipefy ja busca membros do pipe com e-mail; o front usa `extractPipefyPeopleFromSnapshot()` para listar esses e-mails na tela Equipe.
 - Teste feito em 2026-07-20: disparo manual do webhook com `pipeId = 307256948` gerou snapshot com `pipeId = 307256948` e `pipefyMembers = 14`.
 - Nao registrar URL do webhook, token Pipefy, chave Supabase service role ou qualquer segredo nesta memoria.
+
+## Atualizacao 2026-07-28 - Migracao de leads do pipeline antigo para o novo
+
+Operacao executada via API GraphQL do Pipefy:
+
+- Pipeline antigo usado apenas como fonte de leitura: `307115705`, fase `Cadastro`.
+- Pipeline novo usado como destino: `307256948`, fase `Leads Cadastrados`.
+- O pipeline antigo nao foi alterado.
+- Foram copiados apenas cards da fase `Cadastro` cujo responsavel era:
+  - Julia Franco Dantas;
+  - Rafael Gomes Ribeiro;
+  - Rafael Fernandes;
+  - Caue Perrotta Segato;
+  - Ana Clara de Almeida Lourenco.
+- Total elegivel encontrado: `178` cards.
+- Total criado no pipeline novo: `178` cards em `Leads Cadastrados`.
+- Distribuicao elegivel encontrada:
+  - Caue Perrotta Segato: `58`;
+  - Ana Clara de Almeida Lourenco: `9`;
+  - Rafael Gomes Ribeiro: `68`;
+  - Julia Franco Dantas: `43`;
+  - Rafael Fernandes: `0`.
+
+Regra aplicada na copia:
+
+- Foram preenchidas apenas informacoes cadastrais equivalentes do formulario inicial, como nome da empresa, cliente, CNPJ, telefone, e-mail, municipio, segmento/CNAE, capital social, origem e data de cadastro quando disponivel.
+- Os campos operacionais da fase `Leads Cadastrados`, como `Data da primeira ligacao / contato` e `Canal de Prospeccao`, nao foram preenchidos automaticamente, por decisao operacional do usuario.
+- A copia foi idempotente: cards com mesmo CNPJ ou mesmo titulo ja existentes no pipeline novo foram ignorados para evitar duplicidade.
+- Nenhum token ou credencial foi salvo no repositorio.
