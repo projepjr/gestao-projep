@@ -146,7 +146,15 @@ Cada usuario pode solicitar a exclusao da propria conta pelo perfil:
 3. Depois da senha correta, confirma uma mensagem irreversivel.
 4. O perfil e removido do Supabase/app, vinculos operacionais sao limpos quando possivel e a sessao e encerrada.
 
-Essa exclusao propria nao muda a regra administrativa: excluir outro membro continua respeitando `canDeleteMember`, incluindo o bloqueio de remocao de contas de Presidencia por terceiros.
+Essa exclusao propria nao muda a regra administrativa: excluir outro membro continua respeitando `getDeleteMemberAuthorization`/`canDeleteMember`.
+
+Regra critica de governanca: uma conta com acesso de Presidencia so pode ser excluida se ja existir pelo menos outro presidente ativo no sistema. Essa trava vale para:
+
+- autoexclusao pelo perfil;
+- exclusao administrativa pela pagina de membros do GP;
+- chamada remota da Edge Function `delete-auth-user`.
+
+O objetivo e impedir que a empresa fique sem nenhum usuario capaz de controlar permissoes e recuperar acesso administrativo.
 
 ## Exclusao completa no Supabase Auth
 

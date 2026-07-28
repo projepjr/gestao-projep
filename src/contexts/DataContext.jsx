@@ -5,6 +5,7 @@ import { resolveSetor } from '../data/setores'
 import { useAuth } from './AuthContext'
 import {
   canDeleteMember,
+  getDeleteMemberAuthorization,
   canManageMembers,
   canManagePermissions,
   canPostAnnouncements,
@@ -466,8 +467,10 @@ export function DataProvider({ children }) {
     return { success: true }
   }
   const deleteMember = id => {
-    const target = db.get('usuarios').find(member => idsEqual(member.id, id))
-    if (!canDeleteMember(currentUser, target)) return { success: false, error: 'Você não pode remover este membro.' }
+    const users = db.get('usuarios')
+    const target = users.find(member => idsEqual(member.id, id))
+    const authorization = getDeleteMemberAuthorization(currentUser, target, users)
+    if (!authorization.allowed) return { success: false, error: authorization.error || 'Voce nao pode remover este membro.' }
     db.removeUser(id)
     void syncCommercialTeamConfig(db.get('comercial')?.equipe)
     void deleteUserFromSupabase(target)

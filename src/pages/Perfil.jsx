@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useData } from '../contexts/DataContext'
+import { hasPresidencyFullAccess } from '../config/accessControl'
 import {
   Camera, Mail, Phone, Calendar, Star, Pin, Bell, Lock,
   CheckCircle, Clock, AlertCircle, TrendingUp, Briefcase,
@@ -432,7 +433,7 @@ function EmailChangeModal({ currentEmail, onClose, onValidatePassword, onRequest
   )
 }
 
-function DeleteAccountModal({ onClose, onValidatePassword, onDeleteAccount }) {
+function DeleteAccountModal({ isPresidencyAccount, onClose, onValidatePassword, onDeleteAccount }) {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState('password')
@@ -514,6 +515,11 @@ function DeleteAccountModal({ onClose, onValidatePassword, onDeleteAccount }) {
               <p className="text-red-200/80 text-xs leading-relaxed">
                 Isso remove seu acesso ao sistema e nao tem volta. Seus vinculos em projetos, reunioes e equipes serao limpos quando possivel.
               </p>
+              {isPresidencyAccount && (
+                <p className="text-red-100 text-xs leading-relaxed mt-3 pt-3 border-t border-red-900/40">
+                  Conta com acesso de Presidencia: ela so sera excluida se ja existir outro presidente ativo no sistema.
+                </p>
+              )}
             </div>
             {error && <p className="text-xs px-3 py-2 rounded border bg-red-950/40 border-red-900/40 text-red-400">{error}</p>}
             <div className="flex gap-2">
@@ -1011,6 +1017,7 @@ export default function Perfil() {
       )}
       {showDeleteAccountModal && (
         <DeleteAccountModal
+          isPresidencyAccount={hasPresidencyFullAccess(user)}
           onClose={() => setShowDeleteAccountModal(false)}
           onValidatePassword={validateCurrentPassword}
           onDeleteAccount={async password => {

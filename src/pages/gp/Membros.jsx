@@ -391,7 +391,7 @@ function Modal({ member, onClose, onSave }) {
   )
 }
 
-function DeleteModal({ member, onClose, onConfirm }) {
+function DeleteModal({ member, error, onClose, onConfirm }) {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-[#111111] border border-red-900/40 rounded-md w-full max-w-sm shadow-2xl p-6">
@@ -399,6 +399,11 @@ function DeleteModal({ member, onClose, onConfirm }) {
         <p className="text-gray-500 text-sm mt-2 leading-relaxed">
           <strong className="text-gray-300">{member.nome}</strong> será removido também de conversas, avaliações, projetos e responsabilidades.
         </p>
+        {error && (
+          <p className="mt-4 text-xs leading-relaxed px-3 py-2 rounded border bg-red-950/40 border-red-900/40 text-red-300">
+            {error}
+          </p>
+        )}
         <div className="flex gap-2 mt-6">
           <button onClick={onClose} className="flex-1 py-2.5 rounded border border-[#2A2A2A] text-gray-400 text-sm">Cancelar</button>
           <button onClick={onConfirm} className="flex-1 py-2.5 rounded bg-red-700 hover:bg-red-600 text-white font-semibold text-sm">Remover</button>
@@ -469,6 +474,7 @@ export default function Membros() {
   const [deptFilter, setDeptFilter] = useState('todos')
   const [feedbackMember, setFeedbackMember] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
   const canManage = canManageMembers(user)
   const canManageProtectedMembers = canManagePermissions(user)
   const canFeedback = canSendFeedback(user)
@@ -534,7 +540,7 @@ export default function Membros() {
                   </button>
                 )}
                 {canDeleteMember(user, member) && (
-                  <button onClick={() => setDeleteTarget(member)} className="p-1.5 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Remover membro">
+                  <button onClick={() => { setDeleteError(''); setDeleteTarget(member) }} className="p-1.5 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Remover membro">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -595,10 +601,19 @@ export default function Membros() {
       {deleteTarget && (
         <DeleteModal
           member={deleteTarget}
-          onClose={() => setDeleteTarget(null)}
+          error={deleteError}
+          onClose={() => {
+            setDeleteTarget(null)
+            setDeleteError('')
+          }}
           onConfirm={() => {
             const result = deleteMember(deleteTarget.id)
-            if (result.success) setDeleteTarget(null)
+            if (result.success) {
+              setDeleteTarget(null)
+              setDeleteError('')
+              return
+            }
+            setDeleteError(result.error || 'Nao foi possivel remover este membro.')
           }}
         />
       )}

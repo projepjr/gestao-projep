@@ -4,8 +4,9 @@ import { normalizePermissions } from '../config/accessControl'
 import { resolveSetor } from '../data/setores'
 import {
   canApproveUsers,
-  canDeleteMember,
+  getDeleteMemberAuthorization,
   canManagePermissions,
+  validatePresidencyDeletion,
 } from '../config/authorization'
 import {
   createSupabaseAuthAccount,
@@ -399,9 +400,11 @@ export function AuthProvider({ children }) {
   }
 
   const deleteUser = userId => {
-    const target = findUserByIdentity(db.get('usuarios'), userId)
-    if (!canDeleteMember(user, target)) {
-      return { success: false, error: 'Você não pode remover este membro.' }
+    const users = db.get('usuarios')
+    const target = findUserByIdentity(users, userId)
+    const authorization = getDeleteMemberAuthorization(user, target, users)
+    if (!authorization.allowed) {
+      return { success: false, error: authorization.error || 'Voce nao pode remover este membro.' }
     }
     db.removeUser(userId)
     void syncCommercialTeamConfig(db.get('comercial')?.equipe)
@@ -532,6 +535,8 @@ export function AuthProvider({ children }) {
 
     const target = findUserByIdentity(db.get('usuarios'), user)
     if (!target) return { success: false, error: 'Usuario nao encontrado.' }
+    const presidencyGuard = validatePresidencyDeletion(target, db.get('usuarios'))
+    if (!presidencyGuard.allowed) return { success: false, error: presidencyGuard.error }
 
     await deleteUserFromSupabase(target)
     db.removeUser(target.id)
