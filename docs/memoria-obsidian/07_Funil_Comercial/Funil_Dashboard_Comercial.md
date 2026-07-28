@@ -79,6 +79,17 @@ Objetivo:
 - evitar que hunters e closers fiquem misturados;
 - permitir que a dashboard calcule metricas por pessoa correta.
 
+Atualizacao em 2026-07-28:
+
+- Na tabela de Hunters da dashboard, a metrica `Diag. Ag.` nao usa mais historico de passagem por fase nem fases posteriores.
+- A contagem de diagnosticas agendadas por Hunter agora exige:
+  - card atualmente na fase `Diagnostica Agendada`;
+  - campo de data/hora da diagnostica agendada preenchido no periodo filtrado;
+  - responsavel identificado preferencialmente pelo campo `Quem marcou o diagnostico`.
+- O mapper tambem aceita o nome temporario `Quem marcou a reuniao diagnostica` e variaçoes sem acento.
+- Se esse campo especifico nao existir/preencher, a contagem usa o responsavel Hunter ja associado como fallback.
+- Motivo da decisao: evitar que cards que ja avancaram, voltaram ou ficaram em outra fase inflem a coluna `Diag. Ag.` por pessoa.
+
 Campos observados:
 
 - `pipefyName`

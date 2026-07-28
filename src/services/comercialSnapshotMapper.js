@@ -536,6 +536,15 @@ const EVENT_LABELS = {
   noShow: ['data do no-show', 'data do no show'],
 }
 
+const DIAGNOSTIC_SCHEDULER_LABELS = [
+  'quem marcou o diagnostico',
+  'quem marcou a reuniao diagnostica',
+  'quem marcou a reuniao diagnostica na fase diagnostico agendada',
+  'responsavel por marcar o diagnostico',
+  'responsavel pelo agendamento da diagnostica',
+  'responsaveis pela diagnostica',
+]
+
 const STAGE_KEYWORDS = {
   cadastro: ['leads cadastrados', 'cadastro'],
   contact: ['ligacoes', 'ligações', 'contato', 'tentativa de contato', 'tentativas de contato', 'nao contatados', 'não contatados'],
@@ -644,6 +653,11 @@ function contactStageInPeriod(card, range) {
   if (!currentStageMatches(card, STAGE_KEYWORDS.contact)) return false
   if (range?.inicio && range?.fim) return hasFieldDateInRange(card, EVENT_LABELS.contact, range)
   return true
+}
+
+function diagnosticScheduledForHunterInPeriod(card, range) {
+  if (!currentStageMatches(card, STAGE_KEYWORDS.diagnosticScheduled)) return false
+  return fieldEventInPeriod(card, EVENT_LABELS.diagnosticScheduled, range)
 }
 
 function stageEventInPeriod(card, keywords, range) {
@@ -816,6 +830,16 @@ function getResponsibleTeamMember(card, type, teamIndex) {
     ...getFieldValues(card, fieldKeywords),
     ...getCardAssignees(card),
   ]
+
+  for (const value of values) {
+    const member = matchTeamValue(value, teamIndex)
+    if (member) return member
+  }
+  return null
+}
+
+function getDiagnosticSchedulerTeamMember(card, teamIndex) {
+  const values = getFieldValues(card, DIAGNOSTIC_SCHEDULER_LABELS)
 
   for (const value of values) {
     const member = matchTeamValue(value, teamIndex)
@@ -999,10 +1023,6 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
         hunter.leadsContatados += 1
         hunter.contatadas += 1
       }
-      if (diagnosticScheduled) {
-        hunter.diagnosticasAgendadas += 1
-        hunter.reunioesMarcadas += 1
-      }
       if (diagnosticDone) {
         hunter.diagnosticasRealizadas += 1
         hunter.reunioesRealizadas += 1
@@ -1010,6 +1030,18 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       if (proposalScheduled) hunter.propostasAgendadas += 1
       if (proposalDone) hunter.propostasRealizadas += 1
       if (diagnosticNoShow) hunter.noShows += 1
+    }
+
+    if (diagnosticScheduledForHunterInPeriod(card, range)) {
+      const schedulerHunter = findOrCreateRow(
+        hunters,
+        getDiagnosticSchedulerTeamMember(card, hunterIndex) ||
+          getResponsibleTeamMember(card, 'hunter', hunterIndex),
+      )
+      if (schedulerHunter) {
+        schedulerHunter.diagnosticasAgendadas += 1
+        schedulerHunter.reunioesMarcadas += 1
+      }
     }
 
     const closer = findOrCreateRow(closers, getResponsibleTeamMember(card, 'closer', closerIndex))
