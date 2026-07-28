@@ -470,7 +470,7 @@ export function DataProvider({ children }) {
     if (!canDeleteMember(currentUser, target)) return { success: false, error: 'Você não pode remover este membro.' }
     db.removeUser(id)
     void syncCommercialTeamConfig(db.get('comercial')?.equipe)
-    void deleteUserFromSupabase(id)
+    void deleteUserFromSupabase(target)
     return { success: true }
   }
 

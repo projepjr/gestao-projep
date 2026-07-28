@@ -755,7 +755,26 @@ export async function syncUsersToSupabase(users = []) {
 
 export async function deleteUserFromSupabase(userId) {
   if (!isSupabaseConfigured || !supabase) return
-  const { error } = await supabase.from('profiles').delete().eq('id', userUuid(userId))
+  const target = typeof userId === 'object' && userId !== null ? userId : { id: userId }
+  const profileId = target.supabaseId || userUuid(target.id)
+
+  const { data: { session } = {} } = await supabase.auth.getSession()
+  if (session?.access_token) {
+    const { error: functionError } = await supabase.functions.invoke('delete-auth-user', {
+      body: {
+        targetUserId: profileId,
+        targetEmail: target.email || null,
+      },
+    })
+
+    if (functionError) {
+      logRemoteError('delete auth user via edge function', functionError)
+    } else {
+      return
+    }
+  }
+
+  const { error } = await supabase.from('profiles').delete().eq('id', profileId)
   logRemoteError('delete profile', error)
 }
 

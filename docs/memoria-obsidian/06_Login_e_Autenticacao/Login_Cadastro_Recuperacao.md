@@ -144,3 +144,17 @@ Cada usuario pode solicitar a exclusao da propria conta pelo perfil:
 4. O perfil e removido do Supabase/app, vinculos operacionais sao limpos quando possivel e a sessao e encerrada.
 
 Essa exclusao propria nao muda a regra administrativa: excluir outro membro continua respeitando `canDeleteMember`, incluindo o bloqueio de remocao de contas de Presidencia por terceiros.
+
+## Exclusao completa no Supabase Auth
+
+Problema identificado: remover um membro pelo site apagava o perfil operacional em `public.profiles`, mas nao removia necessariamente o usuario em `Authentication > Users`. Isso acontece porque o front-end usa apenas `VITE_SUPABASE_PUBLISHABLE_KEY`, que nao tem permissao para executar `auth.admin.deleteUser`.
+
+Correcao tecnica:
+
+- foi criada a Edge Function `supabase/functions/delete-auth-user`;
+- a funcao deve usar `SUPABASE_SERVICE_ROLE_KEY` apenas como secret do Supabase, nunca no codigo do front-end;
+- `deleteUserFromSupabase` agora tenta chamar essa funcao antes do fallback de apagar apenas `profiles`;
+- autoexclusao e exclusao administrativa sao validadas no servidor;
+- se a funcao ainda nao estiver publicada, o app continua removendo o perfil, mas o Auth pode manter usuarios orfaos.
+
+Acao operacional pendente quando houver usuarios antigos orfaos: remover uma vez pelo painel do Supabase Auth ou publicar a Edge Function e executar limpeza administrativa segura. Nao colocar `service_role` no Vite/Cloudflare Pages.

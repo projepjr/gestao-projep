@@ -398,7 +398,7 @@ export function AuthProvider({ children }) {
     }
     db.removeUser(userId)
     void syncCommercialTeamConfig(db.get('comercial')?.equipe)
-    void deleteUserFromSupabase(userId)
+    void deleteUserFromSupabase(target)
     return { success: true }
   }
 
@@ -526,7 +526,7 @@ export function AuthProvider({ children }) {
     const target = findUserByIdentity(db.get('usuarios'), user)
     if (!target) return { success: false, error: 'Usuario nao encontrado.' }
 
-    await deleteUserFromSupabase(target.id)
+    await deleteUserFromSupabase(target)
     db.removeUser(target.id)
     void syncCommercialTeamConfig(db.get('comercial')?.equipe)
     await signOutFromSupabase()
