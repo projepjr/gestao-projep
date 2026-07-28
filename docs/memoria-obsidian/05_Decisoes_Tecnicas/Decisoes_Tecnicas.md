@@ -88,5 +88,6 @@ Implementacao:
 - diretores podem editar a ordem dos setores aos quais possuem acesso;
 - usuarios com autoridade de Presidencia podem editar qualquer setor editavel;
 - Chat fica fora da regra comum: por ser uma area global, sua edicao deve continuar restrita a Presidencia.
+- a interface de edicao da ordem deve usar arrastar e soltar, nao botoes de seta, para ficar mais intuitiva para diretores e Presidencia.
 
 Regra: nao salvar essa ordem em `localStorage` como fonte oficial, porque a mudanca precisa aparecer igual para todos os usuarios.

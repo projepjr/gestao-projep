@@ -18,7 +18,7 @@ import {
   PanelLeftClose, PanelLeftOpen, MessageSquare, Shield,
   AlertCircle, FileCheck, Target, CheckCircle, UserCheck, CalendarDays,
   Sun, Moon, Trash2, BarChart2, History, CalendarRange, Download,
-  Pencil, ArrowUp, ArrowDown,
+  Pencil, GripVertical,
 } from 'lucide-react'
 import ProjepLogo, { ProjepSymbol } from './ProjepLogo'
 import UserAvatar from './UserAvatar'
@@ -97,6 +97,8 @@ export default function Layout({ children }) {
   const [collapsed,     setCollapsed]     = useState(false)
   const [showNotifs,    setShowNotifs]    = useState(false)
   const [editingSectorId, setEditingSectorId] = useState(null)
+  const [draggedSubItem, setDraggedSubItem] = useState(null)
+  const [draftSidebarOrders, setDraftSidebarOrders] = useState({})
 
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -208,26 +210,59 @@ export default function Layout({ children }) {
     return Boolean(isDirector && hasModuleAccess(user, sector.id))
   }
   const getOrderedSubItems = sector => {
-    const order = sidebarOrder[sector.id] || []
+    const order = editingSectorId === sector.id
+      ? (draftSidebarOrders[sector.id] || sidebarOrder[sector.id] || [])
+      : (sidebarOrder[sector.id] || [])
     const byKey = new Map((sector.subItems || []).map(item => [item.key, item]))
     const ordered = order.map(key => byKey.get(key)).filter(Boolean)
     const missing = (sector.subItems || []).filter(item => !order.includes(item.key))
     return [...ordered, ...missing]
   }
-  const moveVisibleSubItem = (sector, visibleItems, index, direction) => {
-    const targetIndex = index + direction
-    if (targetIndex < 0 || targetIndex >= visibleItems.length) return
 
-    const swappedVisibleKeys = visibleItems.map(item => item.key)
-    ;[swappedVisibleKeys[index], swappedVisibleKeys[targetIndex]] = [swappedVisibleKeys[targetIndex], swappedVisibleKeys[index]]
+  const startEditingSectorOrder = sector => {
+    const nextSectorId = editingSectorId === sector.id ? null : sector.id
+    if (!nextSectorId) {
+      setEditingSectorId(null)
+      setDraggedSubItem(null)
+      return
+    }
 
-    const visibleKeySet = new Set(visibleItems.map(item => item.key))
+    setDraftSidebarOrders(current => ({
+      ...current,
+      [sector.id]: getOrderedSubItems(sector).map(item => item.key),
+    }))
+    setEditingSectorId(sector.id)
+  }
+
+  const finishEditingSectorOrder = sector => {
+    const nextOrder = draftSidebarOrders[sector.id] || getOrderedSubItems(sector).map(item => item.key)
+    updateSidebarOrder(sector.id, nextOrder)
+    setEditingSectorId(null)
+    setDraggedSubItem(null)
+  }
+
+  const reorderDraggedSubItem = (sector, visibleItems, targetKey) => {
+    if (!draggedSubItem || draggedSubItem.sectorId !== sector.id || draggedSubItem.key === targetKey) return
+
+    const fromIndex = visibleItems.findIndex(item => item.key === draggedSubItem.key)
+    const targetIndex = visibleItems.findIndex(item => item.key === targetKey)
+    if (fromIndex < 0 || targetIndex < 0) return
+
+    const nextVisibleKeys = visibleItems.map(item => item.key)
+    const [movedKey] = nextVisibleKeys.splice(fromIndex, 1)
+    nextVisibleKeys.splice(targetIndex, 0, movedKey)
+
+    const visibleKeySet = new Set(nextVisibleKeys)
     let nextVisibleIndex = 0
     const fullOrder = getOrderedSubItems(sector).map(item => item.key)
     const nextOrder = fullOrder.map(key => (
-      visibleKeySet.has(key) ? swappedVisibleKeys[nextVisibleIndex++] : key
+      visibleKeySet.has(key) ? nextVisibleKeys[nextVisibleIndex++] : key
     ))
-    updateSidebarOrder(sector.id, nextOrder)
+
+    setDraftSidebarOrders(current => ({
+      ...current,
+      [sector.id]: nextOrder,
+    }))
   }
 
   return (
@@ -311,7 +346,7 @@ export default function Layout({ children }) {
                           onClick={event => {
                             event.preventDefault()
                             event.stopPropagation()
-                            setEditingSectorId(current => current === sector.id ? null : sector.id)
+                            startEditingSectorOrder(sector)
                           }}
                           className={`p-1 rounded hover:bg-white/15 hover:text-white transition-all ${isEditingOrder ? 'opacity-100 text-white' : 'opacity-0 group-hover/sector:opacity-100 text-white/60'}`}
                           title={isEditingOrder ? 'Concluir edição da ordem' : 'Editar ordem das subpáginas'}
@@ -348,7 +383,7 @@ export default function Layout({ children }) {
                           <span>Editando ordem</span>
                           <button
                             type="button"
-                            onClick={() => setEditingSectorId(null)}
+                            onClick={() => finishEditingSectorOrder(sector)}
                             className="text-[#FF882D] hover:text-white font-semibold transition-colors"
                           >
                             Concluir
@@ -367,29 +402,29 @@ export default function Layout({ children }) {
                         return isEditingOrder ? (
                           <div
                             key={item.path}
-                            className={`flex items-center gap-2.5 px-3 py-2 rounded text-xs font-medium transition-all ${subActive ? 'bg-white/10 text-white' : 'text-white/55 bg-white/[0.03]'}`}
+                            draggable
+                            onDragStart={event => {
+                              event.dataTransfer.effectAllowed = 'move'
+                              event.dataTransfer.setData('text/plain', item.key)
+                              setDraggedSubItem({ sectorId: sector.id, key: item.key })
+                            }}
+                            onDragOver={event => {
+                              event.preventDefault()
+                              event.dataTransfer.dropEffect = 'move'
+                              reorderDraggedSubItem(sector, visibleSubItems, item.key)
+                            }}
+                            onDragEnd={() => setDraggedSubItem(null)}
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded text-xs font-medium transition-all cursor-grab active:cursor-grabbing ${
+                              draggedSubItem?.sectorId === sector.id && draggedSubItem?.key === item.key
+                                ? 'bg-[#CE7028]/25 text-white ring-1 ring-[#CE7028]/40 opacity-80'
+                                : subActive
+                                  ? 'bg-white/10 text-white'
+                                  : 'text-white/55 bg-white/[0.03] hover:bg-white/10 hover:text-white'
+                            }`}
+                            title="Arraste para reorganizar"
                           >
+                            <GripVertical className="w-3.5 h-3.5 flex-shrink-0 text-white/35" />
                             {itemContent}
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => moveVisibleSubItem(sector, visibleSubItems, itemIndex, -1)}
-                                disabled={itemIndex === 0}
-                                className="p-1 rounded text-white/45 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-white/45 transition-all"
-                                title="Mover para cima"
-                              >
-                                <ArrowUp className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moveVisibleSubItem(sector, visibleSubItems, itemIndex, 1)}
-                                disabled={itemIndex === visibleSubItems.length - 1}
-                                className="p-1 rounded text-white/45 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-white/45 transition-all"
-                                title="Mover para baixo"
-                              >
-                                <ArrowDown className="w-3 h-3" />
-                              </button>
-                            </div>
                           </div>
                         ) : (
                           <Link key={item.path} to={item.path} onClick={() => setMobileOpen(false)}
