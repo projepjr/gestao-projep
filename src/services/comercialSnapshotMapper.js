@@ -333,10 +333,10 @@ function buildCardConversionFlags(card, range) {
   const contactAttempted = contactAttemptInPeriod(card, range)
   const contactStage = contactStageInPeriod(card, range)
 
-  const diagnosticScheduled = eventReachedInPeriod(
+  const diagnosticScheduled = scheduledEventMarkedInPeriod(
     card,
     EVENT_LABELS.diagnosticScheduled,
-    PIPEFY_2026_STAGE_GROUPS.diagnosticScheduledOrLater,
+    EVENT_LABELS.diagnosticMarked,
     range,
     FUNNEL_RANKS.diagnosticScheduled,
   )
@@ -366,10 +366,10 @@ function buildCardConversionFlags(card, range) {
     statusIsNoShow,
   )
 
-  const proposalScheduled = eventReachedInPeriod(
+  const proposalScheduled = scheduledEventMarkedInPeriod(
     card,
     EVENT_LABELS.proposalScheduled,
-    PIPEFY_2026_STAGE_GROUPS.proposalScheduledOrLater,
+    EVENT_LABELS.proposalMarked,
     range,
     FUNNEL_RANKS.proposalScheduled,
   )
@@ -518,6 +518,15 @@ const EVENT_LABELS = {
     'data de realização da diagnóstica',
     'data que foi realizada',
   ],
+  diagnosticMarked: [
+    'data em que a diagnostica foi marcada',
+    'data que a diagnostica foi marcada',
+    'data da marcacao da diagnostica',
+    'data de marcacao da diagnostica',
+    'data de entrada na diagnostica agendada',
+    'data de entrada do card na diagnostica agendada',
+    'data de entrada',
+  ],
   proposalScheduled: [
     'data e hora da proposta agendada',
     'data da proposta agendada',
@@ -525,6 +534,15 @@ const EVENT_LABELS = {
     'data e hora da reunião de proposta',
     'data da reuniao de proposta',
     'data da reunião de proposta',
+  ],
+  proposalMarked: [
+    'data em que a proposta foi marcada',
+    'data que a proposta foi marcada',
+    'data da marcacao da proposta',
+    'data de marcacao da proposta',
+    'data de entrada na proposta agendada',
+    'data de entrada do card na proposta agendada',
+    'data de entrada',
   ],
   proposalDone: [
     'data da proposta realizada',
@@ -537,12 +555,27 @@ const EVENT_LABELS = {
 }
 
 const DIAGNOSTIC_SCHEDULER_LABELS = [
+  'quem marcou diagnostica',
+  'quem marcou diagnostica?',
+  'quem marcou a diagnostica',
   'quem marcou o diagnostico',
   'quem marcou a reuniao diagnostica',
   'quem marcou a reuniao diagnostica na fase diagnostico agendada',
   'responsavel por marcar o diagnostico',
   'responsavel pelo agendamento da diagnostica',
   'responsaveis pela diagnostica',
+]
+
+const PROPOSAL_SCHEDULER_LABELS = [
+  'quem marcou proposta',
+  'quem marcou proposta?',
+  'quem marcou a proposta',
+  'quem marcou a reuniao de proposta',
+  'responsavel por marcar proposta',
+  'responsavel pela proposta',
+  'responsaveis pela proposta',
+  'closer',
+  'fechador',
 ]
 
 const STAGE_KEYWORDS = {
@@ -656,7 +689,23 @@ function contactStageInPeriod(card, range) {
 }
 
 function diagnosticScheduledForHunterInPeriod(card, range) {
-  return fieldEventInPeriod(card, EVENT_LABELS.diagnosticScheduled, range)
+  return scheduledEventMarkedInPeriod(
+    card,
+    EVENT_LABELS.diagnosticScheduled,
+    EVENT_LABELS.diagnosticMarked,
+    range,
+    FUNNEL_RANKS.diagnosticScheduled,
+  )
+}
+
+function proposalScheduledForCloserInPeriod(card, range) {
+  return scheduledEventMarkedInPeriod(
+    card,
+    EVENT_LABELS.proposalScheduled,
+    EVENT_LABELS.proposalMarked,
+    range,
+    FUNNEL_RANKS.proposalScheduled,
+  )
 }
 
 function stageEventInPeriod(card, keywords, range) {
@@ -690,6 +739,12 @@ function eventReachedInPeriod(card, fieldLabels, stageKeywords, range, targetRan
   if (enteredStageInRange(card, stageKeywords, range)) return true
   if (!hasReachedStage(card, stageKeywords, fieldLabels)) return false
   return hasFieldDateInRange(card, fieldLabels, range)
+}
+
+function scheduledEventMarkedInPeriod(card, scheduledLabels, markedLabels, range, targetRank = null) {
+  if (targetRank && !canCountStage(card, targetRank)) return false
+  if (!hasFieldValue(card, scheduledLabels)) return false
+  return fieldEventInPeriod(card, markedLabels, range)
 }
 
 function isNoShowFor(card, type, range) {
@@ -839,6 +894,16 @@ function getResponsibleTeamMember(card, type, teamIndex) {
 
 function getDiagnosticSchedulerTeamMember(card, teamIndex) {
   const values = getFieldValues(card, DIAGNOSTIC_SCHEDULER_LABELS)
+
+  for (const value of values) {
+    const member = matchTeamValue(value, teamIndex)
+    if (member) return member
+  }
+  return null
+}
+
+function getProposalSchedulerTeamMember(card, teamIndex) {
+  const values = getFieldValues(card, PROPOSAL_SCHEDULER_LABELS)
 
   for (const value of values) {
     const member = matchTeamValue(value, teamIndex)
@@ -1046,7 +1111,6 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     const closer = findOrCreateRow(closers, getResponsibleTeamMember(card, 'closer', closerIndex))
     if (closer) {
       if (diagnosticDone) closer.diagnosticasRealizadas += 1
-      if (proposalScheduled) closer.propostasAgendadas += 1
       if (proposalDone) {
         closer.propostasRealizadas += 1
         closer.reunioesRealizadas += 1
@@ -1054,6 +1118,15 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       if (proposalNoShow) closer.noShows += 1
       if (inNegotiation && !contractClosed) closer.emNegociacao += 1
       if (contractClosed) closer.contratosFechados += 1
+    }
+
+    if (proposalScheduledForCloserInPeriod(card, range)) {
+      const schedulerCloser = findOrCreateRow(
+        closers,
+        getProposalSchedulerTeamMember(card, closerIndex) ||
+          getResponsibleTeamMember(card, 'closer', closerIndex),
+      )
+      if (schedulerCloser) schedulerCloser.propostasAgendadas += 1
     }
   }
 

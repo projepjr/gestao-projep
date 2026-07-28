@@ -98,6 +98,17 @@ Retificacao da mesma data:
 - A coluna nao deve contar apenas porque o card passou pela fase; precisa existir data preenchida.
 - O responsavel continua sendo priorizado pelo campo `Quem marcou o diagnostico`, com fallback para o responsavel Hunter associado.
 
+Nota de atualizacao da regra de agendamento:
+
+- Em 2026-07-28, o Pipefy passou a expor `Data de entrada` e `Quem marcou diagnostica?` nos snapshots.
+- Para metricas de produtividade por periodo, `Diag. Ag.` deve usar:
+  - `Data e hora da diagnostica agendada` preenchida, para provar que existe reuniao agendada;
+  - `Data de entrada` dentro do periodo filtrado, para representar quando o agendamento foi registrado;
+  - `Quem marcou diagnostica?` como responsavel principal, com fallback para campos antigos/associacao do Hunter.
+- A data/hora futura da diagnostica nao deve medir produtividade semanal/mensal do Hunter; ela serve para calendario e agenda.
+- A mesma logica fica preparada para `Proposta Agendada`: data/hora da proposta preenchida + `Data de entrada` no periodo + responsavel especifico de proposta quando existir.
+- Isso evita contar card em `Pendentes / No-show` apenas porque tambem possui `Data de entrada`.
+
 Campos observados:
 
 - `pipefyName`
@@ -136,9 +147,9 @@ Campos essenciais do pipeline reconstruido apos correcao de estrutura:
 - Leads Cadastrados: `Data da primeira ligacao / contato`, `Canal de Prospeccao`.
 - Tentativa de Contato: `Segunda tentativa de contato`, `Terceira tentativa de contato`, `Observacao do contato`.
 - Interesse Futuro: `Data de retorno futuro`, `Motivo do interesse futuro`, `Foi marcada a Diagnostica?`.
-- Diagnostica Agendada: `Data e hora da diagnostica agendada`, `Responsaveis pela diagnostica`.
+- Diagnostica Agendada: `Data e hora da diagnostica agendada`, `Data de entrada`, `Quem marcou diagnostica?`.
 - Diagnostica Realizada: `Data da diagnostica realizada`, `Responsaveis pela diagnostica`, `Observacoes da diagnostica`.
-- Proposta Agendada: `Data e hora da proposta agendada`, `Responsavel pela proposta`.
+- Proposta Agendada: `Data e hora da proposta agendada`, `Data de entrada`, `Responsavel pela proposta` ou campo equivalente de quem marcou a proposta.
 - Proposta Realizada: `Data da proposta realizada`, `Valor apresentado`, `Observacoes da proposta`.
 - Negociacao: `Data de entrada em negociacao`, `Valor em negociacao`, `Status atual da negociacao`.
 - Pendentes / No-show: `Falta agendar data para reuniao?`, `No-show confirmado?`, `Etapa que aconteceu no-show`, `Data do no-show`, `Motivo/observacao`.

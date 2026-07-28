@@ -355,17 +355,17 @@ function KPICard({ label, value, prevValue, format, Icon, accent }) {
 
 // ── Funil — stages com tooltips ───────────────────────────────
 const FUNIL_STAGES = [
-  { key: 'cadastro', label: 'Leads Cad.', color: '#64748B', tip: 'Leads que entraram no período e ainda estão parados em cadastro.' },
-  { key: 'tentativasContato', label: 'Tent. Contato', color: '#3B82F6', tip: 'Leads que entraram no período e hoje estão em tentativa de contato.' },
-  { key: 'interesseFuturo', label: 'Int. Futuro', color: '#F59E0B', tip: 'Leads que entraram no período e ficaram para retorno futuro.' },
-  { key: 'diagnosticasAgendadas', label: 'Diag. Ag.', color: '#8B5CF6', tip: 'Leads que entraram no período e hoje estão com diagnóstica agendada.' },
-  { key: 'diagnosticasRealizadas', label: 'Diag. Real.', color: '#2A6B68', tip: 'Leads que entraram no período e hoje estão com diagnóstica realizada.' },
-  { key: 'propostasAgendadas', label: 'Prop. Ag.', color: '#E8955A', tip: 'Leads que entraram no período e hoje estão com proposta agendada.' },
-  { key: 'propostasRealizadas', label: 'Prop. Real.', color: '#F59E0B', tip: 'Leads que entraram no período e hoje estão com proposta apresentada.' },
-  { key: 'negociacoes', label: 'Negociação', color: '#CE7028', tip: 'Leads que entraram no período e hoje estão em negociação.' },
-  { key: 'pendentesNoShow', label: 'Pend./No-show', color: '#F97316', tip: 'Leads que entraram no período e hoje estão pendentes ou tiveram no-show.' },
-  { key: 'contratosFechados', label: 'Contratos', color: '#16A34A', tip: 'Leads que entraram no período e hoje viraram contrato.' },
-  { key: 'perdidos', label: 'Perdidos', color: '#EF4444', tip: 'Leads que entraram no período e hoje estão marcados como perdidos.' },
+  { key: 'cadastro', label: 'Leads Cad.', color: '#64748B', tip: 'Leads que entraram no funil dentro do periodo selecionado.' },
+  { key: 'tentativasContato', label: 'Tent. Contato', color: '#3B82F6', tip: 'Leads que tiveram primeira tentativa de contato no periodo selecionado.' },
+  { key: 'interesseFuturo', label: 'Int. Futuro', color: '#F59E0B', tip: 'Leads que estao marcados para retorno futuro no recorte atual.' },
+  { key: 'diagnosticasAgendadas', label: 'Diag. Ag.', color: '#8B5CF6', tip: 'Diagnosticas marcadas no periodo. Usa a data em que o agendamento foi registrado, nao a data futura da reuniao.' },
+  { key: 'diagnosticasRealizadas', label: 'Diag. Real.', color: '#2A6B68', tip: 'Diagnosticas que aconteceram dentro do periodo selecionado.' },
+  { key: 'propostasAgendadas', label: 'Prop. Ag.', color: '#E8955A', tip: 'Propostas marcadas no periodo. Usa a data em que o agendamento foi registrado.' },
+  { key: 'propostasRealizadas', label: 'Prop. Real.', color: '#F59E0B', tip: 'Propostas apresentadas dentro do periodo selecionado.' },
+  { key: 'negociacoes', label: 'Negociação', color: '#CE7028', tip: 'Leads que entraram ou estao em negociacao no recorte selecionado.' },
+  { key: 'pendentesNoShow', label: 'Pend./No-show', color: '#F97316', tip: 'Leads pendentes de reagendamento ou com no-show registrado.' },
+  { key: 'contratosFechados', label: 'Contratos', color: '#16A34A', tip: 'Contratos fechados dentro do periodo selecionado.' },
+  { key: 'perdidos', label: 'Perdidos', color: '#EF4444', tip: 'Leads marcados como perdidos dentro do periodo selecionado.' },
 ]
 const EMPTY_FUNIL = FUNIL_STAGES.reduce((acc, stage) => {
   acc[stage.key] = 0
@@ -552,9 +552,9 @@ const HUNTER_COLS = [
   { label: 'Hunter', tip: null },
   { label: 'Leads Trab.', tip: 'Leads do período que tiveram algum andamento feito por este Hunter.' },
   { label: 'Leads Cont.', tip: 'Leads que responderam ou avançaram para uma etapa que indica contato real com este Hunter.' },
-  { label: 'Diag. Ag.', tip: 'Diagnósticas agendadas sob responsabilidade deste Hunter.' },
+  { label: 'Diag. Ag.', tip: 'Diagnosticas que este Hunter marcou no periodo, pela data de entrada do agendamento.' },
   { label: 'Diag. Real.', tip: 'Diagnósticas que realmente aconteceram sob responsabilidade deste Hunter.' },
-  { label: 'Prop. Ag.', tip: 'Leads deste Hunter que chegaram a uma proposta agendada.' },
+  { label: 'Prop. Ag.', tip: 'Propostas agendadas relacionadas aos leads deste Hunter no periodo.' },
   { label: 'Prop. Real.', tip: 'Leads deste Hunter que chegaram a uma proposta apresentada.' },
   { label: 'No-shows', tip: 'Bolos em diagnósticas. Essa responsabilidade fica com o Hunter.' },
   { label: 'Taxa Conv.', tip: 'Mostra quantos leads trabalhados pelo Hunter chegaram até uma proposta apresentada.' },
@@ -676,7 +676,7 @@ function HuntersSection({ hunters, prevHunters, prevLabel }) {
 const CLOSER_COLS = [
   { label: 'Closer', tip: null },
   { label: 'Diag. Real.', tip: 'Diagnósticas realizadas que chegaram ao contexto deste Closer.' },
-  { label: 'Prop. Ag.', tip: 'Apresentações de proposta agendadas por este Closer.' },
+  { label: 'Prop. Ag.', tip: 'Propostas que este Closer marcou no periodo, pela data de entrada do agendamento.' },
   { label: 'Prop. Real.', tip: 'Apresentações de proposta que realmente aconteceram com este Closer.' },
   { label: 'No-shows', tip: 'Bolos em apresentações de proposta. Essa responsabilidade fica com o Closer.' },
   { label: 'Em Neg.', tip: 'Leads que estão em negociação com este Closer.' },
