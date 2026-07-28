@@ -602,6 +602,10 @@ const LOSS_RESPONSIBLE_LABELS = [
   'quem marcou como perdido',
 ]
 
+const LOSS_STAGE_ENTRY_LABELS = [
+  'data de entrada',
+]
+
 const STAGE_KEYWORDS = {
   cadastro: ['leads cadastrados', 'cadastro'],
   contact: ['ligacoes', 'ligações', 'contato', 'tentativa de contato', 'tentativas de contato', 'nao contatados', 'não contatados'],
@@ -685,10 +689,16 @@ function currentStageInPeriod(card, stageKeywords, range) {
 
 function lostInPeriod(card, range) {
   const isLostStage = currentStageMatches(card, STAGE_KEYWORDS.lost)
-  const hasLostDate = hasFieldValue(card, EVENT_LABELS.lost)
+  const dateLabels = isLostStage
+    ? [...EVENT_LABELS.lost, ...LOSS_STAGE_ENTRY_LABELS]
+    : EVENT_LABELS.lost
+  const hasLostDate = hasFieldValue(card, dateLabels)
 
   if (!isLostStage && !hasLostDate) return false
-  if (range?.inicio && range?.fim) return hasFieldDateInRange(card, EVENT_LABELS.lost, range)
+  if (range?.inicio && range?.fim) {
+    return hasFieldDateInRange(card, dateLabels, range) ||
+      (isLostStage && enteredStageInRange(card, STAGE_KEYWORDS.lost, range))
+  }
   return isLostStage || hasLostDate
 }
 

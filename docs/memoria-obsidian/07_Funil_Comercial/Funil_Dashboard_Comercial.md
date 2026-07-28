@@ -121,6 +121,8 @@ Atualizacao da regra de `Perdidos` em 2026-07-28:
 
 - O Pipefy passou a ter campos especificos na fase `Perdidos`: `Responsavel pela perda` e `Data de entrada na fase perdidos`.
 - A dashboard deve reconhecer `Data de entrada na fase perdidos` como data valida para filtros semanal/mensal.
+- No snapshot real do Pipefy, esse campo pode chegar apenas como `Data de entrada`.
+- Como `Data de entrada` tambem existe em outras fases, ela so deve ser interpretada como data de perda quando o card estiver atualmente na fase `Perdidos`.
 - A coluna `Perdidos` dos Hunters deve ser atribuida primeiro ao campo `Responsavel pela perda`.
 - Se esse campo estiver vazio ou nao bater com a associacao da equipe comercial, o mapper usa o responsavel Hunter geral do card como fallback.
 - Essa regra evita que perdas fiquem zeradas quando o card tem data/responsavel especificos da fase de perda.
