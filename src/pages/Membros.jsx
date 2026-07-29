@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BookUser, Briefcase, Mail, Phone, Search, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useData } from '../contexts/DataContext'
@@ -35,6 +35,15 @@ function MemberModal({ member, onClose, isCurrentUser }) {
   const sector = memberSector(member)
   const phone = memberPhone(member)
   const tags = memberTags(member)
+
+  useEffect(() => {
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>

@@ -97,6 +97,7 @@ Implementacao:
 - usuarios com autoridade de Presidencia podem editar qualquer setor editavel;
 - Atualizacao 2026-07-29: o modulo de chat interno foi removido/desativado. A area global ativa passou a ser `Membros`, com rota `/membros`. A rota antiga `/chat` redireciona para `/membros` por compatibilidade.
 - A pagina global `Membros` deve funcionar como diretorio compacto, com cards pequenos, avatares proporcionais e sem area de conversa. O icone global deve ser diferente do icone do setor `Gestao de Pessoas` para evitar ambiguidade visual.
+- Modais abertos por clique devem fechar tambem com a tecla `Esc`, alem do botao visual de fechar e clique no fundo, para manter a navegacao mais rapida.
 - a interface de edicao da ordem deve usar arrastar e soltar, nao botoes de seta, para ficar mais intuitiva para diretores e Presidencia.
 
 Regra: nao salvar essa ordem em `localStorage` como fonte oficial, porque a mudanca precisa aparecer igual para todos os usuarios.
