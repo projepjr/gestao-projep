@@ -51,6 +51,14 @@ supabase
 
 O snapshot vindo do Pipefy/n8n e transformado por `mapComercialSnapshot(...)` em `src/services/comercialSnapshotMapper.js`.
 
+Atualizacao em 2026-07-29:
+
+- O `payload` dos snapshots comerciais pode ficar grande porque contem muitos cards brutos do Pipefy.
+- A dashboard, a tela de leads e a tela de equipe comercial devem buscar poucos snapshots recentes por vez para evitar timeout no navegador/Supabase.
+- Em `src/pages/comercial/Dashboard.jsx`, o limite de busca foi reduzido para 5 snapshots recentes e o timeout do front-end foi ajustado para 15 segundos.
+- A mensagem "Tempo esgotado ao carregar dados comerciais do Supabase" significa que a consulta ao snapshot demorou alem do limite do front-end; nao significa necessariamente que a tabela esta vazia.
+- Melhor melhoria futura: adicionar coluna `pipe_id` e indice em `comercial_dashboard_snapshots` para buscar diretamente o snapshot do pipeline oficial sem varrer payload JSON.
+
 ## n8n
 
 O n8n e usado como automacao para buscar dados do Pipefy e salvar snapshots no Supabase.

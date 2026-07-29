@@ -16,7 +16,8 @@ import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 
 const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
 const DASHBOARD_REFRESH_MS = 5 * 60 * 1000
-const DASHBOARD_SNAPSHOT_LOOKBACK = 20
+const DASHBOARD_SNAPSHOT_LOOKBACK = 5
+const DASHBOARD_SNAPSHOT_TIMEOUT_MS = 15000
 
 function extractSnapshotPipeIds(payload = {}) {
   return [
@@ -1027,7 +1028,7 @@ export default function ComercialDashboard() {
           .eq('source', 'pipefy')
           .order('synced_at', { ascending: false })
           .limit(DASHBOARD_SNAPSHOT_LOOKBACK),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), DASHBOARD_SNAPSHOT_TIMEOUT_MS)),
       ])
       data = result.data
       error = result.error

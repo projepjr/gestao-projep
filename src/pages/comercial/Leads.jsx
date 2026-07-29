@@ -7,7 +7,7 @@ import { isSupabaseConfigured, supabase } from '../../lib/supabase'
 import { mapLeadSegmentInsights } from '../../services/comercialSnapshotMapper'
 
 const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
-const SNAPSHOT_LOOKBACK = 20
+const SNAPSHOT_LOOKBACK = 5
 const MONTHS_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
 const normalize = value => String(value || '')

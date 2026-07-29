@@ -6,7 +6,7 @@ import { extractPipefyPeopleFromSnapshot } from '../../services/comercialSnapsho
 import UserAvatar from '../../components/UserAvatar'
 
 const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
-const SNAPSHOT_LOOKBACK_LIMIT = 20
+const SNAPSHOT_LOOKBACK_LIMIT = 5
 
 function extractSnapshotPipeIds(payload = {}) {
   return [
