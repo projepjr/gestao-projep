@@ -27,6 +27,15 @@ Decisao: Supabase Realtime deve ser o caminho principal para atualizar mensagens
 
 Polling automatico deve existir apenas como fallback de seguranca, em intervalos moderados. Evitar buscas completas em intervalos muito curtos, porque cada sincronizacao pode atualizar o estado global do React e gerar travamentos perceptiveis conforme a base cresce.
 
+Atualizacao 2026-07-29: a sincronizacao global foi separada em dois fluxos no `supabaseBridge`:
+
+- dados do app: perfis, permissoes, reunioes e responsaveis;
+- comunicacao: mensagens e notificacoes.
+
+Snapshots comerciais (`comercial_dashboard_snapshots`) nao devem disparar sincronizacao global do `DataContext`, porque os payloads do Pipefy sao grandes e podem travar a interface. As paginas comerciais que precisam desses snapshots devem buscar os dados diretamente, com limites pequenos e timeout defensivo.
+
+O polling de comunicacao deve continuar apenas como fallback do Realtime. Intervalos curtos demais aumentam re-renderizacoes sem melhorar o uso normal quando o Realtime esta ativo.
+
 ## Auth
 
 Decisao: Supabase Auth e a fonte principal para login e recuperacao de senha.

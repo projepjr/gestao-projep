@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import db from '../data/db'
 import { hasSubareaAccess, normalizePermissions } from '../config/accessControl'
@@ -36,7 +36,7 @@ const DataContext = createContext(null)
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 const REMOTE_SYNC_INTERVAL_MS = 60 * 1000
-const COMMUNICATION_SYNC_INTERVAL_MS = 15 * 1000
+const COMMUNICATION_SYNC_INTERVAL_MS = 60 * 1000
 const matchesUserId = (id, member) => Boolean(member) && (
   idsEqual(id, member.id) ||
   idsEqual(id, member.supabaseId)
@@ -362,7 +362,10 @@ export function DataProvider({ children }) {
     bootstrapSupabase(db)
       .then(result => {
         if (!mounted || !result?.enabled) return
-        realtimeCleanup = subscribeToSupabaseChanges(db, syncRemote)
+        realtimeCleanup = subscribeToSupabaseChanges(db, {
+          onAppChange: syncRemote,
+          onCommunicationChange: syncCommunicationRemote,
+        })
         if (mounted && result?.enabled) console.info('[Supabase] Sincronização inicial concluída.')
       })
       .catch(error => console.warn('[Supabase] Falha na sincronização inicial:', error.message || error))
@@ -387,14 +390,17 @@ export function DataProvider({ children }) {
     }
   }, [])
 
-  const resolvedCommercial = resolveCommercialUsers(commercial, members)
-  const currentUser = user
+  const resolvedCommercial = useMemo(
+    () => resolveCommercialUsers(commercial, members),
+    [commercial, members],
+  )
+  const currentUser = useMemo(() => (user
     ? db.get('usuarios').find(member =>
       matchesUserId(user.id, member) ||
       matchesUserId(user.supabaseId, member) ||
       (member.email && user.email && member.email.trim().toLowerCase() === user.email.trim().toLowerCase())
     ) || user
-    : user
+    : user), [user, members])
   const canUse = subareaKey => hasSubareaAccess(currentUser, subareaKey)
   const syncUserById = userId => {
     const target = db.get('usuarios').find(member => idsEqual(member.id, userId))

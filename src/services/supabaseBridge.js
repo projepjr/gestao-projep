@@ -941,31 +941,52 @@ export async function pullRemoteState(db) {
   return { enabled: true }
 }
 
-export function subscribeToSupabaseChanges(db, onChange) {
+export function subscribeToSupabaseChanges(db, handlers = {}) {
   if (!isSupabaseConfigured || !supabase) return () => {}
 
-  let syncTimer = null
-  const scheduleSync = () => {
-    window.clearTimeout(syncTimer)
-    syncTimer = window.setTimeout(() => {
-      Promise.resolve(onChange ? onChange() : pullRemoteState(db))
+  const appChange = typeof handlers === 'function' ? handlers : handlers.onAppChange
+  const communicationChange = typeof handlers === 'function' ? handlers : handlers.onCommunicationChange
+  let appSyncTimer = null
+  let communicationSyncTimer = null
+
+  const scheduleAppSync = () => {
+    window.clearTimeout(appSyncTimer)
+    appSyncTimer = window.setTimeout(() => {
+      Promise.resolve(appChange ? appChange() : pullRemoteState(db))
         .catch(error => console.warn('[Supabase] Falha ao atualizar dados remotos:', error.message || error))
     }, 250)
   }
 
+  const scheduleCommunicationSync = () => {
+    window.clearTimeout(communicationSyncTimer)
+    communicationSyncTimer = window.setTimeout(() => {
+      Promise.resolve(communicationChange ? communicationChange() : pullCommunicationState(db))
+        .catch(error => console.warn('[Supabase] Falha ao atualizar comunicacao remota:', error.message || error))
+    }, 250)
+  }
+
+  const scheduleNotificationSync = payload => {
+    const type = payload?.new?.type || payload?.old?.type
+    if (type === COMMERCIAL_CONFIG_SOURCE) {
+      scheduleAppSync()
+      return
+    }
+    scheduleCommunicationSync()
+  }
+
   const channel = supabase
     .channel('projep-app-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, scheduleSync)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'permissions' }, scheduleSync)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, scheduleSync)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, scheduleSync)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, scheduleSync)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_responsibles' }, scheduleSync)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'comercial_dashboard_snapshots' }, scheduleSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, scheduleAppSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'permissions' }, scheduleAppSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, scheduleCommunicationSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, scheduleNotificationSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, scheduleAppSync)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_responsibles' }, scheduleAppSync)
     .subscribe()
 
   return () => {
-    window.clearTimeout(syncTimer)
+    window.clearTimeout(appSyncTimer)
+    window.clearTimeout(communicationSyncTimer)
     supabase.removeChannel(channel)
   }
 }
