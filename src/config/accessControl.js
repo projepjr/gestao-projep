@@ -74,7 +74,7 @@ export const ACCESS_MODULES = [
   {
     key: 'membros',
     label: 'Membros',
-    icon: 'users',
+    icon: 'book-user',
     path: '/membros',
     available: true,
     subareas: [],

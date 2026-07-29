@@ -12,7 +12,7 @@ import {
 } from '../config/accessControl'
 import { hasPresidentAuthority } from '../config/authorization'
 import {
-  Users, LayoutDashboard, Kanban, Trophy, FileText,
+  Users, BookUser, LayoutDashboard, Kanban, Trophy, FileText,
   LogOut, Menu, X, ChevronRight, Bell, Lock,
   Crown, Calculator, FolderKanban, Megaphone, TrendingUp,
   PanelLeftClose, PanelLeftOpen, MessageSquare, Shield,
@@ -31,6 +31,7 @@ const ICONS = {
   megaphone: Megaphone,
   'trending-up': TrendingUp,
   users: Users,
+  'book-user': BookUser,
   'message-square': MessageSquare,
   shield: Shield,
   dashboard: LayoutDashboard,

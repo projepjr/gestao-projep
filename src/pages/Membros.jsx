@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Briefcase, Mail, Phone, Search, Users, X } from 'lucide-react'
+import { BookUser, Briefcase, Mail, Phone, Search, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useData } from '../contexts/DataContext'
 import UserAvatar from '../components/UserAvatar'
@@ -44,7 +44,7 @@ function MemberModal({ member, onClose, isCurrentUser }) {
       >
         <div className="flex items-center justify-between border-b border-[#1E1E1E] p-5">
           <div className="flex items-center gap-4">
-            <UserAvatar user={member} size="lg" />
+            <UserAvatar user={member} size={72} />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-bold text-white">{name}</h2>
@@ -100,33 +100,33 @@ function MemberCard({ member, onOpen, isCurrentUser }) {
     <button
       type="button"
       onClick={() => onOpen(member)}
-      className="group rounded border border-[#1E1E1E] bg-[#111111] p-5 text-left transition-all hover:-translate-y-0.5 hover:border-[#CE7028]/60 hover:bg-[#151515]"
+      className="group rounded border border-[#1E1E1E] bg-[#111111] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[#CE7028]/60 hover:bg-[#151515]"
     >
-      <div className="flex items-start gap-4">
-        <UserAvatar user={member} size="lg" />
+      <div className="flex items-center gap-3">
+        <UserAvatar user={member} size={42} textClassName="text-sm" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate font-bold text-white">{name}</h3>
+            <h3 className="truncate text-sm font-bold text-white">{name}</h3>
             {isCurrentUser && (
               <span className="rounded bg-[#CE7028]/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-[#FF882D]">
                 Voce
               </span>
             )}
           </div>
-          <p className="mt-1 truncate text-sm text-[#CE7028]">{role}</p>
-          <p className="truncate text-sm text-gray-500">{sector}</p>
+          <p className="mt-0.5 truncate text-xs text-[#CE7028]">{role}</p>
+          <p className="truncate text-xs text-gray-500">{sector}</p>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-3 flex min-h-[24px] flex-wrap gap-1.5">
         {tags.slice(0, 3).map(tag => (
-          <span key={tag} className="rounded border border-[#1E1E1E] bg-[#0D0D0D] px-2 py-1 text-xs text-gray-400">
+          <span key={tag} className="rounded border border-[#1E1E1E] bg-[#0D0D0D] px-2 py-0.5 text-[11px] text-gray-400">
             {tag}
           </span>
         ))}
       </div>
 
-      <div className="mt-4 border-t border-[#1E1E1E] pt-3 text-xs font-semibold uppercase tracking-wider text-gray-600 transition-colors group-hover:text-[#CE7028]">
+      <div className="mt-3 border-t border-[#1E1E1E] pt-2 text-[10px] font-semibold uppercase tracking-wider text-gray-600 transition-colors group-hover:text-[#CE7028]">
         Ver perfil resumido
       </div>
     </button>
@@ -165,7 +165,7 @@ export default function Membros() {
         <div>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded border border-[#CE7028]/30 bg-[#CE7028]/10 text-[#CE7028]">
-              <Users className="h-5 w-5" />
+              <BookUser className="h-5 w-5" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white">Membros</h1>
@@ -186,7 +186,7 @@ export default function Membros() {
       </div>
 
       {filteredMembers.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {filteredMembers.map(member => (
             <MemberCard
               key={member.id}
