@@ -8,7 +8,7 @@ Use este arquivo como guia antes de fazer alteracoes no `gestao-projep`. A memor
 - Evitar solucao isolada em componente quando o problema e de fonte de dados.
 - Corrigir a origem do dado sempre que possivel.
 - Nao inventar dados de membros, setores, funil ou credenciais.
-- Nao mexer em dashboard/comercial/chat quando o pedido for restrito a login, e vice-versa.
+- Nao mexer em dashboard/comercial/membros quando o pedido for restrito a login, e vice-versa.
 - Preservar o layout quando o pedido for apenas logico.
 
 ## Comandos de verificacao
@@ -41,5 +41,5 @@ Variaveis publicas do Vite devem manter o prefixo `VITE_`.
 - Supabase Auth deve ser a fonte principal de autenticacao.
 - `localStorage` nao deve ser fonte principal para dados importantes.
 - Ao alterar login/cadastro/aprovacao, validar fluxo em outro navegador ou aba anonima.
-- Ao alterar chat/notificacoes, testar dois usuarios diferentes.
+- Ao alterar membros/notificacoes, testar dois usuarios diferentes.
 - Ao alterar funil comercial, diferenciar estoque atual do pipeline e historico/eventos usados em filtros por periodo.

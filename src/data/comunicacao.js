@@ -1,5 +1,4 @@
-// Fonte única de verdade — chat, notificações e avisos.
-// A base inicial começa limpa para uso com informações reais.
+// Fonte inicial limpa para notificacoes e avisos.
 
 export const INITIAL_COMUNICACAO = {
   mensagens: [],

@@ -29,7 +29,7 @@ export const INITIAL_USUARIOS = [
       projetos: true,
       marketing: true,
       gestaoPessoas: true,
-      chat: true,
+      membros: true,
       subareas: {
         'presidencia.seguranca': true,
         'comercial.dashboard': true,

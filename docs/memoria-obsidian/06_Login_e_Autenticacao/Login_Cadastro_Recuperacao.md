@@ -57,7 +57,7 @@ Ao aprovar:
 - o usuario nao recebe permissao operacional automaticamente;
 - a liberacao de modulos e subareas deve ser feita pela Presidencia em `Presidencia > Seguranca`;
 - a notificacao de aprovacao nao deve gerar badge nao lido para o membro aprovado.
-- o seletor de acesso inicial deve oferecer apenas `Sem acesso` e setores oficiais (`Presidencia`, `Adm e Fin`, `Comercial`, `Projetos`, `Marketing`, `Gestao de Pessoas`). Presets de funcao como hunter, diretor comercial ou somente chat nao devem aparecer na aprovacao.
+- o seletor de acesso inicial deve oferecer apenas `Sem acesso` e setores oficiais (`Presidencia`, `Adm e Fin`, `Comercial`, `Projetos`, `Marketing`, `Gestao de Pessoas`). Presets de funcao como hunter, diretor comercial ou acesso especial a membros nao devem aparecer na aprovacao.
 
 ## Cadastro direto pelo GP
 

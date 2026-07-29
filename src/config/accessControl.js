@@ -72,10 +72,10 @@ export const ACCESS_MODULES = [
     ],
   },
   {
-    key: 'chat',
-    label: 'Chat',
-    icon: 'message-square',
-    path: '/chat',
+    key: 'membros',
+    label: 'Membros',
+    icon: 'users',
+    path: '/membros',
     available: true,
     subareas: [],
   },
@@ -127,6 +127,7 @@ export function hasPresidencyFullAccess(user) {
 
 export function hasModuleAccess(user, moduleKey) {
   if (!user) return false
+  if (moduleKey === 'membros') return true
   if (hasPresidencyFullAccess(user)) return true
   const permissions = normalizePermissions(user.permissoes, user.role)
   return Boolean(permissions[moduleKey])
@@ -145,6 +146,7 @@ export function hasSubareaAccess(user, subareaKey) {
 export function hasPathAccess(user, pathname) {
   if (!user) return false
   if (pathname === '/perfil') return true
+  if (pathname === '/membros') return true
   if (pathname === '/comercial/leads') return hasSubareaAccess(user, 'comercial.dashboard')
   if (pathname.startsWith('/projetos/gestao/')) return hasSubareaAccess(user, 'projetos.gestao')
   const access = ROUTE_ACCESS.get(pathname)

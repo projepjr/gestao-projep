@@ -35,7 +35,8 @@ Este arquivo resume problemas ja corrigidos ou investigados no projeto, com base
   - Correcao: sessao ativa isolada em `sessionStorage`, preservando fallback antigo de `localStorage`.
 
 - Chat e notificacoes tiveram problemas de sincronizacao entre usuarios.
-  - Area relacionada: `src/pages/Chat.jsx`, `src/services/supabaseBridge.js`, `src/contexts/DataContext.jsx`.
+  - Area relacionada no historico: `src/pages/Chat.jsx`, `src/services/supabaseBridge.js`, `src/contexts/DataContext.jsx`.
+  - Atualizacao 2026-07-29: o chat interno foi removido/desativado. A interface global ativa agora e `Membros`, sem envio de mensagens.
 
 ## Comercial
 

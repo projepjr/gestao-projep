@@ -31,7 +31,7 @@ const ProjetosIndicadores = lazy(() => import('./pages/projetos/Indicadores'))
 const ProjetosObservacoes = lazy(() => import('./pages/projetos/Observacoes'))
 const ProjetosRelatorios = lazy(() => import('./pages/projetos/Relatorios'))
 const Perfil = lazy(() => import('./pages/Perfil'))
-const Chat = lazy(() => import('./pages/Chat'))
+const Membros = lazy(() => import('./pages/Membros'))
 
 function PageLoader() {
   return (
@@ -98,8 +98,8 @@ function AppRoutes() {
       <Route path="/projetos/coordenador"   element={<ProtectedRoute><ProjetosCoordenador /></ProtectedRoute>} />
       <Route path="/projetos/base"          element={<ProtectedRoute><BaseConhecimentoProjetos /></ProtectedRoute>} />
 
-      <Route path="/membros" element={<Navigate to="/chat" replace />} />
-      <Route path="/chat"   element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+      <Route path="/membros" element={<ProtectedRoute><Membros /></ProtectedRoute>} />
+      <Route path="/chat" element={<Navigate to="/membros" replace />} />
       <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -104,7 +104,6 @@ export default function Layout({ children }) {
   const { theme, toggleTheme } = useTheme()
   const {
     notifications: storedNotifications,
-    messages: storedMessages,
     refreshData,
     refreshingData,
     markNotificationRead,
@@ -162,7 +161,7 @@ export default function Layout({ children }) {
       const matchesModule = !notification.modulo || hasModuleAccess(user, notification.modulo)
       const systemEnabled = user?.preferenciasNotificacao?.system !== false
       const isDirectMessage = notification.tipo === 'mensagem'
-      return isRecipient && isCurrentForUser && matchesAudience && matchesModule && (systemEnabled || isDirectMessage)
+      return !isDirectMessage && isRecipient && isCurrentForUser && matchesAudience && matchesModule && systemEnabled
     })
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .map(notification => ({
@@ -190,19 +189,6 @@ export default function Layout({ children }) {
   }
   const handleClearAll = () => clearAllNotifications(notifications.map(n => n.id))
   const unreadCount = notifications.filter(n => !n.read).length
-  const chatUnreadCount = (storedMessages || []).filter(message => {
-    if (!user?.id || matchesUserId(message.remetenteId, user)) return false
-
-    if (matchesUserId(message.destinatarioId, user)) {
-      return !message.lida
-    }
-
-    if (message.destinatarioId === 'avisos') {
-      return !(message.lidosPor || []).some(id => matchesUserId(id, user))
-    }
-
-    return false
-  }).length
   const activeSector = SECTORS.find(s => s.path && location.pathname.startsWith(s.path))
   const sidebarOrder = navigation?.sidebarOrder || {}
   const normalizeText = value => `${value || ''}`
@@ -212,7 +198,6 @@ export default function Layout({ children }) {
   const canEditSectorOrder = sector => {
     if (!sector?.subItems?.length || sector.comingSoon) return false
     if (hasPresidentAuthority(user)) return true
-    if (sector.id === 'chat') return false
     const cargo = normalizeText(user?.cargo)
     const isDirector = user?.role === 'diretor' || cargo.includes('diretor')
     return Boolean(isDirector && hasModuleAccess(user, sector.id))
@@ -331,19 +316,9 @@ export default function Layout({ children }) {
                   }
                 `}>
                   <Icon className="w-4 h-4 flex-shrink-0" />
-                  {collapsed && sector.id === 'chat' && chatUnreadCount > 0 && !isDisabled && (
-                    <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-emerald-400 text-[#044947] text-[9px] font-extrabold flex items-center justify-center shadow-[0_0_12px_rgba(52,211,153,0.55)]">
-                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                    </span>
-                  )}
                   {!collapsed && (
                     <>
                       <span className="text-sm font-medium flex-1 truncate">{sector.label}</span>
-                      {sector.id === 'chat' && chatUnreadCount > 0 && !isDisabled && (
-                        <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-emerald-400 text-[#044947] text-[10px] font-extrabold flex items-center justify-center shadow-[0_0_12px_rgba(52,211,153,0.45)]">
-                          {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                        </span>
-                      )}
                       {sector.comingSoon && (
                         <span className="text-[10px] font-semibold bg-white/10 text-white/40 px-1.5 py-0.5 rounded flex-shrink-0 leading-none">Em breve</span>
                       )}

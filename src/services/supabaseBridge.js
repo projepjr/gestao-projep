@@ -112,7 +112,6 @@ function describeSupabaseError(error) {
 const userUuid = userId => appIdToUuid(userId, NS.user)
 const remoteUserId = user => user?.supabaseId || userUuid(user?.id)
 const meetingUuid = meetingId => stableUuid(meetingId, NS.meeting)
-const messageUuid = messageId => stableUuid(messageId, NS.message)
 const notificationUuid = notificationId => stableUuid(notificationId, NS.notification)
 const defaultEmailFromName = name => {
   const slug = `${name || 'membro'}`
@@ -308,32 +307,6 @@ function meetingToRemote(meeting, currentUserId = null) {
     notes: meeting.observacoes || null,
     created_by: currentUserId ? userUuid(currentUserId) : null,
     updated_at: new Date().toISOString(),
-  }
-}
-
-function messageToRemote(message, remoteIds = {}) {
-  const isChannel = message.tipo === 'aviso_geral' || message.destinatarioId === 'avisos'
-  return {
-    id: messageUuid(message.id),
-    sender_id: remoteIds.senderId || (message.remetenteId ? userUuid(message.remetenteId) : null),
-    receiver_id: !isChannel && message.destinatarioId ? (remoteIds.receiverId || userUuid(message.destinatarioId)) : null,
-    channel_id: isChannel ? message.destinatarioId : null,
-    content: message.texto,
-    read_by: (remoteIds.readBy || (message.lidosPor || []).map(id => userUuid(id))),
-    created_at: message.timestamp || new Date().toISOString(),
-  }
-}
-
-function messageFromRemote(row, profileIdToUserId = new Map()) {
-  return {
-    id: uuidToAppId(row.id, NS.message) || row.id,
-    remetenteId: profileIdToUserId.get(row.sender_id) || row.sender_id,
-    destinatarioId: row.channel_id || profileIdToUserId.get(row.receiver_id) || row.receiver_id,
-    texto: row.content,
-    timestamp: row.created_at,
-    lida: Boolean(row.receiver_id && (row.read_by || []).includes(row.receiver_id)),
-    lidosPor: (row.read_by || []).map(id => profileIdToUserId.get(id) || id).filter(Boolean),
-    tipo: row.channel_id ? 'aviso_geral' : 'direta',
   }
 }
 
@@ -806,47 +779,6 @@ export async function deleteMeetingFromSupabase(meetingId) {
   logRemoteError('delete meeting', error)
 }
 
-export async function syncMessageToSupabase(message, users = []) {
-  if (!isSupabaseConfigured || !supabase || !message) return
-  const isChannel = message.tipo === 'aviso_geral' || message.destinatarioId === 'avisos'
-  const sender = findUserByAnyId(users, message.remetenteId)
-  const receiver = isChannel ? null : findUserByAnyId(users, message.destinatarioId)
-  const relatedUsers = [sender, receiver].filter(user => user?.email)
-  const syncedUsers = relatedUsers.length ? await syncUsersToSupabase(relatedUsers) : []
-  const resolveSynced = user => syncedUsers?.find(synced => sameUserIdentity(synced, user)) || user
-  const senderId = sender ? remoteUserId(resolveSynced(sender)) : userUuid(message.remetenteId)
-  const receiverId = !isChannel && receiver ? remoteUserId(resolveSynced(receiver)) : (!isChannel && message.destinatarioId ? userUuid(message.destinatarioId) : null)
-  const readBy = (message.lidosPor || []).map(id => {
-    const reader = findUserByAnyId([...(syncedUsers || []), ...users], id)
-    return reader ? remoteUserId(reader) : userUuid(id)
-  })
-
-  const { error } = await supabase
-    .from('chat_messages')
-    .upsert(messageToRemote(message, { senderId, receiverId, readBy }), { onConflict: 'id' })
-  logRemoteError('upsert message', error)
-}
-
-export async function markRemoteMessageRead(messageId, userId) {
-  if (!isSupabaseConfigured || !supabase || !messageId || !userId) return
-  const id = messageUuid(messageId)
-  const profileId = userUuid(userId)
-  const { data, error: fetchError } = await supabase
-    .from('chat_messages')
-    .select('read_by')
-    .eq('id', id)
-    .maybeSingle()
-  logRemoteError('fetch message read state', fetchError)
-  if (fetchError) return
-
-  const readBy = [...new Set([...(data?.read_by || []), profileId])]
-  const { error } = await supabase
-    .from('chat_messages')
-    .update({ read_by: readBy })
-    .eq('id', id)
-  logRemoteError('mark message read', error)
-}
-
 export async function syncNotificationToSupabase(notification, users = []) {
   if (!isSupabaseConfigured || !supabase || !notification) return
   const recipient = notification.usuarioId ? findUserByAnyId(users, notification.usuarioId) : null
@@ -888,17 +820,13 @@ export async function pullCommunication(db, profileIdToUserId) {
     notifQuery = notifQuery.or(`profile_id.is.null,profile_id.eq.${currentProfileId}`)
   }
 
-  const [{ data: remoteMessages, error: messageError }, { data: remoteNotifications, error: notificationError }] = await Promise.all([
-    supabase.from('chat_messages').select('*').order('created_at', { ascending: true }),
-    notifQuery,
-  ])
-  logRemoteError('fetch messages', messageError)
+  const { data: remoteNotifications, error: notificationError } = await notifQuery
   logRemoteError('fetch notifications', notificationError)
-  if (messageError || notificationError) return
+  if (notificationError) return
 
   db.mutate('comunicacao', current => ({
     ...current,
-    mensagens: (remoteMessages || []).map(row => messageFromRemote(row, profileIdToUserId)),
+    mensagens: [],
     notificacoes: (remoteNotifications || [])
       .filter(row => row.type !== COMMERCIAL_CONFIG_SOURCE)
       .map(row => notificationFromRemote(row, profileIdToUserId)),
@@ -978,7 +906,6 @@ export function subscribeToSupabaseChanges(db, handlers = {}) {
     .channel('projep-app-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, scheduleAppSync)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'permissions' }, scheduleAppSync)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, scheduleCommunicationSync)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, scheduleNotificationSync)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, scheduleAppSync)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_responsibles' }, scheduleAppSync)

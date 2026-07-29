@@ -55,12 +55,13 @@ Pelo codigo, o sistema sincroniza ou le dados como:
 - `permissions`
 - `meetings`
 - `meeting_responsibles`
-- `chat_messages`
 - `notifications`
 - `sectors`
 - `comercial_dashboard_snapshots`
 
 Essas tabelas aparecem em `src/services/supabaseBridge.js` e nas leituras da dashboard comercial.
+
+Observacao 2026-07-29: `chat_messages` ficou como estrutura legada no banco. O front-end nao usa mais chat interno; a area ativa e o diretorio de membros em `/membros`.
 
 ## SMTP e recuperacao de senha
 
@@ -95,4 +96,3 @@ Casos tratados:
 - redirect URL nao permitida;
 - usuario nao encontrado;
 - erro vazio `{}` retornado pelo Supabase.
-

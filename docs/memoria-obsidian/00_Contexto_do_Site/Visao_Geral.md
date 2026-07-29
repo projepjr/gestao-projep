@@ -41,8 +41,12 @@ O projeto e um SPA Vite. Nao e Next.js.
 - Projetos:
   - `src/pages/projetos/BaseConhecimento.jsx`
   - `src/data/projetos.js`
-- Chat:
-  - `src/pages/Chat.jsx`
+- Membros:
+  - `src/pages/Membros.jsx`
+
+## Comunicacao interna
+
+Atualizacao 2026-07-29: o chat interno foi removido/desativado por decisao de produto. A area global ativa passou a ser `Membros`, um diretorio para consulta dos membros cadastrados no sistema. A rota legada `/chat` redireciona para `/membros` apenas para nao quebrar links antigos.
 
 ## Fonte de verdade
 

@@ -288,7 +288,7 @@ export function AuthProvider({ children }) {
         whatsapp: false,
         weekly_report: true,
       },
-      permissoes: normalizePermissions({ chat: false }, 'membro'),
+      permissoes: normalizePermissions({ membros: true }, 'membro'),
     }
 
     const syncResult = await syncUsersToSupabase([newUser])

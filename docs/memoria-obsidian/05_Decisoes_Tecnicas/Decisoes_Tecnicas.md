@@ -14,7 +14,6 @@ Isso inclui:
 - perfis;
 - status de aprovacao;
 - permissoes;
-- mensagens;
 - notificacoes;
 - reunioes;
 - snapshots comerciais.
@@ -23,14 +22,14 @@ Isso inclui:
 
 ## Sincronizacao e performance
 
-Decisao: Supabase Realtime deve ser o caminho principal para atualizar mensagens, notificacoes, permissoes e dados compartilhados entre navegadores.
+Decisao: Supabase Realtime deve ser o caminho principal para atualizar notificacoes, permissoes e dados compartilhados entre navegadores.
 
 Polling automatico deve existir apenas como fallback de seguranca, em intervalos moderados. Evitar buscas completas em intervalos muito curtos, porque cada sincronizacao pode atualizar o estado global do React e gerar travamentos perceptiveis conforme a base cresce.
 
 Atualizacao 2026-07-29: a sincronizacao global foi separada em dois fluxos no `supabaseBridge`:
 
 - dados do app: perfis, permissoes, reunioes e responsaveis;
-- comunicacao: mensagens e notificacoes.
+- comunicacao: notificacoes e avisos.
 
 Snapshots comerciais (`comercial_dashboard_snapshots`) nao devem disparar sincronizacao global do `DataContext`, porque os payloads do Pipefy sao grandes e podem travar a interface. As paginas comerciais que precisam desses snapshots devem buscar os dados diretamente, com limites pequenos e timeout defensivo.
 
@@ -96,7 +95,7 @@ Implementacao:
 - `src/components/Layout.jsx` aplica a ordem salva sem duplicar a lista de modulos;
 - diretores podem editar a ordem dos setores aos quais possuem acesso;
 - usuarios com autoridade de Presidencia podem editar qualquer setor editavel;
-- Chat fica fora da regra comum: por ser uma area global, sua edicao deve continuar restrita a Presidencia.
+- Atualizacao 2026-07-29: o modulo de chat interno foi removido/desativado. A area global ativa passou a ser `Membros`, com rota `/membros`. A rota antiga `/chat` redireciona para `/membros` por compatibilidade.
 - a interface de edicao da ordem deve usar arrastar e soltar, nao botoes de seta, para ficar mais intuitiva para diretores e Presidencia.
 
 Regra: nao salvar essa ordem em `localStorage` como fonte oficial, porque a mudanca precisa aparecer igual para todos os usuarios.

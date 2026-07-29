@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import db from '../data/db'
 import { hasSubareaAccess, normalizePermissions } from '../config/accessControl'
@@ -9,7 +9,6 @@ import {
   getDeleteMemberAuthorization,
   canManageMembers,
   canManagePermissions,
-  canPostAnnouncements,
   canSendFeedback,
 } from '../config/authorization'
 import {
@@ -19,13 +18,11 @@ import {
   deleteRemoteNotification,
   deleteUserFromSupabase,
   pullCommunicationState,
-  markRemoteMessageRead,
   markRemoteNotificationRead,
   pullRemoteState,
   subscribeToSupabaseChanges,
   syncCommercialTeamConfig,
   syncMeetingToSupabase,
-  syncMessageToSupabase,
   syncNavigationConfig,
   syncNotificationToSupabase,
   syncUsersToSupabase,
@@ -197,7 +194,7 @@ function syncTaskDeadlineNotifications(projectData) {
         id,
         usuarioId: task.responsavelId,
         titulo: days === 0 ? 'Tarefa vence hoje' : `Tarefa vence em ${days} dia${days > 1 ? 's' : ''}`,
-        descricao: `${task.titulo} · ${project.nome}`,
+        descricao: `${task.titulo} Â· ${project.nome}`,
         timestamp: previous?.timestamp || new Date().toISOString(),
         lida: previous?.lida || false,
         lidosPor: previous?.lidosPor || [],
@@ -213,36 +210,6 @@ function syncTaskDeadlineNotifications(projectData) {
   if (JSON.stringify(next) !== JSON.stringify(existing)) {
     db.set('comunicacao', { ...communication, notificacoes: next })
   }
-}
-
-function markConversationReadInDb({ userId, memberId = null, channelId = null }) {
-  const changedMessageIds = []
-  db.mutate('comunicacao', current => {
-    let changed = false
-    const mensagens = (current.mensagens || []).map(message => {
-      const isDirect = memberId && idBelongsToUser(message.remetenteId, memberId) && idBelongsToUser(message.destinatarioId, userId) && !message.lida
-      const isChannel = channelId && message.destinatarioId === channelId && !(message.lidosPor || []).some(id => idBelongsToUser(id, userId))
-      if (!isDirect && !isChannel) return message
-      changed = true
-      changedMessageIds.push(message.id)
-      return channelId
-        ? { ...message, lidosPor: [...new Set([...(message.lidosPor || []), userId])] }
-        : { ...message, lida: true }
-    })
-    const notificacoes = (current.notificacoes || []).map(notification => {
-      const linkUserId = notification.link?.includes('?')
-        ? new URLSearchParams(notification.link.split('?')[1]).get('user')
-        : null
-      const linkMatchesConversation = !linkUserId || idBelongsToUser(linkUserId, memberId)
-      if (memberId && idBelongsToUser(notification.usuarioId, userId) && !notification.lida && notification.tipo === 'mensagem' && linkMatchesConversation) {
-        changed = true
-        return { ...notification, lida: true }
-      }
-      return notification
-    })
-    return changed ? { ...current, mensagens, notificacoes } : current
-  })
-  changedMessageIds.forEach(messageId => { void markRemoteMessageRead(messageId, userId) })
 }
 
 export function DataProvider({ children }) {
@@ -343,7 +310,7 @@ export function DataProvider({ children }) {
       try {
         await pullRemoteState(db)
       } catch (error) {
-        console.warn('[Supabase] Falha ao buscar atualizações remotas:', error.message || error)
+        console.warn('[Supabase] Falha ao buscar atualizaÃ§Ãµes remotas:', error.message || error)
       } finally {
         syncInFlight = false
       }
@@ -354,7 +321,7 @@ export function DataProvider({ children }) {
       try {
         await pullCommunicationState(db)
       } catch (error) {
-        console.warn('[Supabase] Falha ao buscar mensagens remotas:', error.message || error)
+        console.warn('[Supabase] Falha ao buscar comunicacao remota:', error.message || error)
       } finally {
         communicationSyncInFlight = false
       }
@@ -366,9 +333,9 @@ export function DataProvider({ children }) {
           onAppChange: syncRemote,
           onCommunicationChange: syncCommunicationRemote,
         })
-        if (mounted && result?.enabled) console.info('[Supabase] Sincronização inicial concluída.')
+        if (mounted && result?.enabled) console.info('[Supabase] SincronizaÃ§Ã£o inicial concluÃ­da.')
       })
-      .catch(error => console.warn('[Supabase] Falha na sincronização inicial:', error.message || error))
+      .catch(error => console.warn('[Supabase] Falha na sincronizaÃ§Ã£o inicial:', error.message || error))
     // Supabase Realtime is the main sync path. Polling stays as a safety net, so
     // the app does not re-render global state every few seconds while idle.
     const intervalId = window.setInterval(syncRemote, REMOTE_SYNC_INTERVAL_MS)
@@ -452,15 +419,15 @@ export function DataProvider({ children }) {
   }, [])
 
   const addMember = async member => {
-    if (!canManageMembers(currentUser)) return { success: false, error: 'Você não pode cadastrar membros.' }
+    if (!canManageMembers(currentUser)) return { success: false, error: 'VocÃª nÃ£o pode cadastrar membros.' }
     const temporaryCredentials = member.usarDadosTemporarios ? createTemporaryCredentials(member.nome) : null
     const email = (temporaryCredentials?.email || member.email)?.trim().toLowerCase()
     const senha = temporaryCredentials?.senha || member.senha
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return { success: false, error: 'Informe um email válido.' }
+      return { success: false, error: 'Informe um email vÃ¡lido.' }
     }
     if (emailInUse(email)) {
-      return { success: false, error: 'Já existe um membro com este email.' }
+      return { success: false, error: 'JÃ¡ existe um membro com este email.' }
     }
     if (!senha || senha.length < 6) {
       return { success: false, error: 'A senha inicial deve ter pelo menos 6 caracteres.' }
@@ -473,7 +440,7 @@ export function DataProvider({ children }) {
     if (authResult.success === false && authResult.enabled !== false) {
       return {
         success: false,
-        error: `NÃ£o foi possÃ­vel criar o login no Supabase Auth: ${authResult.error || 'erro desconhecido'}`,
+        error: `NÃƒÂ£o foi possÃƒÂ­vel criar o login no Supabase Auth: ${authResult.error || 'erro desconhecido'}`,
       }
     }
     const canonicalSector = resolveSetor(member.setorId || member.setor)
@@ -482,7 +449,7 @@ export function DataProvider({ children }) {
       ? 'presidente'
       : cargo.includes('diretor') ? 'diretor' : (member.role || 'membro')
     if (!canManagePermissions(currentUser) && role !== 'membro') {
-      return { success: false, error: 'Somente a presidência pode cadastrar diretores.' }
+      return { success: false, error: 'Somente a presidÃªncia pode cadastrar diretores.' }
     }
     const basePermissions = {}
 
@@ -523,11 +490,11 @@ export function DataProvider({ children }) {
     }
   }
   const updateMember = (id, data) => {
-    if (!canManageMembers(currentUser)) return { success: false, error: 'Você não pode editar membros.' }
+    if (!canManageMembers(currentUser)) return { success: false, error: 'VocÃª nÃ£o pode editar membros.' }
     const target = db.get('usuarios').find(member => idsEqual(member.id, id))
-    if (!target) return { success: false, error: 'Membro não encontrado.' }
+    if (!target) return { success: false, error: 'Membro nÃ£o encontrado.' }
     if (!canManagePermissions(currentUser) && ['presidente', 'diretor'].includes(target.role)) {
-      return { success: false, error: 'Você não pode editar este membro.' }
+      return { success: false, error: 'VocÃª nÃ£o pode editar este membro.' }
     }
     const canonicalSector = resolveSetor(data.setorId || data.setor || target.setorId)
     const allowed = ['nome', 'cargo', 'telefone', 'fotoPerfil', 'status', 'dataCadastro', 'skills', 'projects', 'performance']
@@ -558,8 +525,8 @@ export function DataProvider({ children }) {
   })
 
   const updateCommercialTeam = (role, entries) => {
-    if (!canUse('comercial.equipe')) return { success: false, error: 'Você não pode alterar a equipe comercial.' }
-    if (!['hunters', 'closers'].includes(role)) return { success: false, error: 'Função comercial inválida.' }
+    if (!canUse('comercial.equipe')) return { success: false, error: 'VocÃª nÃ£o pode alterar a equipe comercial.' }
+    if (!['hunters', 'closers'].includes(role)) return { success: false, error: 'FunÃ§Ã£o comercial invÃ¡lida.' }
     const normalizedEntries = (entries || []).map(entry => ({
       id: entry.id || db.createId(),
       userId: entry.userId,
@@ -586,10 +553,10 @@ export function DataProvider({ children }) {
   }
 
   const updateCommercialPipeId = pipeId => {
-    if (!canUse('comercial.equipe')) return { success: false, error: 'VocÃª nÃ£o pode alterar a integraÃ§Ã£o comercial.' }
+    if (!canUse('comercial.equipe')) return { success: false, error: 'VocÃƒÂª nÃƒÂ£o pode alterar a integraÃƒÂ§ÃƒÂ£o comercial.' }
     const normalizedPipeId = `${pipeId || ''}`.trim()
     if (!/^\d+$/.test(normalizedPipeId)) {
-      return { success: false, error: 'Informe um ID de pipeline vÃ¡lido.' }
+      return { success: false, error: 'Informe um ID de pipeline vÃƒÂ¡lido.' }
     }
 
     let nextEquipe = null
@@ -614,7 +581,7 @@ export function DataProvider({ children }) {
       ? order.map(item => `${item}`).filter(Boolean)
       : []
     if (!normalizedSectorId || !normalizedOrder.length) {
-      return { success: false, error: 'Ordem de navegação inválida.' }
+      return { success: false, error: 'Ordem de navegaÃ§Ã£o invÃ¡lida.' }
     }
 
     let nextNavigation = null
@@ -636,22 +603,22 @@ export function DataProvider({ children }) {
   }
 
   const addLead = lead => {
-    if (!canUse('comercial.pipeline')) return { success: false, error: 'Você não pode alterar o pipeline.' }
+    if (!canUse('comercial.pipeline')) return { success: false, error: 'VocÃª nÃ£o pode alterar o pipeline.' }
     const newLead = { ...lead, id: db.createId() }
     updateCommercialList('leads', current => [...current, newLead])
     return { success: true, lead: newLead }
   }
   const updateLead = (id, data) => {
-    if (!canUse('comercial.pipeline')) return { success: false, error: 'Você não pode alterar o pipeline.' }
+    if (!canUse('comercial.pipeline')) return { success: false, error: 'VocÃª nÃ£o pode alterar o pipeline.' }
     const target = db.get('comercial').leads?.find(lead => idsEqual(lead.id, id))
-    if (!target) return { success: false, error: 'Lead não encontrado.' }
+    if (!target) return { success: false, error: 'Lead nÃ£o encontrado.' }
     updateCommercialList('leads', current => current.map(lead => idsEqual(lead.id, id) ? { ...lead, ...data } : lead))
     if (data.stage === 'fechado' && target.stage !== 'fechado') {
       addNotification({
         usuarioId: null,
         modulo: 'comercial',
-        titulo: 'Novo negócio fechado',
-        descricao: `${target.company} avançou para a etapa Fechado`,
+        titulo: 'Novo negÃ³cio fechado',
+        descricao: `${target.company} avanÃ§ou para a etapa Fechado`,
         tipo: 'contract',
         link: '/comercial/pipeline',
         lidosPor: [user.id],
@@ -660,7 +627,7 @@ export function DataProvider({ children }) {
     return { success: true }
   }
   const deleteLead = id => {
-    if (!canUse('comercial.pipeline')) return { success: false, error: 'Você não pode alterar o pipeline.' }
+    if (!canUse('comercial.pipeline')) return { success: false, error: 'VocÃª nÃ£o pode alterar o pipeline.' }
     updateCommercialList('leads', current => current.filter(lead => !idsEqual(lead.id, id)))
     return { success: true }
   }
@@ -678,8 +645,8 @@ export function DataProvider({ children }) {
       addNotification({
         usuarioId: memberId,
         modulo: 'comercial',
-        titulo: 'Você foi alocado em uma reunião',
-        descricao: `${meeting.empresa} · ${meeting.data}${meeting.horaInicio ? ` às ${meeting.horaInicio}` : ''}`,
+        titulo: 'VocÃª foi alocado em uma reuniÃ£o',
+        descricao: `${meeting.empresa} Â· ${meeting.data}${meeting.horaInicio ? ` Ã s ${meeting.horaInicio}` : ''}`,
         tipo: 'sistema',
         link: `/comercial/calendario?data=${meeting.data}`,
       })
@@ -788,7 +755,7 @@ export function DataProvider({ children }) {
   })
 
   const addContract = contract => {
-    if (!canUse('comercial.contratos')) return { success: false, error: 'Você não pode cadastrar contratos.' }
+    if (!canUse('comercial.contratos')) return { success: false, error: 'VocÃª nÃ£o pode cadastrar contratos.' }
     const created = { ...contract, id: db.createId() }
     updateCommercialList('contratos', current => [...current, created])
     syncProjectFromContract(created)
@@ -796,7 +763,7 @@ export function DataProvider({ children }) {
       usuarioId: null,
       modulo: 'comercial',
       titulo: 'Novo contrato cadastrado',
-      descricao: `${created.company} foi adicionado à carteira de contratos`,
+      descricao: `${created.company} foi adicionado Ã  carteira de contratos`,
       tipo: 'contract',
       link: '/comercial/contratos',
       lidosPor: [user.id],
@@ -804,7 +771,7 @@ export function DataProvider({ children }) {
     return { success: true, contract: created }
   }
   const updateContract = (id, data) => {
-    if (!canUse('comercial.contratos')) return { success: false, error: 'Você não pode editar contratos.' }
+    if (!canUse('comercial.contratos')) return { success: false, error: 'VocÃª nÃ£o pode editar contratos.' }
     let updatedContract = null
     updateCommercialList('contratos', current => current.map(contract => {
       if (!idsEqual(contract.id, id)) return contract
@@ -814,10 +781,10 @@ export function DataProvider({ children }) {
     if (updatedContract) syncProjectFromContract(updatedContract)
     return updatedContract
       ? { success: true, contract: updatedContract }
-      : { success: false, error: 'Contrato não encontrado.' }
+      : { success: false, error: 'Contrato nÃ£o encontrado.' }
   }
   const deleteContract = id => {
-    if (!canUse('comercial.contratos')) return { success: false, error: 'Você não pode remover contratos.' }
+    if (!canUse('comercial.contratos')) return { success: false, error: 'VocÃª nÃ£o pode remover contratos.' }
     updateCommercialList('contratos', current => current.filter(contract => !idsEqual(contract.id, id)))
     db.mutate('projetos', current => ({
       ...current,
@@ -829,7 +796,7 @@ export function DataProvider({ children }) {
   const normalizeKnowledgeStatus = status => {
     const text = `${status || ''}`.trim()
     const key = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-    if (key === 'concluido') return 'Concluído'
+    if (key === 'concluido') return 'ConcluÃ­do'
     if (key === 'em andamento') return 'Em andamento'
     if (key === 'arquivado') return 'Arquivado'
     return text || 'Planejado'
@@ -920,7 +887,7 @@ export function DataProvider({ children }) {
     return { success: true }
   }
 
-  // ── Projetos (gestao) ─────────────────────────────────────────
+  // â”€â”€ Projetos (gestao) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const updateProjectsList = updater => db.mutate('projetos', current => ({
     ...current,
     projetos: typeof updater === 'function' ? updater(current.projetos || []) : updater,
@@ -931,7 +898,7 @@ export function DataProvider({ children }) {
   }))
 
   const addProject = data => {
-    if (!canUse('projetos.gestao')) return { success: false, error: 'Você não tem permissão para criar projetos.' }
+    if (!canUse('projetos.gestao')) return { success: false, error: 'VocÃª nÃ£o tem permissÃ£o para criar projetos.' }
     const project = {
       saude: 'verde', percentualConcluido: 0, fase: '', descricao: '',
       membros: [], tarefas: [], etapas: [], observacoes: [], historico: [],
@@ -944,13 +911,13 @@ export function DataProvider({ children }) {
   }
 
   const updateProject = (id, data) => {
-    if (!canUse('projetos.gestao')) return { success: false, error: 'Você não tem permissão para editar projetos.' }
+    if (!canUse('projetos.gestao')) return { success: false, error: 'VocÃª nÃ£o tem permissÃ£o para editar projetos.' }
     updateProjectsList(current => current.map(p => idsEqual(p.id, id) ? { ...p, ...data } : p))
     return { success: true }
   }
 
   const deleteProject = id => {
-    if (!canUse('projetos.gestao')) return { success: false, error: 'Você não tem permissão para excluir projetos.' }
+    if (!canUse('projetos.gestao')) return { success: false, error: 'VocÃª nÃ£o tem permissÃ£o para excluir projetos.' }
     updateProjectsList(current => current.filter(p => !idsEqual(p.id, id)))
     return { success: true }
   }
@@ -1031,25 +998,25 @@ export function DataProvider({ children }) {
     [key]: typeof updater === 'function' ? updater(current[key] || []) : updater,
   }))
   const addCandidate = candidate => {
-    if (!canUse('gestaoPessoas.processo')) return { success: false, error: 'Você não pode alterar o processo seletivo.' }
+    if (!canUse('gestaoPessoas.processo')) return { success: false, error: 'VocÃª nÃ£o pode alterar o processo seletivo.' }
     const created = { ...candidate, id: db.createId() }
     updatePeopleList('processoSeletivo', current => [...current, created])
     return { success: true, candidate: created }
   }
   const updateCandidate = (id, data) => {
-    if (!canUse('gestaoPessoas.processo')) return { success: false, error: 'Você não pode alterar o processo seletivo.' }
+    if (!canUse('gestaoPessoas.processo')) return { success: false, error: 'VocÃª nÃ£o pode alterar o processo seletivo.' }
     updatePeopleList('processoSeletivo', current => current.map(candidate => idsEqual(candidate.id, id) ? { ...candidate, ...data } : candidate))
     return { success: true }
   }
   const deleteCandidate = id => {
-    if (!canUse('gestaoPessoas.processo')) return { success: false, error: 'Você não pode alterar o processo seletivo.' }
+    if (!canUse('gestaoPessoas.processo')) return { success: false, error: 'VocÃª nÃ£o pode alterar o processo seletivo.' }
     updatePeopleList('processoSeletivo', current => current.filter(candidate => !idsEqual(candidate.id, id)))
     return { success: true }
   }
 
   const addFeedback = ({ memberId, evaluatorId, text, stars = 5 }) => {
     if (!canSendFeedback(currentUser) || !matchesUserId(evaluatorId, currentUser)) {
-      return { success: false, error: 'Você não pode enviar feedbacks.' }
+      return { success: false, error: 'VocÃª nÃ£o pode enviar feedbacks.' }
     }
     const evaluations = [...(db.get('gestaoPessoas').avaliacoes || [])]
     const index = evaluations.findIndex(evaluation => idsEqual(evaluation.membroId, memberId))
@@ -1083,7 +1050,7 @@ export function DataProvider({ children }) {
     addNotification({
       usuarioId: memberId,
       titulo: 'Novo feedback recebido',
-      descricao: `${evaluator?.nome || 'Gestão de Pessoas'} enviou um feedback sobre seu desempenho`,
+      descricao: `${evaluator?.nome || 'GestÃ£o de Pessoas'} enviou um feedback sobre seu desempenho`,
       tipo: 'sistema',
       link: '/perfil',
     })
@@ -1104,63 +1071,6 @@ export function DataProvider({ children }) {
     }))
     void syncNotificationToSupabase(next, db.get('usuarios'))
     return next
-  }
-
-  const sendMessage = ({ senderId, receiverId = null, channelId = null, content, type = 'direta' }) => {
-    const text = content?.trim()
-    if (!user || !idsEqual(senderId, user.id) || !text) return { success: false, error: 'Mensagem inválida.' }
-    if (channelId === 'avisos' && !canPostAnnouncements(currentUser)) {
-      return { success: false, error: 'Somente a diretoria pode publicar avisos.' }
-    }
-    if (receiverId && !db.get('usuarios').some(member => idsEqual(member.id, receiverId) && member.status === 'ativo')) {
-      return { success: false, error: 'Destinatário indisponível.' }
-    }
-    const recipient = channelId || receiverId
-    const message = {
-      id: db.createId(),
-      remetenteId: senderId,
-      destinatarioId: recipient,
-      texto: text,
-      timestamp: new Date().toISOString(),
-      lida: false,
-      lidosPor: channelId ? [senderId] : [],
-      tipo: channelId ? 'aviso_geral' : type,
-    }
-    db.mutate('comunicacao', current => ({
-      ...current,
-      mensagens: [...(current.mensagens || []), message],
-      avisos: channelId === 'avisos' ? [{
-        id: db.createId(),
-        autorId: senderId,
-        titulo: 'Aviso Geral',
-        texto: text,
-        timestamp: message.timestamp,
-        fixado: false,
-      }, ...(current.avisos || [])] : (current.avisos || []),
-    }))
-    void syncMessageToSupabase(message, db.get('usuarios'))
-
-    if (channelId === 'avisos') {
-      addNotification({
-        usuarioId: null,
-        titulo: 'Novo aviso geral',
-        descricao: text,
-        tipo: 'aviso',
-        link: '/chat',
-        lidosPor: [senderId],
-      })
-    } else if (receiverId) {
-      const sender = members.find(member => matchesUserId(senderId, member))
-      addNotification({
-        usuarioId: receiverId,
-        titulo: sender?.nome || 'Nova mensagem',
-        descricao: text,
-        tipo: 'mensagem',
-        link: `/chat?user=${senderId}`,
-      })
-    }
-
-    return { success: true, message }
   }
 
   const markNotificationRead = (notificationId, userId) => {
@@ -1251,18 +1161,15 @@ export function DataProvider({ children }) {
       deleteCandidate,
       addFeedback,
       communication,
-      messages: communication.mensagens || [],
       notifications: (communication.notificacoes || [])
         .filter(n => !notifDeletedIds.current.has(String(n.id)))
         .map(n => notifReadIds.current.has(String(n.id)) ? { ...n, lida: true } : n),
       notices: communication.avisos || [],
-      sendMessage,
       addNotification,
       markNotificationRead,
       markAllNotificationsRead,
       deleteNotification,
       clearAllNotifications,
-      markConversationRead: markConversationReadInDb,
       projectData,
       projects: [...(projectData.projetos || []), ...mondayProjects],
       revisoesSemana: projectData.revisoesSemana || [],

@@ -266,7 +266,7 @@ function Modal({ member, onClose, onSave }) {
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-semibold">Adicionar foto de perfil</p>
                 <p className="text-gray-500 text-xs mt-1 leading-relaxed">
-                  A foto aparece no perfil, chat, cards de membros e, se for o usuário logado, também na sidebar.
+                  A foto aparece no perfil, cards de membros e, se for o usuário logado, também na sidebar.
                 </p>
                 <div className="flex flex-wrap gap-2 mt-3">
                   <label className="inline-flex items-center gap-2 px-3 py-2 rounded border border-[#CE7028]/40 bg-[#CE7028]/10 text-[#FF882D] hover:bg-[#CE7028]/20 text-xs font-semibold cursor-pointer transition-colors">
