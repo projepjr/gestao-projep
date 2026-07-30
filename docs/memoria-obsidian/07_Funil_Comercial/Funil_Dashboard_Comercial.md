@@ -67,6 +67,15 @@ Regra:
 
 - tokens do Pipefy e chaves privadas devem ficar no n8n/Supabase/provedor de hospedagem, nunca versionados no front-end.
 
+Atualizacao em 2026-07-30:
+
+- O workflow `Follow-up Comercial - Pipefy` passou a ter gatilho imediato por webhook, alem do agendamento de 15 minutos como fallback.
+- O Pipefy foi configurado com webhook `card.move` no pipeline oficial `307256948`.
+- O filtro do webhook considera apenas cards que entram na fase `Negociacao` (`343749671`).
+- O webhook chama o caminho n8n `pipefy-followup-negociacao`.
+- A automacao continua reaproveitando a mesma logica de deduplicacao por `ID do card original` antes de criar cards no pipe `Follow-up Comercial`.
+- Nao registrar URL completa, token do Pipefy ou chaves do n8n nesta memoria.
+
 Atualizacao em 2026-07-17:
 
 - Foi gerado um workflow de importacao manual sanitizado em `workflow-pipefy-dashboard-307256948.json`.
