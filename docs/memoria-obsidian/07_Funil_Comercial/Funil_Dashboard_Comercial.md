@@ -558,6 +558,13 @@ Fases ativas do pipeline de follow-up:
 3. `Terceiro contato`
 4. `Quarto contato`
 
+Campos das fases do follow-up:
+
+- `Primeiro contato`: `Data do primeiro contato`, `Observacao do primeiro contato`.
+- `Segundo contato`: `Data do segundo contato`, `Observacao do segundo contato`.
+- `Terceiro contato`: `Data do terceiro contato`, `Observacao do terceiro contato`.
+- `Quarto contato`: `Data do quarto contato`, `Observacao do quarto contato`.
+
 Campos do formulario inicial do follow-up:
 
 - `Nome da empresa`
