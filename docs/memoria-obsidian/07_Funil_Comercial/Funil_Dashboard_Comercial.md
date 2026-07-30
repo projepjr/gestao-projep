@@ -532,3 +532,40 @@ Regra atual:
 - Empresas com termos como `holding`, `holdings`, `participacoes`, `consultoria`, `consultor`, `assessoria`, `administrador`, `administradora`, `administracao`, `gestao empresarial`, `contabilidade`, `auditoria`, `mentoria`, `coach`, `treinamento`, `corretora`, `intermediacao`, `representacao comercial`, `escritorio`, `servicos combinados de escritorio`, `preparacao de documentos`, `atividades auxiliares` e `servicos administrativos` sao bloqueadas antes da criacao do card no Pipefy.
 - O workflow permaneceu ativo apos a alteracao.
 - Nenhum token, API key ou credencial foi salvo no repositorio.
+
+## Atualizacao 2026-07-30 - Follow-up Comercial no Pipefy
+
+Foi criado um novo pipeline no Pipefy para controle separado de follow-up comercial:
+
+- Nome: `Follow-up Comercial`.
+- Pipe ID: `307279853`.
+- Objetivo: receber copia de cards que entram em `Negociacao` no pipeline comercial oficial.
+- Pipeline comercial fonte autorizado: `307256948`.
+
+Fases ativas do pipeline de follow-up:
+
+1. `Primeiro contato`
+2. `Segundo contato`
+3. `Terceiro contato`
+4. `Quarto contato`
+
+Campos do formulario inicial do follow-up:
+
+- `Nome da empresa`
+- `Nome do cliente`
+- `Numero de telefone`
+- `Responsavel pela negociacao`
+- `Data do contato`
+- `ID do card original`
+- `Link do card original`
+
+Observacoes operacionais:
+
+- O campo `ID do card original` e usado como trava de duplicidade.
+- A automacao nao deve criar outro card de follow-up se ja existir card com o mesmo `ID do card original`.
+- O workflow n8n dedicado criado para essa sincronizacao se chama `Follow-up Comercial - Pipefy`.
+- ID do workflow n8n: `cIJhBuZZ2uVws9Yf`.
+- O workflow ficou ativo e roda a cada 15 minutos.
+- A automacao consulta cards na fase `Negociacao` do pipe `307256948` e cria os faltantes no pipe `307279853`, fase `Primeiro contato`.
+- Nenhum outro pipeline do Pipefy foi alterado nesta automacao.
+- Nenhum token, API key ou credencial foi salvo no repositorio.
