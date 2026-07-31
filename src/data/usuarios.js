@@ -33,6 +33,7 @@ export const INITIAL_USUARIOS = [
       subareas: {
         'presidencia.seguranca': true,
         'comercial.dashboard': true,
+        'comercial.meuDesempenho': true,
         'comercial.pipeline': true,
         'comercial.calendario': true,
         'comercial.ranking': true,

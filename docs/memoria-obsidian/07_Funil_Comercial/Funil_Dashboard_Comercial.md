@@ -638,3 +638,9 @@ Privacidade:
 
 - A tela nunca deve mostrar resultados individuais de outros membros.
 - A comparacao com time deve continuar usando apenas media agregada.
+
+Permissoes:
+
+- A subarea fica registrada como `comercial.meuDesempenho`.
+- O acesso deve ser liberado em `Presidencia > Seguranca`, dentro dos acessos detalhados do setor Comercial.
+- Usuários sem essa subarea liberada nao devem ver a aba no menu nem acessar `/comercial/meu-desempenho`.
