@@ -585,3 +585,56 @@ Observacoes operacionais:
 - A automacao consulta cards na fase `Negociacao` do pipe `307256948` e cria os faltantes no pipe `307279853`, fase `Primeiro contato`.
 - Nenhum outro pipeline do Pipefy foi alterado nesta automacao.
 - Nenhum token, API key ou credencial foi salvo no repositorio.
+
+## Atualizacao 2026-07-31 - Comercial / Meu Desempenho
+
+Foi criada uma subarea no setor Comercial chamada `Meu Desempenho`.
+
+Objetivo:
+
+- Mostrar ao usuario logado o proprio desempenho comercial no periodo selecionado.
+- Comparar o resultado individual apenas com a media agregada do time.
+- Nao exibir nomes, linhas ou metricas individuais de outros hunters/closers.
+
+Arquivos principais:
+
+- `src/pages/comercial/MeuDesempenho.jsx`
+- `src/services/comercialDashboardData.js`
+- `src/config/accessControl.js`
+- `src/App.jsx`
+
+Regras da tela:
+
+- A fonte de dados e o snapshot comercial salvo no Supabase em `comercial_dashboard_snapshots`.
+- A pagina reutiliza o mapper `src/services/comercialSnapshotMapper.js`, o mesmo usado pela dashboard comercial.
+- O usuario e associado aos dados de Hunter ou Closer por `userId`, `supabaseId`, e-mail ou nome normalizado.
+- Se o usuario tiver vinculo como Hunter e Closer, a tela permite alternar entre as duas visoes.
+- Se nao houver vinculo comercial para o usuario logado, a tela mostra estado vazio e orienta configurar em `Comercial > Equipe`.
+
+Metricas de Hunter:
+
+- Leads cadastrados
+- Leads trabalhados
+- Leads contatados
+- Diagnosticas agendadas
+- Diagnosticas realizadas
+- Propostas agendadas
+- Propostas realizadas
+- No-shows
+- Perdidos
+- Taxa de conversao: leads trabalhados que chegaram ate diagnostica realizada
+
+Metricas de Closer:
+
+- Diagnosticas realizadas
+- Propostas agendadas
+- Propostas realizadas
+- No-shows
+- Em negociacao
+- Contratos
+- Taxa de contratos: propostas realizadas que viraram contratos fechados
+
+Privacidade:
+
+- A tela nunca deve mostrar resultados individuais de outros membros.
+- A comparacao com time deve continuar usando apenas media agregada.

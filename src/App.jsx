@@ -10,6 +10,7 @@ import { getDefaultPath, hasPathAccess } from './config/accessControl'
 
 const ComercialDashboard = lazy(() => import('./pages/comercial/Dashboard'))
 const LeadsInsights = lazy(() => import('./pages/comercial/Leads'))
+const MeuDesempenho = lazy(() => import('./pages/comercial/MeuDesempenho'))
 const Pipeline = lazy(() => import('./pages/comercial/Pipeline'))
 const Calendario = lazy(() => import('./pages/comercial/Calendario'))
 const Ranking = lazy(() => import('./pages/comercial/Ranking'))
@@ -72,6 +73,7 @@ function AppRoutes() {
 
       <Route path="/comercial"           element={<ProtectedRoute><ComercialDashboard /></ProtectedRoute>} />
       <Route path="/comercial/leads"     element={<ProtectedRoute><LeadsInsights /></ProtectedRoute>} />
+      <Route path="/comercial/meu-desempenho" element={<ProtectedRoute><MeuDesempenho /></ProtectedRoute>} />
       <Route path="/comercial/pipeline"  element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
       <Route path="/comercial/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
       <Route path="/comercial/ranking"   element={<ProtectedRoute><Ranking /></ProtectedRoute>} />
