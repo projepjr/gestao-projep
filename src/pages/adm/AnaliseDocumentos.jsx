@@ -160,6 +160,23 @@ function MarkdownMessage({ text }) {
   )
 }
 
+function isEmptyAssistantText(text) {
+  const cleaned = `${text || ''}`.trim()
+  if (!cleaned) return true
+  if (['{}', '[]', 'null', 'undefined'].includes(cleaned.toLowerCase())) return true
+
+  try {
+    const parsed = JSON.parse(cleaned)
+    if (parsed === null) return true
+    if (Array.isArray(parsed) && parsed.length === 0) return true
+    if (typeof parsed === 'object' && Object.keys(parsed).length === 0) return true
+  } catch {
+    // Respostas em texto/Markdown nao entram aqui.
+  }
+
+  return false
+}
+
 function formatBytes(bytes = 0) {
   if (!bytes) return '0 KB'
   const units = ['B', 'KB', 'MB']
@@ -194,6 +211,9 @@ function buildConversationQuestion(messages, nextQuestion, analysisType) {
 
 function ChatMessage({ message }) {
   const isUser = message.role === 'user'
+  const assistantText = isEmptyAssistantText(message.text)
+    ? 'A IA nao retornou uma resposta valida. Tente enviar a pergunta novamente em alguns instantes.'
+    : message.text
 
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -214,7 +234,7 @@ function ChatMessage({ message }) {
         {isUser ? (
           <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.text}</p>
         ) : (
-          <MarkdownMessage text={message.text} />
+          <MarkdownMessage text={assistantText} />
         )}
       </div>
 

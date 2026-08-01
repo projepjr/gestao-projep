@@ -39,7 +39,19 @@ function normalizeN8nResponse(payload) {
 
 function hasUsefulAiText(text) {
   const cleaned = `${text || ''}`.trim()
-  return Boolean(cleaned && cleaned !== '{}' && cleaned !== '[]' && cleaned !== 'null')
+  if (!cleaned) return false
+  if (['{}', '[]', 'null', 'undefined'].includes(cleaned.toLowerCase())) return false
+
+  try {
+    const parsed = JSON.parse(cleaned)
+    if (parsed === null) return false
+    if (Array.isArray(parsed) && parsed.length === 0) return false
+    if (typeof parsed === 'object' && Object.keys(parsed).length === 0) return false
+  } catch {
+    // Texto comum da IA nao precisa ser JSON valido.
+  }
+
+  return true
 }
 
 export async function analyzeDocumentWithClaude({ file, question, analysisType, user }) {
