@@ -37,16 +37,19 @@ Para o front-end Vite, configurar:
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL=
+VITE_N8N_DOCUMENT_ANALYSIS_WEBHOOK_URL=
 ```
 
 `VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL` e opcional e deve apontar para um webhook publico do n8n que atualiza Pipefy -> Supabase. Nao usar token privado nessa URL.
+
+`VITE_N8N_DOCUMENT_ANALYSIS_WEBHOOK_URL` aponta para o webhook publico do n8n usado pela tela Adm e Fin > Analise de Documentos. Esse webhook chama a Claude/Anthropic API pelo ambiente do n8n; a chave da IA nunca deve ficar no front-end.
 
 Nao configurar variaveis com prefixo `NEXT_PUBLIC_`, pois o projeto nao e Next.js.
 
 Observacao operacional:
 
 - Variaveis com prefixo `VITE_` sao aplicadas em tempo de build.
-- Depois de criar ou alterar `VITE_N8N_GLOBAL_REFRESH_WEBHOOK_URL`, e necessario gerar novo deploy na Cloudflare Pages.
+- Depois de criar ou alterar variaveis `VITE_`, e necessario gerar novo deploy na Cloudflare Pages.
 
 Nao expor no front-end:
 

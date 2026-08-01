@@ -33,6 +33,7 @@ const ProjetosObservacoes = lazy(() => import('./pages/projetos/Observacoes'))
 const ProjetosRelatorios = lazy(() => import('./pages/projetos/Relatorios'))
 const Perfil = lazy(() => import('./pages/Perfil'))
 const Membros = lazy(() => import('./pages/Membros'))
+const AnaliseDocumentosAdm = lazy(() => import('./pages/adm/AnaliseDocumentos'))
 
 function PageLoader() {
   return (
@@ -87,6 +88,9 @@ function AppRoutes() {
 
       <Route path="/presidencia"           element={<ProtectedRoute requiredPath="/presidencia/seguranca"><Navigate to="/presidencia/seguranca" replace /></ProtectedRoute>} />
       <Route path="/presidencia/seguranca" element={<ProtectedRoute><Seguranca /></ProtectedRoute>} />
+
+      <Route path="/adm-fin" element={<ProtectedRoute requiredPath="/adm-fin/analise-documentos"><Navigate to="/adm-fin/analise-documentos" replace /></ProtectedRoute>} />
+      <Route path="/adm-fin/analise-documentos" element={<ProtectedRoute><AnaliseDocumentosAdm /></ProtectedRoute>} />
 
       <Route path="/projetos"                element={<ProtectedRoute requiredPath="/projetos/dashboard"><Navigate to="/projetos/dashboard" replace /></ProtectedRoute>} />
       <Route path="/projetos/dashboard"     element={<ProtectedRoute><ProjetosDashboard /></ProtectedRoute>} />

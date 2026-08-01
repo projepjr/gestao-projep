@@ -19,6 +19,7 @@ Obsidian e apenas a interface de leitura, navegacao e edicao. A memoria oficial 
 - `05_Decisoes_Tecnicas/`: decisoes arquiteturais importantes.
 - `06_Login_e_Autenticacao/`: fluxo de login, cadastro, aprovacao e recuperacao.
 - `07_Funil_Comercial/`: dashboard comercial, Pipefy, n8n e snapshots.
+- `08_Adm_Fin/`: analise de documentos, IA e integracoes do setor Adm e Fin.
 
 ## Como usar
 
@@ -28,6 +29,7 @@ Obsidian e apenas a interface de leitura, navegacao e edicao. A memoria oficial 
 - Depois de alterar deploy, repositorio, Cloudflare ou rotas de producao, atualizar `03_Cloudflare_GitHub`.
 - Depois de alterar Supabase, Auth, SMTP ou recuperacao de senha, atualizar `02_Supabase` ou `06_Login_e_Autenticacao`.
 - Depois de alterar funil, dashboard comercial, Pipefy ou n8n, atualizar `07_Funil_Comercial`.
+- Depois de alterar analise de documentos, IA ou fluxos do Adm e Fin, atualizar `08_Adm_Fin`.
 - Antes de commit, separar mudancas de memoria, codigo funcional e arquivos sensiveis.
 
 ## Stack real

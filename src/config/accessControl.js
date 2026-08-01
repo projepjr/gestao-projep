@@ -13,9 +13,11 @@ export const ACCESS_MODULES = [
     key: 'adminFinanceiro',
     label: 'Adm e Fin',
     icon: 'calculator',
-    path: null,
-    available: false,
-    subareas: [],
+    path: '/adm-fin',
+    available: true,
+    subareas: [
+      { key: 'adminFinanceiro.analiseDocumentos', label: 'Análise de Documentos', path: '/adm-fin/analise-documentos', icon: 'file-text' },
+    ],
   },
   {
     key: 'comercial',
