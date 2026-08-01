@@ -36,6 +36,12 @@ Front-end Vite:
 VITE_N8N_DOCUMENT_ANALYSIS_WEBHOOK_URL=
 ```
 
+Cloudflare Pages:
+
+- `VITE_N8N_DOCUMENT_ANALYSIS_WEBHOOK_URL` configurada em Production e Preview.
+- A variavel aponta para o webhook publico do n8n de analise de documentos.
+- A chave da Anthropic/Claude continua protegida no n8n, fora do front-end.
+
 n8n:
 
 ```env
