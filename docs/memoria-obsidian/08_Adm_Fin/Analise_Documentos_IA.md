@@ -75,13 +75,28 @@ Se a tabela nao existir, a analise continua funcionando, mas o historico nao ser
 
 ## n8n
 
-Foi preparado um workflow local de importacao:
+Workflow criado no n8n:
+
+- Nome: `Projep - Analise de Documentos Claude`
+- ID: `W7xbPfaPhUtfR1bc`
+- Webhook: `https://optimistic-chowchow.pikapod.net/webhook/projep/documentos/analisar`
+- Status: ativo
+
+O workflow recebe o arquivo e a pergunta do site, prepara o payload para a API da Anthropic/Claude, chama a API com credencial protegida no n8n e responde ao front-end com `{ ok, analysis, model, usage, analyzedAt }`.
+
+Modelo configurado no workflow:
+
+- `claude-sonnet-4-6`
+
+Foi criada uma credencial protegida no n8n para o header `x-api-key`. A chave real da Anthropic nao deve ser registrada no repositorio, na memoria ou em variaveis `VITE_`.
+
+Arquivo local de referencia/export:
 
 - `workflow-documentos-claude-v1.json`
 
-Esse arquivo nao deve ser commitado. Ele foi sanitizado para usar `{{$env.ANTHROPIC_API_KEY}}` em vez de chave real.
+Esse arquivo nao deve ser commitado. Workflows JSON devem permanecer ignorados porque podem carregar configuracoes sensiveis.
 
-Tentativa de criacao via API publica do n8n retornou HTTP 400 sem corpo de erro. Se a API continuar recusando a criacao, importar manualmente o JSON pela UI do n8n e configurar as variaveis de ambiente no servidor.
+Observacao tecnica: o n8n bloqueou acesso direto a `$env` no Code node (`access to env vars denied`). A solucao aplicada foi usar credencial nativa `httpHeaderAuth` no node HTTP, mantendo a chave fora do codigo.
 
 ## Limitacoes conhecidas
 
