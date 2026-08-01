@@ -644,3 +644,10 @@ Permissoes:
 - A subarea fica registrada como `comercial.meuDesempenho`.
 - O acesso deve ser liberado em `Presidencia > Seguranca`, dentro dos acessos detalhados do setor Comercial.
 - Usuários sem essa subarea liberada nao devem ver a aba no menu nem acessar `/comercial/meu-desempenho`.
+
+Atualizacao visual - Meu Desempenho simplificado:
+
+- A tela `Meu Desempenho` foi simplificada para manter apenas um grafico principal.
+- O usuario escolhe a metrica em um seletor e o grafico compara `Voce` contra `Media do time`.
+- Foram removidos cards e grades extras de indicadores para deixar a leitura mais direta.
+- A regra de privacidade permanece: nenhum resultado individual de outros membros e exibido, apenas media agregada.

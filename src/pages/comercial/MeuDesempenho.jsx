@@ -4,13 +4,13 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  ReferenceLine,
+  LabelList,
   ResponsiveContainer,
   Tooltip as ChartTooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { BarChart2, Calendar, ChevronLeft, ChevronRight, Radio, Target, User, Users } from 'lucide-react'
+import { BarChart2, Calendar, ChevronLeft, ChevronRight, Radio, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import {
@@ -25,7 +25,6 @@ import {
 
 const ORANGE = '#CE7028'
 const GREEN = '#044947'
-const BLUE = '#3B82F6'
 
 function normalize(value) {
   return `${value ?? ''}`
@@ -63,7 +62,7 @@ function InfoTip({ text }) {
       <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#CE7028] text-[10px] font-bold text-[#CE7028]">
         ?
       </span>
-      <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-64 -translate-x-1/2 rounded border border-[#CE7028] bg-[#1E1E1E] px-3 py-2 text-xs font-medium leading-relaxed text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+      <span className="pointer-events-none absolute right-0 top-full z-30 mt-2 w-72 rounded border border-[#CE7028] bg-[#1E1E1E] px-3 py-2 text-xs font-medium leading-relaxed text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
         {text}
       </span>
     </span>
@@ -97,17 +96,17 @@ const HUNTER_METRICS = [
   {
     key: 'leadsTrabalhados',
     label: 'Leads trabalhados',
-    help: 'Leads que tiveram algum andamento feito por você no período.',
+    help: 'Leads que tiveram algum avanço feito por você no período.',
   },
   {
     key: 'leadsContatados',
     label: 'Leads contatados',
-    help: 'Leads em que houve contato real com a empresa.',
+    help: 'Leads em que houve contato real com a empresa, como ligação atendida ou resposta útil.',
   },
   {
     key: 'diagnosticasAgendadas',
     label: 'Diagnósticas agendadas',
-    help: 'Diagnósticas marcadas no período e atribuídas a você.',
+    help: 'Reuniões diagnósticas que você marcou no período.',
   },
   {
     key: 'diagnosticasRealizadas',
@@ -127,7 +126,7 @@ const HUNTER_METRICS = [
   {
     key: 'noShows',
     label: 'No-shows',
-    help: 'Reuniões que não aconteceram por ausência do lead. Diagnóstica conta para Hunter; proposta conta para Closer.',
+    help: 'Reuniões que não aconteceram por ausência do lead. No-show de diagnóstica fica com o Hunter.',
   },
   {
     key: 'perdidos',
@@ -162,7 +161,7 @@ const CLOSER_METRICS = [
   {
     key: 'noShows',
     label: 'No-shows',
-    help: 'Propostas que não aconteceram por ausência do lead. No-show de proposta fica sob responsabilidade do Closer.',
+    help: 'Propostas que não aconteceram por ausência do lead. No-show de proposta fica com o Closer.',
   },
   {
     key: 'emNegociacao',
@@ -302,7 +301,6 @@ export default function MeuDesempenho() {
   const selectedMetric = metricOptions.find(metric => metric.key === selectedMetricKey) || metricOptions[0]
   const userValue = metricValue(currentRow, selectedMetric)
   const teamAverage = average(roleRows.map(row => metricValue(row, selectedMetric)))
-  const difference = userValue - teamAverage
 
   const chartData = [
     { label: 'Você', valor: userValue },
@@ -324,7 +322,7 @@ export default function MeuDesempenho() {
           <p className="text-sm text-[#6B7895]">Comercial</p>
           <h1 className="mt-1 text-3xl font-extrabold text-white">Meu Desempenho</h1>
           <p className="mt-2 text-[#6B7895]">
-            Compare seus resultados com a média do time, sem expor dados individuais de outras pessoas.
+            Escolha uma métrica e compare seu resultado com a média do time.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
             {statusMessage && (
@@ -420,153 +418,97 @@ export default function MeuDesempenho() {
           </p>
         </div>
       ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded border border-[#1E1E1E] bg-[#111111] p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-widest text-[#6B7895]">Visualizando</p>
-                <User className="text-[#CE7028]" size={20} />
-              </div>
-              <p className="mt-5 text-2xl font-extrabold text-white">{roleView === 'closer' ? 'Closer' : 'Hunter'}</p>
-              <p className="mt-2 text-sm text-[#6B7895]">{periodLabel}</p>
-            </div>
-
-            <div className="rounded border border-[#1E1E1E] bg-[#111111] p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-widest text-[#6B7895]">Seu resultado</p>
-                <Target className="text-[#CE7028]" size={20} />
-              </div>
-              <p className="mt-5 text-3xl font-extrabold text-white">{formatMetric(userValue, selectedMetric.isPercent)}</p>
-              <p className="mt-2 text-sm text-[#6B7895]">{selectedMetric.label}</p>
-            </div>
-
-            <div className="rounded border border-[#1E1E1E] bg-[#111111] p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-widest text-[#6B7895]">Média do time</p>
-                <Users className="text-[#044947]" size={20} />
-              </div>
-              <p className="mt-5 text-3xl font-extrabold text-white">{formatMetric(teamAverage, selectedMetric.isPercent)}</p>
-              <p className="mt-2 text-sm text-[#6B7895]">Média agregada, sem nomes individuais.</p>
-            </div>
-
-            <div className="rounded border border-[#1E1E1E] bg-[#111111] p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-widest text-[#6B7895]">Diferença</p>
-                <BarChart2 className={difference >= 0 ? 'text-green-400' : 'text-red-400'} size={20} />
-              </div>
-              <p className={`mt-5 text-3xl font-extrabold ${difference >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {difference >= 0 ? '+' : ''}{formatMetric(difference, selectedMetric.isPercent)}
+        <div className="rounded border border-[#1E1E1E] bg-[#111111] p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold text-white">Você x média do time</h2>
+              <p className="mt-1 text-sm text-[#6B7895]">
+                A média é agregada. A tela não mostra dados individuais de outras pessoas.
               </p>
-              <p className="mt-2 text-sm text-[#6B7895]">Comparado com a média do time.</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {canSeeRoleToggle && (
+                <div className="flex rounded border border-[#1E1E1E] bg-[#0A0A0A] p-1">
+                  {[
+                    { key: 'hunter', label: 'Hunter' },
+                    { key: 'closer', label: 'Closer' },
+                  ].map(option => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => {
+                        setRoleView(option.key)
+                        setSelectedMetricKey(option.key === 'closer' ? CLOSER_METRICS[0].key : HUNTER_METRICS[1].key)
+                      }}
+                      className={`rounded px-4 py-2 text-sm font-bold ${
+                        roleView === option.key ? 'bg-[#CE7028] text-white' : 'text-[#8A95AD] hover:text-white'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#6B7895]">Métrica</span>
+                <select
+                  value={selectedMetricKey}
+                  onChange={event => setSelectedMetricKey(event.target.value)}
+                  className="min-w-[260px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-4 py-2 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
+                >
+                  {metricOptions.map(metric => (
+                    <option key={metric.key} value={metric.key}>{metric.label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
 
-          <div className="rounded border border-[#1E1E1E] bg-[#111111] p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-xl font-extrabold text-white">Comparativo individual</h2>
-                <p className="mt-1 text-sm text-[#6B7895]">
-                  Escolha uma métrica para comparar seu resultado com a média do time.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                {canSeeRoleToggle && (
-                  <div className="flex rounded border border-[#1E1E1E] bg-[#0A0A0A] p-1">
-                    {[
-                      { key: 'hunter', label: 'Hunter' },
-                      { key: 'closer', label: 'Closer' },
-                    ].map(option => (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => {
-                          setRoleView(option.key)
-                          setSelectedMetricKey(option.key === 'closer' ? CLOSER_METRICS[0].key : HUNTER_METRICS[1].key)
-                        }}
-                        className={`rounded px-4 py-2 text-sm font-bold ${
-                          roleView === option.key ? 'bg-[#CE7028] text-white' : 'text-[#8A95AD] hover:text-white'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold uppercase tracking-widest text-[#6B7895]">Métrica</span>
-                  <select
-                    value={selectedMetricKey}
-                    onChange={event => setSelectedMetricKey(event.target.value)}
-                    className="min-w-[260px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-4 py-2 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
-                  >
-                    {metricOptions.map(metric => (
-                      <option key={metric.key} value={metric.key}>{metric.label}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center gap-2 text-sm text-[#8A95AD]">
-              <span className="font-bold text-white">{selectedMetric.label}</span>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded border border-[#1E1E1E] bg-[#0A0A0A] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">{selectedMetric.label}</span>
               <InfoTip text={selectedMetric.help} />
             </div>
-
-            <div className="mt-6 h-[360px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 24, right: 28, left: 0, bottom: 8 }}>
-                  <CartesianGrid stroke="#1E1E1E" strokeDasharray="3 3" />
-                  <XAxis dataKey="label" stroke="#6B7895" tick={{ fill: '#8A95AD', fontSize: 12 }} />
-                  <YAxis stroke="#6B7895" tick={{ fill: '#8A95AD', fontSize: 12 }} />
-                  <ChartTooltip
-                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                    contentStyle={{ background: '#111111', border: '1px solid #1E1E1E', borderRadius: 6, color: '#fff' }}
-                    formatter={value => [formatMetric(value, selectedMetric.isPercent), selectedMetric.label]}
-                  />
-                  <ReferenceLine
-                    y={teamAverage}
-                    stroke="#CE7028"
-                    strokeDasharray="4 4"
-                    label={{ value: 'Média', fill: '#CE7028', fontSize: 12, position: 'insideTopRight' }}
-                  />
-                  <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={entry.label} fill={index === 0 ? ORANGE : GREEN} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <span className="text-[#8A95AD]">
+                Você: <strong className="text-white">{formatMetric(userValue, selectedMetric.isPercent)}</strong>
+              </span>
+              <span className="text-[#8A95AD]">
+                Média do time: <strong className="text-white">{formatMetric(teamAverage, selectedMetric.isPercent)}</strong>
+              </span>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {metricOptions.map(metric => {
-              const value = metricValue(currentRow, metric)
-              const avg = average(roleRows.map(row => metricValue(row, metric)))
-              return (
-                <button
-                  key={metric.key}
-                  type="button"
-                  onClick={() => setSelectedMetricKey(metric.key)}
-                  className={`rounded border p-5 text-left transition ${
-                    selectedMetricKey === metric.key
-                      ? 'border-[#CE7028] bg-[#CE7028]/10'
-                      : 'border-[#1E1E1E] bg-[#111111] hover:border-[#CE7028]/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-bold uppercase tracking-widest text-[#6B7895]">{metric.label}</span>
-                    <InfoTip text={metric.help} />
-                  </div>
-                  <p className="mt-4 text-2xl font-extrabold text-white">{formatMetric(value, metric.isPercent)}</p>
-                  <p className="mt-1 text-xs text-[#6B7895]">Média do time: {formatMetric(avg, metric.isPercent)}</p>
-                </button>
-              )
-            })}
+          <div className="mt-6 h-[430px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 32, right: 28, left: 0, bottom: 8 }}>
+                <CartesianGrid stroke="#1E1E1E" strokeDasharray="3 3" />
+                <XAxis dataKey="label" stroke="#6B7895" tick={{ fill: '#8A95AD', fontSize: 12 }} />
+                <YAxis stroke="#6B7895" tick={{ fill: '#8A95AD', fontSize: 12 }} />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  contentStyle={{ background: '#111111', border: '1px solid #1E1E1E', borderRadius: 6, color: '#fff' }}
+                  formatter={value => [formatMetric(value, selectedMetric.isPercent), selectedMetric.label]}
+                />
+                <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
+                  <LabelList
+                    dataKey="valor"
+                    position="top"
+                    fill="#FFFFFF"
+                    fontSize={13}
+                    fontWeight={800}
+                    formatter={value => formatMetric(value, selectedMetric.isPercent)}
+                  />
+                  {chartData.map((entry, index) => (
+                    <Cell key={entry.label} fill={index === 0 ? ORANGE : GREEN} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
