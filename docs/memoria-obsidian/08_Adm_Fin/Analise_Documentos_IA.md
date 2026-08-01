@@ -35,6 +35,8 @@ Fluxo correto:
 - O usuario escolhe um documento, seleciona o tipo de conversa e envia perguntas em sequencia.
 - Perguntas de continuacao enviam o historico recente da conversa para manter contexto.
 - O historico deve usar linguagem simples, como "Nenhum historico encontrado ainda", sem citar infraestrutura.
+- A tela foi ajustada para um layout estilo ChatGPT: coluna principal de conversa, upload pelo icone de clipe no compositor, seletor de tipo de conversa discreto no cabecalho do chat e historico recente abaixo da conversa.
+- Evitar barras laterais grandes nessa tela. Upload, modo de conversa e historico nao devem competir visualmente com o chat.
 
 ## Variaveis
 
