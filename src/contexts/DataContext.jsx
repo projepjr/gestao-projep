@@ -32,8 +32,8 @@ import { triggerN8nRefresh } from '../services/n8nRefresh'
 const DataContext = createContext(null)
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
-const REMOTE_SYNC_INTERVAL_MS = 60 * 1000
-const COMMUNICATION_SYNC_INTERVAL_MS = 60 * 1000
+const REMOTE_SYNC_INTERVAL_MS = 5 * 60 * 1000
+const COMMUNICATION_SYNC_INTERVAL_MS = 5 * 60 * 1000
 const matchesUserId = (id, member) => Boolean(member) && (
   idsEqual(id, member.id) ||
   idsEqual(id, member.supabaseId)

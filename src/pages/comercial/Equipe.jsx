@@ -1,45 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Edit2, Link2, Plus, Search, Trash2, Users, X } from 'lucide-react'
 import { useData } from '../../contexts/DataContext'
-import { isSupabaseConfigured, supabase } from '../../lib/supabase'
+import { fetchLatestComercialSnapshot } from '../../services/comercialDashboardData'
 import { extractPipefyPeopleFromSnapshot } from '../../services/comercialSnapshotMapper'
 import UserAvatar from '../../components/UserAvatar'
 
 const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
-const SNAPSHOT_LOOKBACK_LIMIT = 5
-
-function extractSnapshotPipeIds(payload = {}) {
-  return [
-    payload.pipe?.id,
-    payload.pipeId,
-    payload.pipe_id,
-    payload.raw?.pipe?.id,
-    payload.raw?.data?.pipe?.id,
-    payload.raw?.data?.pipeId,
-    payload.raw?.data?.pipe_id,
-    ...(payload.pipes || []).map(pipe => pipe?.id),
-    ...(payload.raw?.pipes || []).map(pipe => pipe?.id),
-  ].flat().filter(Boolean).map(String)
-}
-
-function isComercialPipeSnapshot(snapshot, pipeId = PIPEFY_COMERCIAL_PIPE_ID) {
-  return extractSnapshotPipeIds(snapshot?.payload || {}).includes(`${pipeId}`)
-}
-
-function hasUsableSnapshotPayload(snapshot) {
-  return Boolean(snapshot?.payload && typeof snapshot.payload === 'object' && !Array.isArray(snapshot.payload))
-}
-
-function selectComercialSnapshot(snapshots, pipeId = PIPEFY_COMERCIAL_PIPE_ID) {
-  const usableSnapshots = snapshots.filter(hasUsableSnapshotPayload)
-  const snapshotsWithPipeId = usableSnapshots.filter(snapshot => extractSnapshotPipeIds(snapshot.payload).length > 0)
-  const explicitPipeSnapshot = usableSnapshots.find(snapshot => isComercialPipeSnapshot(snapshot, pipeId))
-
-  if (explicitPipeSnapshot) return explicitPipeSnapshot
-  if (snapshotsWithPipeId.length > 0) return null
-
-  return usableSnapshots[0] || null
-}
 
 const INPUT = 'w-full bg-[#0D0D0D] border border-[#1E1E1E] rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CE7028] transition-colors placeholder-gray-700'
 const LABEL = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block'
@@ -166,21 +132,13 @@ export default function EquipeComercial() {
   const currentPipeId = `${commercial.pipefyPipeId || commercial.integracaoPipefy?.pipeId || PIPEFY_COMERCIAL_PIPE_ID}`.trim()
   const [pipeIdDraft, setPipeIdDraft] = useState(currentPipeId)
 
-  const loadSnapshot = useCallback(async () => {
-    if (!isSupabaseConfigured || !supabase) return
-    const { data, error } = await supabase
-      .from('comercial_dashboard_snapshots')
-      .select('payload, synced_at')
-      .eq('source', 'pipefy')
-      .order('synced_at', { ascending: false })
-      .limit(SNAPSHOT_LOOKBACK_LIMIT)
-    if (!error) {
-      const snapshots = Array.isArray(data) ? data : []
-      setSnapshot(selectComercialSnapshot(snapshots, currentPipeId))
-    } else {
-      console.warn('[EquipeComercial] Falha ao carregar snapshot:', error.message || error)
+  const loadSnapshot = useCallback(async ({ force = false } = {}) => {
+    const result = await fetchLatestComercialSnapshot({ force })
+    setSnapshot(result.snapshot)
+    if (result.error && !result.snapshot) {
+      console.warn('[EquipeComercial] Falha ao carregar snapshot:', result.error)
     }
-  }, [currentPipeId])
+  }, [])
 
   useEffect(() => {
     setPipeIdDraft(currentPipeId)
@@ -191,8 +149,9 @@ export default function EquipeComercial() {
   }, [loadSnapshot])
 
   useEffect(() => {
-    window.addEventListener('projep:refresh-data', loadSnapshot)
-    return () => window.removeEventListener('projep:refresh-data', loadSnapshot)
+    const handleRefresh = () => loadSnapshot({ force: true })
+    window.addEventListener('projep:refresh-data', handleRefresh)
+    return () => window.removeEventListener('projep:refresh-data', handleRefresh)
   }, [loadSnapshot])
 
   const entries = commercial.equipe?.[role] || []

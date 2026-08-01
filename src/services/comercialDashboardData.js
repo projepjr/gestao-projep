@@ -4,6 +4,13 @@ import { mapComercialSnapshot } from './comercialSnapshotMapper'
 export const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
 export const COMERCIAL_SNAPSHOT_LOOKBACK = 5
 export const COMERCIAL_SNAPSHOT_TIMEOUT_MS = 15000
+const COMERCIAL_SNAPSHOT_CACHE_TTL_MS = 60 * 1000
+const DASHBOARD_DATA_CACHE_LIMIT = 6
+
+let snapshotCache = null
+let snapshotCacheAt = 0
+let snapshotFetchPromise = null
+const dashboardDataCache = new Map()
 
 const MONTHS_PT = [
   'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
@@ -124,6 +131,7 @@ export function selectComercialSnapshot(snapshots = []) {
 export async function fetchLatestComercialSnapshot({
   lookback = COMERCIAL_SNAPSHOT_LOOKBACK,
   timeoutMs = COMERCIAL_SNAPSHOT_TIMEOUT_MS,
+  force = false,
 } = {}) {
   if (!isSupabaseConfigured || !supabase) {
     return {
@@ -133,45 +141,101 @@ export async function fetchLatestComercialSnapshot({
     }
   }
 
-  try {
-    const result = await Promise.race([
-      supabase
-        .from('comercial_dashboard_snapshots')
-        .select('id, payload, synced_at')
-        .eq('source', 'pipefy')
-        .order('synced_at', { ascending: false })
-        .limit(lookback),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
-    ])
+  const now = Date.now()
+  if (!force && snapshotCache && now - snapshotCacheAt < COMERCIAL_SNAPSHOT_CACHE_TTL_MS) {
+    return snapshotCache
+  }
 
-    if (result.error) {
-      return { snapshot: null, statusMessage: '', error: result.error.message || 'Erro ao carregar snapshot comercial.' }
-    }
+  if (snapshotFetchPromise) {
+    return snapshotFetchPromise
+  }
 
-    const snapshots = Array.isArray(result.data) ? result.data : []
-    const selected = selectComercialSnapshot(snapshots)
-    if (!selected.snapshot) {
+  snapshotFetchPromise = (async () => {
+    try {
+      const result = await Promise.race([
+        supabase
+          .from('comercial_dashboard_snapshots')
+          .select('id, payload, synced_at')
+          .eq('source', 'pipefy')
+          .order('synced_at', { ascending: false })
+          .limit(lookback),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+      ])
+
+      if (result.error) {
+        if (snapshotCache?.snapshot) return snapshotCache
+        return { snapshot: null, statusMessage: '', error: result.error.message || 'Erro ao carregar snapshot comercial.' }
+      }
+
+      const snapshots = Array.isArray(result.data) ? result.data : []
+      const selected = selectComercialSnapshot(snapshots)
+      if (!selected.snapshot) {
+        return {
+          snapshot: null,
+          statusMessage: '',
+          error: snapshots.length ? 'Nenhum snapshot do pipeline comercial encontrado.' : 'Nenhum snapshot comercial encontrado.',
+        }
+      }
+
+      snapshotCache = { ...selected, error: '' }
+      snapshotCacheAt = Date.now()
+      return snapshotCache
+    } catch (error) {
+      if (snapshotCache?.snapshot) return snapshotCache
       return {
         snapshot: null,
         statusMessage: '',
-        error: snapshots.length ? 'Nenhum snapshot do pipeline comercial encontrado.' : 'Nenhum snapshot comercial encontrado.',
+        error: error?.message === 'timeout'
+          ? 'Tempo esgotado ao carregar dados comerciais do Supabase.'
+          : (error?.message || 'Erro ao carregar dados comerciais.'),
       }
+    } finally {
+      snapshotFetchPromise = null
     }
+  })()
 
-    return { ...selected, error: '' }
-  } catch (error) {
-    return {
-      snapshot: null,
-      statusMessage: '',
-      error: error?.message === 'timeout'
-        ? 'Tempo esgotado ao carregar dados comerciais do Supabase.'
-        : (error?.message || 'Erro ao carregar dados comerciais.'),
-    }
-  }
+  return snapshotFetchPromise
+}
+
+function memberSignature(members = []) {
+  return (members || [])
+    .map(member => [
+      member?.id,
+      member?.supabaseId,
+      member?.nome,
+      member?.name,
+      member?.email,
+      member?.cargo,
+    ].join(':'))
+    .join('|')
+}
+
+function commercialSignature(commercial = {}) {
+  const team = commercial?.equipe || {}
+  return JSON.stringify({
+    pipefyPipeId: commercial?.pipefyPipeId,
+    hunters: team.hunters || [],
+    closers: team.closers || [],
+  })
+}
+
+function dashboardCacheKey(snapshot, members, commercial) {
+  if (!snapshot?.payload) return ''
+  return [
+    snapshot.id || '',
+    snapshot.synced_at || '',
+    memberSignature(members),
+    commercialSignature(commercial),
+  ].join('::')
 }
 
 export function buildRemoteDashboardData(snapshot, members, commercial) {
   if (!snapshot?.payload) return null
+  const cacheKey = dashboardCacheKey(snapshot, members, commercial)
+  if (cacheKey && dashboardDataCache.has(cacheKey)) {
+    return dashboardDataCache.get(cacheKey)
+  }
+
   const referenceDate = snapshot.synced_at || snapshot.payload?.periodo?.atualizadoEm || new Date().toISOString()
   const aovivo = mapComercialSnapshot(snapshot.payload, { members, commercial })
   const semanas = buildWeekRanges(referenceDate, 10)
@@ -179,10 +243,19 @@ export function buildRemoteDashboardData(snapshot, members, commercial) {
   const meses = buildMonthRanges(referenceDate, 8)
     .map(range => mapComercialSnapshot(snapshot.payload, { members, commercial, range }))
 
-  return {
+  const data = {
     ...commercial,
     aovivo,
     semanas,
     meses,
   }
+
+  if (cacheKey) {
+    dashboardDataCache.set(cacheKey, data)
+    while (dashboardDataCache.size > DASHBOARD_DATA_CACHE_LIMIT) {
+      dashboardDataCache.delete(dashboardDataCache.keys().next().value)
+    }
+  }
+
+  return data
 }

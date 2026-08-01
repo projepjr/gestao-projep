@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -192,6 +192,7 @@ export default function MeuDesempenho() {
   const [viewMode, setViewMode] = useState('aovivo')
   const [roleView, setRoleView] = useState('hunter')
   const [selectedMetricKey, setSelectedMetricKey] = useState(HUNTER_METRICS[1].key)
+  const loadingSnapshotRef = useRef(false)
 
   const referenceDate = snapshot?.synced_at || new Date().toISOString()
   const weeks = useMemo(() => buildWeekRanges(referenceDate, 10), [referenceDate])
@@ -199,13 +200,20 @@ export default function MeuDesempenho() {
   const [weekIndex, setWeekIndex] = useState(0)
   const [monthIndex, setMonthIndex] = useState(0)
 
-  const loadSnapshot = useCallback(async () => {
-    setLoading(true)
-    const result = await fetchLatestComercialSnapshot()
-    setSnapshot(result.snapshot)
-    setStatusMessage(result.statusMessage || '')
-    setError(result.error || '')
-    setLoading(false)
+  const loadSnapshot = useCallback(async ({ force = false, silent = false } = {}) => {
+    if (loadingSnapshotRef.current) return
+    loadingSnapshotRef.current = true
+    if (!silent) setLoading(true)
+
+    try {
+      const result = await fetchLatestComercialSnapshot({ force })
+      setSnapshot(result.snapshot)
+      setStatusMessage(result.statusMessage || '')
+      setError(result.error || '')
+    } finally {
+      if (!silent) setLoading(false)
+      loadingSnapshotRef.current = false
+    }
   }, [])
 
   useEffect(() => {
@@ -213,7 +221,7 @@ export default function MeuDesempenho() {
   }, [loadSnapshot])
 
   useEffect(() => {
-    const handler = () => loadSnapshot()
+    const handler = () => loadSnapshot({ force: true })
     window.addEventListener('projep:refresh-data', handler)
     return () => window.removeEventListener('projep:refresh-data', handler)
   }, [loadSnapshot])

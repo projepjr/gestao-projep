@@ -101,3 +101,18 @@ Implementacao:
 - a interface de edicao da ordem deve usar arrastar e soltar, nao botoes de seta, para ficar mais intuitiva para diretores e Presidencia.
 
 Regra: nao salvar essa ordem em `localStorage` como fonte oficial, porque a mudanca precisa aparecer igual para todos os usuarios.
+
+## Performance e sincronizacao
+
+Atualizacao 2026-08-01: para reduzir travamentos no uso diario, as telas comerciais que dependem de snapshots grandes do Pipefy passaram a compartilhar a busca por `src/services/comercialDashboardData.js`.
+
+Decisoes:
+
+- evitar queries duplicadas para `comercial_dashboard_snapshots` em `Dashboard`, `Leads`, `Equipe` e `Meu Desempenho`;
+- usar cache curto em memoria para snapshot comercial, com TTL de 60 segundos;
+- reutilizar a mesma promise quando varias telas pedem o snapshot ao mesmo tempo;
+- manter o botao global de atualizar como caminho para forcar busca nova (`force: true`);
+- reduzir polling global do `DataContext` para 5 minutos, usando Realtime e atualizacao manual como caminhos principais;
+- cachear tambem o resultado mapeado do snapshot comercial por snapshot + composicao da equipe, evitando recalcular a dashboard inteira a cada render.
+
+Regra: nao reintroduzir busca direta de snapshot comercial dentro das paginas quando a mesma consulta puder usar `fetchLatestComercialSnapshot`.

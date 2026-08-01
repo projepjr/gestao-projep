@@ -651,3 +651,26 @@ Atualizacao visual - Meu Desempenho simplificado:
 - O usuario escolhe a metrica em um seletor e o grafico compara `Voce` contra `Media do time`.
 - Foram removidos cards e grades extras de indicadores para deixar a leitura mais direta.
 - A regra de privacidade permanece: nenhum resultado individual de outros membros e exibido, apenas media agregada.
+
+## Atualizacao 2026-08-01 - Performance dos snapshots comerciais
+
+Problema observado:
+
+- O site estava travando ao trocar abas e ao atualizar dados comerciais.
+- Varias paginas comerciais consultavam e mapeavam o mesmo snapshot grande do Pipefy separadamente.
+- O polling frequente do contexto global aumentava re-renderizacoes mesmo quando o Realtime ja estava ativo.
+
+Implementacao:
+
+- `src/services/comercialDashboardData.js` passou a centralizar a busca do snapshot comercial.
+- A busca usa cache em memoria por 60 segundos e deduplica chamadas simultaneas.
+- Em caso de timeout/erro temporario, a tela pode manter o ultimo snapshot remoto em cache em vez de cair imediatamente para estado pesado de erro.
+- `Dashboard`, `Leads`, `Equipe` e `Meu Desempenho` passaram a usar `fetchLatestComercialSnapshot`.
+- O mapeamento do snapshot para os dados da dashboard tambem ganhou cache por snapshot e assinatura da equipe comercial.
+- O intervalo de sincronizacao global do `DataContext` foi reduzido para 5 minutos.
+
+Regras:
+
+- O botao global de atualizacao deve continuar usando `projep:refresh-data`, que chama as telas comerciais com `force: true`.
+- Cache curto nao pode alterar formulas; ele apenas evita refazer a mesma consulta/calculo repetidamente.
+- Novas telas comerciais que precisam do snapshot devem usar o servico compartilhado, nao consultar Supabase diretamente.

@@ -3,11 +3,9 @@ import {
   AlertCircle, ArrowUpDown, BarChart2, Calendar, ChevronLeft, ChevronRight,
   FileCheck, PhoneCall, Radio, Search, Target, Users,
 } from 'lucide-react'
-import { isSupabaseConfigured, supabase } from '../../lib/supabase'
+import { fetchLatestComercialSnapshot } from '../../services/comercialDashboardData'
 import { mapLeadSegmentInsights } from '../../services/comercialSnapshotMapper'
 
-const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
-const SNAPSHOT_LOOKBACK = 5
 const MONTHS_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
 const normalize = value => String(value || '')
@@ -74,29 +72,6 @@ function findCurrentIndex(periods, date = new Date()) {
   return found >= 0 ? found : Math.max(0, periods.length - 1)
 }
 
-function extractSnapshotPipeIds(payload = {}) {
-  return [
-    payload.pipe?.id,
-    payload.pipeId,
-    payload.pipe_id,
-    payload.raw?.pipe?.id,
-    payload.raw?.data?.pipe?.id,
-    payload.raw?.data?.pipeId,
-    payload.raw?.data?.pipe_id,
-    ...(payload.pipes || []).map(pipe => pipe?.id),
-    ...(payload.raw?.pipes || []).map(pipe => pipe?.id),
-  ].flat().filter(Boolean).map(String)
-}
-
-function selectComercialSnapshot(snapshots) {
-  const usable = snapshots.filter(snapshot => snapshot?.payload && typeof snapshot.payload === 'object' && !Array.isArray(snapshot.payload))
-  const explicit = usable.find(snapshot => extractSnapshotPipeIds(snapshot.payload).includes(PIPEFY_COMERCIAL_PIPE_ID))
-  if (explicit) return { snapshot: explicit, message: 'Snapshot Pipefy carregado' }
-  const withPipeId = usable.filter(snapshot => extractSnapshotPipeIds(snapshot.payload).length > 0)
-  if (withPipeId.length) return { snapshot: null, message: '' }
-  if (usable[0]) return { snapshot: usable[0], message: 'Snapshot sem pipe_id explícito. Assumindo pipeline 307256948.' }
-  return { snapshot: null, message: '' }
-}
 
 function MetricCard({ label, value, Icon, tone = 'text-white', helper }) {
   return (
@@ -214,86 +189,47 @@ export default function LeadsInsights() {
     snapshotRef.current = snapshot
   }, [snapshot])
 
-  const refreshLatestSnapshot = useCallback(async () => {
+  const refreshLatestSnapshot = useCallback(async ({ force = false, silent = false } = {}) => {
     if (fetchingSnapshotRef.current) return
     fetchingSnapshotRef.current = true
 
-    if (!isSupabaseConfigured || !supabase) {
-      setStatus({ loading: false, error: 'Supabase nÃ£o configurado.', message: '' })
+    if (!silent) setStatus(prev => ({ ...prev, loading: !snapshotRef.current }))
+
+    try {
+      const result = await fetchLatestComercialSnapshot({ force })
+      const selected = result.snapshot
+      setSnapshot(selected)
+      snapshotRef.current = selected
+      setStatus({
+        loading: false,
+        error: selected ? '' : result.error || 'Nenhum snapshot comercial valido encontrado.',
+        message: result.statusMessage || '',
+      })
+    } finally {
       fetchingSnapshotRef.current = false
-      return
     }
-
-    const { data, error } = await supabase
-      .from('comercial_dashboard_snapshots')
-      .select('id, payload, synced_at')
-      .eq('source', 'pipefy')
-      .order('synced_at', { ascending: false })
-      .limit(SNAPSHOT_LOOKBACK)
-
-    if (error) {
-      console.warn('[LeadsInsights] Falha ao atualizar snapshot:', error.message || error)
-      setStatus({ loading: false, error: 'NÃ£o foi possÃ­vel carregar o snapshot comercial.', message: '' })
-      fetchingSnapshotRef.current = false
-      return
-    }
-
-    const { snapshot: selected, message } = selectComercialSnapshot(Array.isArray(data) ? data : [])
-    setSnapshot(selected)
-    snapshotRef.current = selected
-    setStatus({
-      loading: false,
-      error: selected ? '' : 'Nenhum snapshot comercial vÃ¡lido encontrado.',
-      message,
-    })
-    fetchingSnapshotRef.current = false
   }, [])
 
   useEffect(() => {
     let cancelled = false
 
-    async function fetchLatestSnapshot() {
-      if (!isSupabaseConfigured || !supabase) {
-        setStatus({ loading: false, error: 'Supabase não configurado.', message: '' })
-        return
-      }
-
-      setStatus(prev => ({ ...prev, loading: !snapshotRef.current }))
-      const { data, error } = await supabase
-        .from('comercial_dashboard_snapshots')
-        .select('id, payload, synced_at')
-        .eq('source', 'pipefy')
-        .order('synced_at', { ascending: false })
-        .limit(SNAPSHOT_LOOKBACK)
-
+    const load = async (options = {}) => {
       if (cancelled) return
-      if (error) {
-        console.warn('[LeadsInsights] Falha ao carregar snapshot:', error.message || error)
-        setStatus({ loading: false, error: 'Não foi possível carregar o snapshot comercial.', message: '' })
-        return
-      }
-
-      const { snapshot: selected, message } = selectComercialSnapshot(Array.isArray(data) ? data : [])
-      setSnapshot(selected)
-      snapshotRef.current = selected
-      setStatus({
-        loading: false,
-        error: selected ? '' : 'Nenhum snapshot comercial válido encontrado.',
-        message,
-      })
+      await refreshLatestSnapshot(options)
     }
 
-    fetchLatestSnapshot()
-    const intervalId = window.setInterval(fetchLatestSnapshot, 5 * 60 * 1000)
+    load()
+    const intervalId = window.setInterval(() => load({ silent: true }), 5 * 60 * 1000)
     return () => {
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [])
+  }, [refreshLatestSnapshot])
 
   useEffect(() => {
-    window.addEventListener('projep:refresh-data', refreshLatestSnapshot)
-    return () => window.removeEventListener('projep:refresh-data', refreshLatestSnapshot)
+    const handleRefresh = () => refreshLatestSnapshot({ force: true })
+    window.addEventListener('projep:refresh-data', handleRefresh)
+    return () => window.removeEventListener('projep:refresh-data', handleRefresh)
   }, [refreshLatestSnapshot])
 
   const selectedRange = useMemo(() => {
