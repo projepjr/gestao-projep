@@ -41,7 +41,7 @@ Fluxo correto:
 - Respostas da IA devem ser renderizadas visualmente como Markdown simples, evitando mostrar asteriscos, marcadores e titulos crus para o usuario final.
 - O front-end envia `mode: "free-chat"` quando nao ha documento e `mode: "document-chat"` quando ha arquivo anexado. O workflow n8n deve aceitar `hasFile: false` e responder com texto em `text`, `analysis`, `result`, `message`, `answer`, `output` ou `response`.
 - Se o webhook retornar corpo vazio, `{}`, `[]` ou `null`, o site deve mostrar erro amigavel em vez de renderizar JSON cru na conversa.
-- Em 2026-08-01, o webhook ativo foi testado com `mode: "free-chat"` e respondeu HTTP 200 com corpo vazio. Isso indica que o workflow n8n ainda precisa tratar conversa sem arquivo no node de preparacao/resposta. O front-end foi protegido para nao renderizar `{}` em bolhas antigas ou respostas invalidas.
+- Em 2026-08-01, o webhook ativo foi testado com `mode: "free-chat"` e respondeu HTTP 200 com corpo vazio. O workflow n8n foi corrigido no node `Preparar analise Claude` para aceitar conversa sem arquivo (`hasFile: false`) e montar um prompt de chat livre. O node `Normalizar resposta` tambem foi endurecido para devolver texto valido em `text`/`analysis` quando a Claude responder.
 
 ## Variaveis
 
