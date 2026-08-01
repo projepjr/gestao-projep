@@ -41,9 +41,8 @@ export async function analyzeDocumentWithClaude({ file, question, analysisType, 
   if (!WEBHOOK_URL) {
     throw new Error('Webhook de analise de documentos nao configurado. Configure VITE_N8N_DOCUMENT_ANALYSIS_WEBHOOK_URL.')
   }
-  if (!file) throw new Error('Selecione um arquivo para analisar.')
 
-  const dataUrl = await readFileAsDataUrl(file)
+  const dataUrl = file ? await readFileAsDataUrl(file) : null
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
 
@@ -65,12 +64,13 @@ export async function analyzeDocumentWithClaude({ file, question, analysisType, 
         } : null,
         analysisType,
         question,
-        file: {
+        hasFile: Boolean(file),
+        file: file ? {
           name: file.name,
           type: file.type || 'application/octet-stream',
           size: file.size,
           base64: extractBase64(dataUrl),
-        },
+        } : null,
       }),
     })
   } catch (error) {

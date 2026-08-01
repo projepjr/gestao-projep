@@ -37,6 +37,8 @@ Fluxo correto:
 - O historico deve usar linguagem simples, como "Nenhum historico encontrado ainda", sem citar infraestrutura.
 - A tela foi ajustada para um layout estilo ChatGPT: coluna principal de conversa, upload pelo icone de clipe no compositor, seletor de tipo de conversa discreto no cabecalho do chat e historico recente abaixo da conversa.
 - Evitar barras laterais grandes nessa tela. Upload, modo de conversa e historico nao devem competir visualmente com o chat.
+- O chat deve aceitar conversa livre mesmo sem documento anexado. Quando houver documento, o arquivo entra como contexto adicional da pergunta.
+- Respostas da IA devem ser renderizadas visualmente como Markdown simples, evitando mostrar asteriscos, marcadores e titulos crus para o usuario final.
 
 ## Variaveis
 

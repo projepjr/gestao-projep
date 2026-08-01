@@ -42,11 +42,123 @@ const ANALYSIS_TYPES = [
 ]
 
 const QUICK_PROMPTS = [
+  'Quero tirar uma duvida administrativa.',
   'Resuma os pontos mais importantes deste documento.',
   'Quais riscos a PROJEP deveria revisar antes de assinar?',
   'Existe alguma clausula que parece faltar ou estar incompleta?',
-  'Quais pontos financeiros precisam de atencao?',
 ]
+
+function renderInlineMarkdown(text) {
+  const parts = `${text || ''}`.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index} className="font-bold text-white">{part.slice(2, -2)}</strong>
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={index} className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-xs text-[#E8955A]">{part.slice(1, -1)}</code>
+    }
+    return part
+  })
+}
+
+function MarkdownMessage({ text }) {
+  const lines = `${text || ''}`.replace(/\r\n/g, '\n').split('\n')
+  const blocks = []
+  let paragraph = []
+  let list = []
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return
+    blocks.push({ type: 'paragraph', text: paragraph.join(' ') })
+    paragraph = []
+  }
+
+  const flushList = () => {
+    if (!list.length) return
+    blocks.push({ type: 'list', items: list })
+    list = []
+  }
+
+  lines.forEach(rawLine => {
+    const line = rawLine.trim()
+
+    if (!line) {
+      flushParagraph()
+      flushList()
+      return
+    }
+
+    if (/^---+$/.test(line)) {
+      flushParagraph()
+      flushList()
+      blocks.push({ type: 'divider' })
+      return
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/)
+    if (heading) {
+      flushParagraph()
+      flushList()
+      blocks.push({ type: 'heading', level: heading[1].length, text: heading[2] })
+      return
+    }
+
+    const bullet = line.match(/^[-*]\s+(.+)$/)
+    if (bullet) {
+      flushParagraph()
+      list.push(bullet[1])
+      return
+    }
+
+    const numbered = line.match(/^\d+\.\s+(.+)$/)
+    if (numbered) {
+      flushParagraph()
+      list.push(numbered[1])
+      return
+    }
+
+    paragraph.push(line)
+  })
+
+  flushParagraph()
+  flushList()
+
+  return (
+    <div className="space-y-3 text-sm leading-6 text-gray-200">
+      {blocks.map((block, index) => {
+        if (block.type === 'heading') {
+          const size = block.level === 1 ? 'text-lg' : block.level === 2 ? 'text-base' : 'text-sm'
+          return (
+            <h3 key={index} className={`${size} font-bold text-white`}>
+              {renderInlineMarkdown(block.text)}
+            </h3>
+          )
+        }
+
+        if (block.type === 'list') {
+          return (
+            <ul key={index} className="ml-4 list-disc space-y-1 text-gray-200">
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
+              ))}
+            </ul>
+          )
+        }
+
+        if (block.type === 'divider') {
+          return <div key={index} className="h-px bg-[#2A2A2A]" />
+        }
+
+        return (
+          <p key={index} className="text-gray-200">
+            {renderInlineMarkdown(block.text)}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
 
 function formatBytes(bytes = 0) {
   if (!bytes) return '0 KB'
@@ -99,7 +211,11 @@ function ChatMessage({ message }) {
         <div className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-wider opacity-70">
           {isUser ? 'Voce' : 'Assistente'}
         </div>
-        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{message.text}</pre>
+        {isUser ? (
+          <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.text}</p>
+        ) : (
+          <MarkdownMessage text={message.text} />
+        )}
       </div>
 
       {isUser && (
@@ -150,11 +266,6 @@ export default function AnaliseDocumentos() {
     event?.preventDefault()
     const trimmedQuestion = question.trim()
     if (!trimmedQuestion || loading) return
-
-    if (!file) {
-      setError('Escolha um documento antes de iniciar a conversa.')
-      return
-    }
 
     const userMessage = {
       id: `user-${Date.now()}`,
@@ -232,7 +343,7 @@ export default function AnaliseDocumentos() {
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Chat com IA</p>
             <h2 className="mt-1 truncate text-lg font-bold text-white">
-              {file ? file.name : 'Anexe um documento para comecar'}
+              {file ? file.name : 'Chat livre com IA'}
             </h2>
             <p className="mt-1 text-xs text-gray-600">{selectedType.description}</p>
           </div>
@@ -282,7 +393,7 @@ export default function AnaliseDocumentos() {
               </div>
               <h3 className="mt-4 text-xl font-bold text-white">Converse com a IA sobre o documento</h3>
               <p className="mt-2 max-w-lg text-sm leading-6 text-gray-500">
-                Anexe um arquivo pelo clipe e faca perguntas sobre riscos, pendencias, pontos financeiros ou clausulas especificas.
+                Faca uma pergunta livre ou anexe um documento pelo clipe para pedir uma analise mais especifica.
               </p>
               <div className="mt-5 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
                 {QUICK_PROMPTS.map(prompt => (
@@ -357,12 +468,12 @@ export default function AnaliseDocumentos() {
               onChange={event => setQuestion(event.target.value)}
               onKeyDown={handleKeyDown}
               rows={1}
-              placeholder={file ? 'Pergunte algo sobre o documento...' : 'Anexe um documento pelo clipe para conversar com a IA...'}
+              placeholder={file ? 'Pergunte algo sobre o documento...' : 'Pergunte livremente ou anexe um documento pelo clipe...'}
               className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl border border-[#1E1E1E] bg-[#0D0D0D] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-700 focus:border-[#CE7028]"
             />
             <button
               type="submit"
-              disabled={loading || !file || !question.trim()}
+              disabled={loading || !question.trim()}
               className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#CE7028] text-white transition-colors hover:bg-[#B8621F] disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Enviar pergunta"
             >
