@@ -39,6 +39,8 @@ Fluxo correto:
 - Evitar barras laterais grandes nessa tela. Upload, modo de conversa e historico nao devem competir visualmente com o chat.
 - O chat deve aceitar conversa livre mesmo sem documento anexado. Quando houver documento, o arquivo entra como contexto adicional da pergunta.
 - Respostas da IA devem ser renderizadas visualmente como Markdown simples, evitando mostrar asteriscos, marcadores e titulos crus para o usuario final.
+- O front-end envia `mode: "free-chat"` quando nao ha documento e `mode: "document-chat"` quando ha arquivo anexado. O workflow n8n deve aceitar `hasFile: false` e responder com texto em `text`, `analysis`, `result`, `message`, `answer`, `output` ou `response`.
+- Se o webhook retornar corpo vazio, `{}`, `[]` ou `null`, o site deve mostrar erro amigavel em vez de renderizar JSON cru na conversa.
 
 ## Variaveis
 

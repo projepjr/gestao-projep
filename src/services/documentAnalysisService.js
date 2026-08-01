@@ -21,20 +21,25 @@ function extractBase64(dataUrl) {
 function normalizeN8nResponse(payload) {
   const data = Array.isArray(payload) ? payload[0] : payload
   const json = data?.json || data
-  const content = json?.content || json?.analysis || json?.resultado || json?.result || json?.message
+  const content = json?.content || json?.analysis || json?.resultado || json?.result || json?.message || json?.answer || json?.output || json?.response
 
   if (Array.isArray(content)) {
     const text = content
       .map(item => item?.text || item?.content || '')
       .filter(Boolean)
       .join('\n\n')
-    return { ...json, text: text || JSON.stringify(json, null, 2) }
+    return { ...json, text }
   }
 
   if (typeof content === 'string') return { ...json, text: content }
   if (typeof json === 'string') return { text: json }
 
-  return { ...json, text: json?.text || JSON.stringify(json || {}, null, 2) }
+  return { ...json, text: json?.text || '' }
+}
+
+function hasUsefulAiText(text) {
+  const cleaned = `${text || ''}`.trim()
+  return Boolean(cleaned && cleaned !== '{}' && cleaned !== '[]' && cleaned !== 'null')
 }
 
 export async function analyzeDocumentWithClaude({ file, question, analysisType, user }) {
@@ -64,6 +69,8 @@ export async function analyzeDocumentWithClaude({ file, question, analysisType, 
         } : null,
         analysisType,
         question,
+        mode: file ? 'document-chat' : 'free-chat',
+        documentRequired: false,
         hasFile: Boolean(file),
         file: file ? {
           name: file.name,
@@ -95,7 +102,13 @@ export async function analyzeDocumentWithClaude({ file, question, analysisType, 
     throw new Error(message)
   }
 
-  return normalizeN8nResponse(payload)
+  const normalized = normalizeN8nResponse(payload)
+  if (!hasUsefulAiText(normalized.text)) {
+    console.warn('[AnaliseDocumentos] Webhook retornou resposta vazia ou invalida:', payload)
+    throw new Error('A IA nao retornou uma resposta valida. Tente novamente em instantes.')
+  }
+
+  return normalized
 }
 
 export async function saveDocumentAnalysis({ user, file, question, analysisType, result }) {
