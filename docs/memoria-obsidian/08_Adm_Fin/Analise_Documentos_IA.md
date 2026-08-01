@@ -28,6 +28,14 @@ Fluxo correto:
 5. n8n retorna a resposta para o site.
 6. Site tenta salvar o historico no Supabase em `document_analyses`, se a tabela existir.
 
+## Interface
+
+- A tela deve ser orientada ao usuario final, sem expor detalhes tecnicos como n8n, webhook, Supabase ou chave de API.
+- A experiencia principal e um chat com IA sobre o documento enviado.
+- O usuario escolhe um documento, seleciona o tipo de conversa e envia perguntas em sequencia.
+- Perguntas de continuacao enviam o historico recente da conversa para manter contexto.
+- O historico deve usar linguagem simples, como "Nenhum historico encontrado ainda", sem citar infraestrutura.
+
 ## Variaveis
 
 Front-end Vite:

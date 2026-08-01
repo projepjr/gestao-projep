@@ -1,21 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   Bot,
-  CheckCircle2,
   FileSearch,
-  FileText,
   History,
   Loader2,
-  MessageSquareText,
-  ShieldCheck,
+  Paperclip,
+  Send,
+  Sparkles,
+  Trash2,
   Upload,
+  User,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   analyzeDocumentWithClaude,
   fetchDocumentAnalysisHistory,
-  isDocumentAnalysisConfigured,
   saveDocumentAnalysis,
 } from '../../services/documentAnalysisService'
 
@@ -25,12 +25,12 @@ const LABEL = 'mb-2 block text-xs font-bold uppercase tracking-wider text-gray-5
 const ANALYSIS_TYPES = [
   {
     value: 'contrato-geral',
-    label: 'Revisao geral do contrato',
-    description: 'Analisa riscos, lacunas, pontos obrigatorios e inconsistencias.',
+    label: 'Revisao geral',
+    description: 'Riscos, pontos faltantes e melhorias antes da assinatura.',
   },
   {
     value: 'riscos',
-    label: 'Riscos e pontos de atencao',
+    label: 'Riscos principais',
     description: 'Foca no que pode gerar problema juridico, financeiro ou operacional.',
   },
   {
@@ -41,8 +41,15 @@ const ANALYSIS_TYPES = [
   {
     value: 'pergunta-livre',
     label: 'Pergunta livre',
-    description: 'Use para tirar uma duvida especifica sobre o arquivo.',
+    description: 'Use para conversar livremente sobre o documento.',
   },
+]
+
+const QUICK_PROMPTS = [
+  'Resuma os pontos mais importantes deste documento.',
+  'Quais riscos a PROJEP deveria revisar antes de assinar?',
+  'Existe alguma clausula que parece faltar ou estar incompleta?',
+  'Quais pontos financeiros precisam de atencao?',
 ]
 
 function formatBytes(bytes = 0) {
@@ -57,45 +64,53 @@ function formatBytes(bytes = 0) {
   return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`
 }
 
-function InfoCard({ icon: Icon, title, children }) {
-  return (
-    <div className="rounded border border-[#1E1E1E] bg-[#111111] p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <Icon className="h-4 w-4 text-[#CE7028]" />
-        <h3 className="text-sm font-bold text-white">{title}</h3>
-      </div>
-      <p className="text-sm leading-relaxed text-gray-500">{children}</p>
-    </div>
-  )
+function buildConversationQuestion(messages, nextQuestion, analysisType) {
+  const previous = messages
+    .slice(-6)
+    .map(message => `${message.role === 'assistant' ? 'IA' : 'Usuario'}: ${message.text}`)
+    .join('\n\n')
+
+  if (!previous) return nextQuestion
+
+  return [
+    'Continue a conversa abaixo sobre o mesmo documento.',
+    `Tipo de analise selecionado: ${analysisType}.`,
+    '',
+    'Historico recente:',
+    previous,
+    '',
+    'Nova pergunta do usuario:',
+    nextQuestion,
+  ].join('\n')
 }
 
-function ResultBlock({ result }) {
-  if (!result) {
-    return (
-      <div className="flex min-h-[300px] flex-col items-center justify-center rounded border border-dashed border-[#1E1E1E] bg-[#111111] p-8 text-center">
-        <Bot className="h-10 w-10 text-gray-700" />
-        <h2 className="mt-4 text-lg font-bold text-white">Nenhuma analise ainda.</h2>
-        <p className="mt-2 max-w-md text-sm text-gray-500">
-          Envie um contrato ou documento para a IA analisar dentro do fluxo seguro do n8n.
-        </p>
-      </div>
-    )
-  }
+function ChatMessage({ message }) {
+  const isUser = message.role === 'user'
 
   return (
-    <div className="rounded border border-[#1E1E1E] bg-[#111111]">
-      <div className="flex items-center justify-between border-b border-[#1E1E1E] p-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Resultado da IA</p>
-          <h2 className="mt-1 text-lg font-bold text-white">Analise do documento</h2>
+    <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
+      {!isUser && (
+        <div className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#CE7028]/15 text-[#CE7028]">
+          <Bot className="h-4 w-4" />
         </div>
-        <CheckCircle2 className="h-5 w-5 text-green-400" />
+      )}
+
+      <div className={`max-w-[82%] rounded-2xl px-4 py-3 ${
+        isUser
+          ? 'rounded-br-sm bg-[#CE7028] text-white'
+          : 'rounded-bl-sm border border-[#1E1E1E] bg-[#161616] text-gray-200'
+      }`}>
+        <div className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-wider opacity-70">
+          {isUser ? 'Voce' : 'Assistente'}
+        </div>
+        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{message.text}</pre>
       </div>
-      <div className="max-h-[560px] overflow-auto p-5">
-        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-gray-200">
-          {result.text}
-        </pre>
-      </div>
+
+      {isUser && (
+        <div className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#044947] text-white">
+          <User className="h-4 w-4" />
+        </div>
+      )}
     </div>
   )
 }
@@ -105,10 +120,12 @@ export default function AnaliseDocumentos() {
   const [file, setFile] = useState(null)
   const [analysisType, setAnalysisType] = useState(ANALYSIS_TYPES[0].value)
   const [question, setQuestion] = useState('')
-  const [result, setResult] = useState(null)
+  const [messages, setMessages] = useState([])
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const bottomRef = useRef(null)
+
   const selectedType = useMemo(
     () => ANALYSIS_TYPES.find(type => type.value === analysisType) || ANALYSIS_TYPES[0],
     [analysisType],
@@ -122,159 +139,255 @@ export default function AnaliseDocumentos() {
     return () => { mounted = false }
   }, [user])
 
-  const handleAnalyze = async event => {
-    event.preventDefault()
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, loading])
+
+  const handleFileChange = selectedFile => {
+    setFile(selectedFile)
     setError('')
-    setResult(null)
+    setMessages([])
+  }
+
+  const handleSend = async event => {
+    event?.preventDefault()
+    const trimmedQuestion = question.trim()
+    if (!trimmedQuestion || loading) return
+
+    if (!file) {
+      setError('Escolha um documento antes de iniciar a conversa.')
+      return
+    }
+
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      text: trimmedQuestion,
+      createdAt: new Date().toISOString(),
+    }
+
+    const previousMessages = messages
+    setMessages(current => [...current, userMessage])
+    setQuestion('')
+    setError('')
     setLoading(true)
+
     try {
       const analysis = await analyzeDocumentWithClaude({
         file,
-        question,
+        question: buildConversationQuestion(previousMessages, trimmedQuestion, selectedType.label),
         analysisType,
         user,
       })
-      setResult(analysis)
+
+      const assistantMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        text: analysis.text,
+        createdAt: new Date().toISOString(),
+      }
+
+      setMessages(current => [...current, assistantMessage])
+
       const saveResult = await saveDocumentAnalysis({
         user,
         file,
-        question,
+        question: trimmedQuestion,
         analysisType,
         result: analysis,
       })
+
       if (saveResult.saved) {
         const rows = await fetchDocumentAnalysisHistory(user)
         setHistory(rows)
       }
     } catch (err) {
-      setError(err?.message || 'Nao foi possivel analisar o documento.')
+      setError(err?.message || 'Nao foi possivel analisar o documento agora.')
+      setMessages(current => current.filter(message => message.id !== userMessage.id))
     } finally {
       setLoading(false)
     }
   }
 
+  const handleKeyDown = event => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      handleSend(event)
+    }
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="flex h-[calc(100vh-120px)] min-h-[720px] flex-col gap-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded border border-[#CE7028]/30 bg-[#CE7028]/10 text-[#CE7028]">
-              <FileSearch className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Analise de Documentos</h1>
-              <p className="mt-1 text-gray-500">Use IA para revisar contratos, propostas e documentos do Adm e Fin.</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded border border-[#CE7028]/30 bg-[#CE7028]/10 text-[#CE7028]">
+            <FileSearch className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white">Analise de Documentos</h1>
+            <p className="mt-1 text-gray-500">Converse com a IA sobre contratos, propostas e documentos do Adm e Fin.</p>
           </div>
         </div>
-
-        <div className={`rounded border px-3 py-2 text-xs font-bold ${
-          isDocumentAnalysisConfigured
-            ? 'border-green-900/40 bg-green-950/20 text-green-400'
-            : 'border-yellow-900/40 bg-yellow-950/20 text-yellow-400'
-        }`}>
-          {isDocumentAnalysisConfigured ? 'Webhook n8n configurado' : 'Webhook n8n pendente'}
-        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <InfoCard icon={ShieldCheck} title="Chave da IA protegida">
-          A chave Claude/Anthropic deve ficar no n8n. O navegador envia apenas o arquivo e a pergunta para o webhook.
-        </InfoCard>
-        <InfoCard icon={FileText} title="Documentos aceitos">
-          O fluxo foi preparado para PDF, texto, Markdown, HTML e documentos convertidos pelo n8n.
-        </InfoCard>
-        <InfoCard icon={MessageSquareText} title="Uso recomendado">
-          Faca perguntas objetivas: riscos do contrato, clausulas faltantes, pontos financeiros ou pendencias.
-        </InfoCard>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <form onSubmit={handleAnalyze} className="space-y-4 rounded border border-[#1E1E1E] bg-[#111111] p-5">
-          <div>
-            <label className={LABEL}>Arquivo</label>
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded border border-dashed border-[#CE7028]/35 bg-[#CE7028]/5 p-6 text-center transition-colors hover:border-[#CE7028] hover:bg-[#CE7028]/10">
-              <Upload className="h-8 w-8 text-[#CE7028]" />
-              <span className="mt-3 text-sm font-bold text-white">
-                {file ? file.name : 'Clique para escolher um documento'}
+      <div className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[360px_1fr]">
+        <aside className="flex min-h-0 flex-col gap-4">
+          <section className="rounded border border-[#1E1E1E] bg-[#111111] p-5">
+            <label className={LABEL}>Documento</label>
+            <label className="flex cursor-pointer flex-col items-center justify-center rounded border border-dashed border-[#CE7028]/35 bg-[#CE7028]/5 p-5 text-center transition-colors hover:border-[#CE7028] hover:bg-[#CE7028]/10">
+              <Upload className="h-7 w-7 text-[#CE7028]" />
+              <span className="mt-3 max-w-full truncate text-sm font-bold text-white">
+                {file ? file.name : 'Escolher documento'}
               </span>
               <span className="mt-1 text-xs text-gray-500">
-                {file ? `${file.type || 'arquivo'} - ${formatBytes(file.size)}` : 'PDF, TXT, MD, HTML, DOCX/RTF via n8n'}
+                {file ? `${file.type || 'arquivo'} - ${formatBytes(file.size)}` : 'PDF, TXT, MD, HTML ou DOCX'}
               </span>
               <input
                 type="file"
                 accept=".pdf,.txt,.md,.html,.htm,.docx,.rtf"
                 className="hidden"
-                onChange={event => setFile(event.target.files?.[0] || null)}
+                onChange={event => handleFileChange(event.target.files?.[0] || null)}
               />
             </label>
-          </div>
 
-          <div>
-            <label className={LABEL}>Tipo de analise</label>
+            {file && (
+              <button
+                type="button"
+                onClick={() => handleFileChange(null)}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded border border-[#1E1E1E] px-3 py-2 text-xs font-bold text-gray-500 transition-colors hover:border-red-900/50 hover:bg-red-950/20 hover:text-red-300"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Remover documento
+              </button>
+            )}
+          </section>
+
+          <section className="rounded border border-[#1E1E1E] bg-[#111111] p-5">
+            <label className={LABEL}>Tipo de conversa</label>
             <select value={analysisType} onChange={event => setAnalysisType(event.target.value)} className={INPUT}>
               {ANALYSIS_TYPES.map(type => (
                 <option key={type.value} value={type.value}>{type.label}</option>
               ))}
             </select>
             <p className="mt-2 text-xs leading-relaxed text-gray-600">{selectedType.description}</p>
+          </section>
+
+          <section className="min-h-0 flex-1 overflow-hidden rounded border border-[#1E1E1E] bg-[#111111]">
+            <div className="flex items-center gap-2 border-b border-[#1E1E1E] p-4">
+              <History className="h-4 w-4 text-[#CE7028]" />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-white">Historico recente</h2>
+            </div>
+            <div className="max-h-56 overflow-auto">
+              {history.length > 0 ? (
+                <div className="divide-y divide-[#1E1E1E]">
+                  {history.map(item => (
+                    <div key={item.id} className="p-4">
+                      <p className="truncate text-sm font-bold text-white">{item.file_name || 'Documento sem nome'}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : 'sem data'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center text-sm text-gray-500">
+                  Nenhum historico encontrado ainda.
+                </div>
+              )}
+            </div>
+          </section>
+        </aside>
+
+        <section className="flex min-h-0 flex-col overflow-hidden rounded border border-[#1E1E1E] bg-[#111111]">
+          <div className="flex items-center justify-between border-b border-[#1E1E1E] p-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Chat com IA</p>
+              <h2 className="mt-1 text-lg font-bold text-white">
+                {file ? file.name : 'Escolha um documento para comecar'}
+              </h2>
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#CE7028]/10 text-[#CE7028]">
+              <Sparkles className="h-4 w-4" />
+            </div>
           </div>
 
-          <div>
-            <label className={LABEL}>Pergunta ou instrucao</label>
-            <textarea
-              value={question}
-              onChange={event => setQuestion(event.target.value)}
-              rows={5}
-              placeholder="Ex: analise os riscos deste contrato e diga o que precisa ser revisado antes da assinatura."
-              className={INPUT}
-            />
+          <div className="min-h-0 flex-1 overflow-auto p-5">
+            {messages.length === 0 ? (
+              <div className="flex min-h-full flex-col items-center justify-center text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#CE7028]/10 text-[#CE7028]">
+                  <Bot className="h-7 w-7" />
+                </div>
+                <h3 className="mt-4 text-xl font-bold text-white">Como posso ajudar com este documento?</h3>
+                <p className="mt-2 max-w-lg text-sm leading-6 text-gray-500">
+                  Envie um arquivo e faca perguntas. Voce pode pedir resumo, riscos, pendencias, pontos financeiros ou revisar clausulas especificas.
+                </p>
+                <div className="mt-5 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
+                  {QUICK_PROMPTS.map(prompt => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => setQuestion(prompt)}
+                      className="rounded border border-[#1E1E1E] bg-[#0D0D0D] p-3 text-left text-sm text-gray-300 transition-colors hover:border-[#CE7028]/60 hover:text-white"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {messages.map(message => (
+                  <ChatMessage key={message.id} message={message} />
+                ))}
+                {loading && (
+                  <div className="flex gap-3">
+                    <div className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#CE7028]/15 text-[#CE7028]">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                    <div className="rounded-2xl rounded-bl-sm border border-[#1E1E1E] bg-[#161616] px-4 py-3 text-sm text-gray-400">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-[#CE7028]" />
+                        Analisando...
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
+            )}
           </div>
 
           {error && (
-            <div className="flex gap-3 rounded border border-red-900/40 bg-red-950/20 p-3 text-sm text-red-300">
+            <div className="mx-5 mb-3 flex gap-3 rounded border border-red-900/40 bg-red-950/20 p-3 text-sm text-red-300">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading || !file}
-            className="flex w-full items-center justify-center gap-2 rounded bg-[#CE7028] px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-[#B8621F] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-            {loading ? 'Analisando...' : 'Analisar documento'}
-          </button>
-        </form>
-
-        <ResultBlock result={result} />
-      </div>
-
-      <div className="rounded border border-[#1E1E1E] bg-[#111111]">
-        <div className="flex items-center gap-2 border-b border-[#1E1E1E] p-4">
-          <History className="h-4 w-4 text-[#CE7028]" />
-          <h2 className="text-sm font-bold uppercase tracking-wider text-white">Historico recente</h2>
-        </div>
-        {history.length > 0 ? (
-          <div className="divide-y divide-[#1E1E1E]">
-            {history.map(item => (
-              <div key={item.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-bold text-white">{item.file_name || 'Documento sem nome'}</p>
-                  <p className="text-xs text-gray-500">{item.analysis_type || 'analise'} - {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : 'sem data'}</p>
-                </div>
-                <span className="rounded border border-green-900/30 bg-green-950/20 px-2 py-1 text-xs font-bold text-green-400">
-                  Concluida
-                </span>
+          <form onSubmit={handleSend} className="border-t border-[#1E1E1E] p-4">
+            <div className="flex items-end gap-3">
+              <div className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded border border-[#1E1E1E] text-gray-600 sm:flex">
+                <Paperclip className="h-4 w-4" />
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-8 text-center text-sm text-gray-500">
-            Nenhum historico encontrado no Supabase ainda.
-          </div>
-        )}
+              <textarea
+                value={question}
+                onChange={event => setQuestion(event.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                placeholder={file ? 'Pergunte algo sobre o documento...' : 'Escolha um documento para conversar com a IA...'}
+                className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl border border-[#1E1E1E] bg-[#0D0D0D] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-700 focus:border-[#CE7028]"
+              />
+              <button
+                type="submit"
+                disabled={loading || !file || !question.trim()}
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#CE7028] text-white transition-colors hover:bg-[#B8621F] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Enviar pergunta"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </button>
+            </div>
+          </form>
+        </section>
       </div>
     </div>
   )
