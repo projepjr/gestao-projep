@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, X, Clock, Building2,
   User, Video, Phone, MessageCircle, Edit2, Trash2, CheckCircle2,
@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
+import { fetchLatestComercialSnapshot } from '../../services/comercialDashboardData'
+import { resolvePipefyMeetingResponsibles } from '../../services/comercialSnapshotMapper'
 
 const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
@@ -109,7 +111,7 @@ function buildCalendarDays(monthDate) {
   })
 }
 
-function normalizeMeeting(meeting, leads, members, commercial) {
+function normalizeMeeting(meeting, leads, members, commercial, pipefySnapshot) {
   const lead = leads.find(item => idsEqual(item.id, meeting.leadId))
   const responsibleIds = getResponsibleIds(meeting)
   const responsibleMembers = responsibleIds
@@ -118,6 +120,13 @@ function normalizeMeeting(meeting, leads, members, commercial) {
   const responsibleMember = responsibleMembers.length
     ? { nome: responsibleMembers.map(member => member.nome).join(', ') }
     : null
+  const pipefyResponsibles = responsibleMembers.length
+    ? []
+    : resolvePipefyMeetingResponsibles(pipefySnapshot, meeting, { members, commercial })
+  const pipefyResponsibleName = pipefyResponsibles
+    .map(member => member.nome || member.name)
+    .filter(Boolean)
+    .join(', ')
   const responsibleCommercial = [...(commercial.hunters || []), ...(commercial.closers || [])]
     .find(item => idsEqual(item.id, meeting.responsavelId))
 
@@ -133,8 +142,8 @@ function normalizeMeeting(meeting, leads, members, commercial) {
     horaInicio: meeting.horaInicio || '',
     horaFim: meeting.horaFim || '',
     responsavelIds: responsibleIds,
-    responsaveis: responsibleMembers,
-    responsavelNome: responsibleMember?.nome || responsibleCommercial?.nome || 'Sem responsável',
+    responsaveis: responsibleMembers.length ? responsibleMembers : pipefyResponsibles,
+    responsavelNome: responsibleMember?.nome || pipefyResponsibleName || responsibleCommercial?.nome || 'Sem responsável',
   }
 }
 
@@ -478,10 +487,26 @@ export default function CalendarioComercial() {
   const [query, setQuery] = useState('')
   const [modalMeeting, setModalMeeting] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [pipefySnapshot, setPipefySnapshot] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchLatestComercialSnapshot()
+      .then(result => {
+        if (!cancelled) setPipefySnapshot(result?.snapshot?.payload || null)
+      })
+      .catch(() => {
+        if (!cancelled) setPipefySnapshot(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const normalizedMeetings = useMemo(
-    () => meetings.map(meeting => normalizeMeeting(meeting, leads, members, commercial)),
-    [commercial, leads, meetings, members],
+    () => meetings.map(meeting => normalizeMeeting(meeting, leads, members, commercial, pipefySnapshot)),
+    [commercial, leads, meetings, members, pipefySnapshot],
   )
 
   const filteredMeetings = useMemo(() => {

@@ -674,3 +674,25 @@ Regras:
 - O botao global de atualizacao deve continuar usando `projep:refresh-data`, que chama as telas comerciais com `force: true`.
 - Cache curto nao pode alterar formulas; ele apenas evita refazer a mesma consulta/calculo repetidamente.
 - Novas telas comerciais que precisam do snapshot devem usar o servico compartilhado, nao consultar Supabase diretamente.
+
+## Atualizacao 2026-08-01 - Responsaveis de reunioes e no-show
+
+Regra atual:
+
+- O pipeline oficial continua sendo `307256948`.
+- No calendario comercial, reunioes vindas do Pipefy devem exibir responsaveis quando essa informacao existir.
+- O ideal e o n8n salvar responsaveis diretamente em `meeting_responsibles`.
+- Enquanto o n8n ainda nao preencher essa tabela, o front pode inferir responsaveis pelo snapshot comercial mais recente, casando a empresa da reuniao com o card do Pipefy.
+
+Campos usados para inferencia:
+
+- Diagnostica agendada: `Quem marcou o diagnostico` ou variacoes antigas como `Quem marcou a diagnostica`.
+- Proposta agendada: `Responsavel pela proposta` ou variacoes como `Quem marcou a proposta`.
+- Pendentes / No-show: `Quem fez o follow-up`.
+
+Regra de no-show:
+
+- O campo `Quem fez o follow-up` tem prioridade para atribuir no-show.
+- Se o valor bater com um Hunter configurado em `Comercial > Equipe`, o no-show entra para o Hunter.
+- Se o valor bater com um Closer configurado em `Comercial > Equipe`, o no-show entra para o Closer.
+- Se o campo nao existir ou nao casar com ninguem, fica o fallback antigo: no-show de diagnostica conta para Hunter; no-show de proposta conta para Closer.

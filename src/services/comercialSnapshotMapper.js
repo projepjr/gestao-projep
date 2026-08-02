@@ -322,9 +322,15 @@ function getLeadSegment(card) {
 }
 
 function getCardCompanyName(card) {
-  return card?.title ||
+  return getFieldValue(card, [
+    'nome da empresa',
+    'empresa',
+    'razao social',
+    'razão social',
+    'nome fantasia',
+  ]) ||
+    card?.title ||
     card?.name ||
-    getFieldValue(card, ['nome da empresa', 'empresa', 'razao social', 'razão social']) ||
     'Empresa sem nome'
 }
 
@@ -600,6 +606,20 @@ const LOSS_RESPONSIBLE_LABELS = [
   'quem perdeu',
   'quem moveu para perdidos',
   'quem marcou como perdido',
+]
+
+const NO_SHOW_RESPONSIBLE_LABELS = [
+  'quem fez o follow-up',
+  'quem fez follow-up',
+  'quem fez o follow up',
+  'quem fez follow up',
+  'responsavel pelo follow-up',
+  'responsavel pelo follow up',
+  'responsavel pelo no-show',
+  'responsavel pelo no show',
+  'responsavel do no-show',
+  'responsavel do no show',
+  'responsavel pelo reagendamento',
 ]
 
 const LOSS_STAGE_ENTRY_LABELS = [
@@ -965,6 +985,20 @@ function getLossResponsibleTeamMember(card, teamIndex) {
   return null
 }
 
+function getNoShowResponsibleTeamMember(card, hunterIndex, closerIndex) {
+  const values = getFieldValues(card, NO_SHOW_RESPONSIBLE_LABELS)
+
+  for (const value of values) {
+    const hunter = matchTeamValue(value, hunterIndex)
+    if (hunter) return { type: 'hunter', member: hunter }
+
+    const closer = matchTeamValue(value, closerIndex)
+    if (closer) return { type: 'closer', member: closer }
+  }
+
+  return null
+}
+
 function createHunterRows(members, commercial) {
   return buildBasePeople('hunter', members, commercial).map(person => ({
     id: person.id,
@@ -1149,7 +1183,6 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       }
       if (proposalScheduled) hunter.propostasAgendadas += 1
       if (proposalDone) hunter.propostasRealizadas += 1
-      if (diagnosticNoShow) hunter.noShows += 1
     }
 
     if (lost) {
@@ -1180,9 +1213,23 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
         closer.propostasRealizadas += 1
         closer.reunioesRealizadas += 1
       }
-      if (proposalNoShow) closer.noShows += 1
       if (inNegotiation && !contractClosed) closer.emNegociacao += 1
       if (contractClosed) closer.contratosFechados += 1
+    }
+
+    if (diagnosticNoShow || proposalNoShow) {
+      const noShowOwner = getNoShowResponsibleTeamMember(card, hunterIndex, closerIndex)
+      if (noShowOwner?.type === 'hunter') {
+        const noShowHunter = findOrCreateRow(hunters, noShowOwner.member)
+        if (noShowHunter) noShowHunter.noShows += 1
+      } else if (noShowOwner?.type === 'closer') {
+        const noShowCloser = findOrCreateRow(closers, noShowOwner.member)
+        if (noShowCloser) noShowCloser.noShows += 1
+      } else if (diagnosticNoShow && hunter) {
+        hunter.noShows += 1
+      } else if (proposalNoShow && closer) {
+        closer.noShows += 1
+      }
     }
 
     if (proposalScheduledForCloserInPeriod(card, range)) {
@@ -1387,6 +1434,68 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
     cardsMapeados: cards.length,
     totalCardsSnapshot: allCards.length,
   }
+}
+
+function normalizeCompanyForMatch(value) {
+  return normalize(value).replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function getCalendarResponsibleMembers(card, meeting, hunterIndex, closerIndex) {
+  const type = normalize(meeting?.tipo || meeting?.type)
+  const status = normalize(meeting?.status)
+
+  if (includesAny(status, ['no-show', 'no show', 'noshow'])) {
+    const noShowOwner = getNoShowResponsibleTeamMember(card, hunterIndex, closerIndex)
+    if (noShowOwner?.member) return [noShowOwner.member]
+  }
+
+  if (includesAny(type, ['proposta'])) {
+    const closer = getProposalSchedulerTeamMember(card, closerIndex) ||
+      getResponsibleTeamMember(card, 'closer', closerIndex)
+    return closer ? [closer] : []
+  }
+
+  if (includesAny(type, ['diagnostico', 'diagnostica'])) {
+    const hunter = getDiagnosticSchedulerTeamMember(card, hunterIndex) ||
+      getResponsibleTeamMember(card, 'hunter', hunterIndex)
+    return hunter ? [hunter] : []
+  }
+
+  return [
+    getResponsibleTeamMember(card, 'hunter', hunterIndex),
+    getResponsibleTeamMember(card, 'closer', closerIndex),
+  ].filter(Boolean)
+}
+
+export function resolvePipefyMeetingResponsibles(payload, meeting, { members = [], commercial = {} } = {}) {
+  const cards = getCards(payload)
+  if (!cards.length || !meeting) return []
+
+  const companyKey = normalizeCompanyForMatch(meeting.empresa || meeting.company || '')
+  const titleKey = normalizeCompanyForMatch(meeting.titulo || meeting.title || '')
+  if (!companyKey && !titleKey) return []
+
+  const matchedCard = cards.find(card => {
+    const cardCompany = normalizeCompanyForMatch(getCardCompanyName(card))
+    if (!cardCompany) return false
+    return (companyKey && (companyKey.includes(cardCompany) || cardCompany.includes(companyKey))) ||
+      (titleKey && (titleKey.includes(cardCompany) || cardCompany.includes(titleKey)))
+  })
+
+  if (!matchedCard) return []
+
+  const pipeMembers = getPipeMembers(payload)
+  const hunterIndex = buildTeamIndex('hunter', commercial.equipe?.hunters || [], members, pipeMembers)
+  const closerIndex = buildTeamIndex('closer', commercial.equipe?.closers || [], members, pipeMembers)
+
+  return getCalendarResponsibleMembers(matchedCard, meeting, hunterIndex, closerIndex)
+    .map(member => ({
+      id: member.id,
+      nome: member.nome || member.name || member.pipefyName || member.email || '',
+      email: member.email || '',
+      role: member.role || '',
+    }))
+    .filter(member => member.id || member.nome)
 }
 
 export function extractPipefyPeopleFromSnapshot(payload) {
