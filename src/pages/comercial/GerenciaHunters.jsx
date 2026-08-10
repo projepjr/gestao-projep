@@ -231,6 +231,7 @@ function HunterAnalysis() {
   const [endDate, setEndDate] = useState('')
   const [selectedMetricKey, setSelectedMetricKey] = useState('leadsTrabalhados')
   const [selectedHunters, setSelectedHunters] = useState([])
+  const [showTeamAverage, setShowTeamAverage] = useState(true)
   const [hunterSearch, setHunterSearch] = useState('')
   const loadingRef = useRef(false)
 
@@ -535,7 +536,7 @@ function HunterAnalysis() {
               </div>
             </label>
             <div className="rounded border border-[#1E1E1E] bg-[#0D0D0D] px-3 py-2 text-xs text-gray-500">
-              Selecionados: <span className="font-bold text-white">{selectedRows.length}</span>
+              Selecionados: <span className="font-bold text-white">{selectedRows.length + (showTeamAverage ? 1 : 0)}</span>
               <span className="mx-2 text-gray-700">|</span>
               Média selecionada: <span className="font-bold text-[#00D4D4]">{formatMetric(selectedAverage, selectedMetric.isPercent)}</span>
               <span className="mx-2 text-gray-700">|</span>
@@ -558,19 +559,34 @@ function HunterAnalysis() {
             <div className="mb-3 flex gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedHunters(hunters.map(hunterId))}
+                onClick={() => {
+                  setSelectedHunters(hunters.map(hunterId))
+                  setShowTeamAverage(true)
+                }}
                 className="flex-1 rounded bg-[#CE7028] px-2 py-2 text-xs font-semibold text-white"
               >
                 Selecionar todos
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedHunters([])}
+                onClick={() => {
+                  setSelectedHunters([])
+                  setShowTeamAverage(false)
+                }}
                 className="rounded border border-[#1E1E1E] px-3 py-2 text-xs font-semibold text-gray-400 hover:text-white"
               >
                 Limpar
               </button>
             </div>
+            <label className={`mb-2 flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-xs transition-colors ${showTeamAverage ? 'bg-[#5975FF]/15 text-white' : 'text-gray-500 hover:bg-white/5 hover:text-white'}`}>
+              <input
+                type="checkbox"
+                checked={showTeamAverage}
+                onChange={() => setShowTeamAverage(current => !current)}
+                className="accent-[#5975FF]"
+              />
+              <span className="truncate font-semibold">Média do time</span>
+            </label>
             <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
               {filteredHunters.map(row => {
                 const key = hunterId(row)
@@ -594,7 +610,7 @@ function HunterAnalysis() {
           </div>
 
           <div className="min-h-[360px] rounded-md border border-[#1E1E1E] bg-[#0D0D0D] p-4">
-            {chartData.length === 0 || selectedRows.length === 0 ? (
+            {chartData.length === 0 || (!showTeamAverage && selectedRows.length === 0) ? (
               <div className="flex h-[330px] items-center justify-center text-sm text-gray-600">
                 Selecione ao menos um hunter para visualizar o gráfico.
               </div>
@@ -619,7 +635,9 @@ function HunterAnalysis() {
                       )
                     }}
                   />
-                  <Line type="monotone" dataKey="media" name="Média do time" stroke="#5975FF" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  {showTeamAverage && (
+                    <Line type="monotone" dataKey="media" name="Média do time" stroke="#5975FF" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  )}
                   {selectedRows.map((row, index) => (
                     <Line
                       key={hunterId(row)}

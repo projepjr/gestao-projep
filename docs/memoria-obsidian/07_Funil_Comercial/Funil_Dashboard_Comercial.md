@@ -746,3 +746,4 @@ Performance:
 - A selecao/deselecao de Hunters no grafico nao deve recalcular o snapshot comercial inteiro.
 - O grafico calcula os pontos por periodo/metrica uma vez e usa chaves estaveis por Hunter para apenas mostrar ou esconder linhas.
 - Evitar recolocar `selectedRows` como dependencia do mapeamento do snapshot, pois isso faz a tela travar em interacoes simples.
+- A linha `Media do time` deve ser selecionavel separadamente dos Hunters, permitindo analisar apenas a media agregada em visao semanal, mensal ou ao vivo.
