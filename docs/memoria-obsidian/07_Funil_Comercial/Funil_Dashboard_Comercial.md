@@ -747,3 +747,24 @@ Performance:
 - O grafico calcula os pontos por periodo/metrica uma vez e usa chaves estaveis por Hunter para apenas mostrar ou esconder linhas.
 - Evitar recolocar `selectedRows` como dependencia do mapeamento do snapshot, pois isso faz a tela travar em interacoes simples.
 - A linha `Media do time` deve ser selecionavel separadamente dos Hunters, permitindo analisar apenas a media agregada em visao semanal, mensal ou ao vivo.
+
+## Atualizacao 2026-08-10 - Meu Desempenho com navegacao de periodo
+
+Problema observado:
+
+- Em `Comercial > Meu Desempenho`, alterar datas diretamente nos campos do calendario fazia a tela recalcular o grafico a cada clique.
+- Essa interacao deixava a pagina pesada, principalmente quando o snapshot comercial vinha grande do Pipefy.
+
+Implementacao:
+
+- A tela passou a usar navegacao rapida por periodo, parecida com a Dashboard Comercial.
+- Em modo semanal, as setas navegam de domingo a sabado.
+- Em modo mensal, as setas navegam por mes calendario.
+- O periodo personalizado ficou recolhido em um botao discreto.
+- As datas personalizadas agora ficam em estado de rascunho e so recalculam o grafico ao clicar em `Aplicar periodo`.
+
+Regra:
+
+- Nao recalcular o grafico enquanto o usuario ainda esta escolhendo datas no calendario.
+- Manter o limite de ate 8 semanas em modo semanal e ate 6 meses em modo mensal.
+- A visao `Ao Vivo` continua usando todo o historico disponivel.
