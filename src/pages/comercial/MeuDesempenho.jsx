@@ -1,30 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
-  LabelList,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip as ChartTooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { BarChart2, Calendar, ChevronLeft, ChevronRight, Radio, User } from 'lucide-react'
+import { Activity, Calendar, ChevronDown, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import {
-  buildRemoteDashboardData,
-  buildMonthRanges,
-  buildWeekRanges,
   fetchLatestComercialSnapshot,
-  findCurrentMonthIndex,
-  findCurrentWeekIndex,
-  fmtDate,
+  isoDate,
 } from '../../services/comercialDashboardData'
+import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 
 const ORANGE = '#CE7028'
-const GREEN = '#044947'
+const CYAN = '#00D4D4'
+const BLUE = '#5975FF'
 
 function normalize(value) {
   return `${value ?? ''}`
@@ -56,13 +51,95 @@ function formatMetric(value, isPercent = false) {
   return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1)
 }
 
+function formatDateInput(date) {
+  return isoDate(date)
+}
+
+function formatLongDate(iso) {
+  if (!iso) return ''
+  const [year, month, day] = iso.split('-')
+  return `${day}/${month}/${year}`
+}
+
+function parseDate(iso) {
+  if (!iso) return null
+  const [year, month, day] = iso.split('-').map(Number)
+  if (!year || !month || !day) return null
+  const date = new Date(year, month - 1, day)
+  date.setHours(0, 0, 0, 0)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function addDays(date, amount) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + amount)
+  return next
+}
+
+function addMonths(date, amount) {
+  const next = new Date(date)
+  next.setMonth(next.getMonth() + amount)
+  return next
+}
+
+function clampDate(date, max) {
+  return date > max ? new Date(max) : date
+}
+
+function daysBetween(start, end) {
+  return Math.max(1, Math.round((end - start) / 86400000) + 1)
+}
+
+function buildDefaultStart(referenceDate) {
+  const reference = new Date(referenceDate)
+  reference.setHours(0, 0, 0, 0)
+  const start = new Date(reference)
+  start.setDate(reference.getDate() - 41)
+  return start
+}
+
+function buildChartBuckets(startIso, endIso) {
+  const start = parseDate(startIso)
+  const end = parseDate(endIso)
+  if (!start || !end || start > end) return []
+
+  const totalDays = daysBetween(start, end)
+  const useMonths = totalDays > 120
+  const maxPoints = 8
+  const buckets = []
+  let cursor = new Date(start)
+  let index = 1
+
+  while (cursor <= end && buckets.length < maxPoints) {
+    const nextBoundary = useMonths
+      ? addDays(addMonths(cursor, 1), -1)
+      : addDays(cursor, 6)
+    const bucketEnd = clampDate(nextBoundary, end)
+    buckets.push({
+      label: useMonths ? `Mes ${index}` : `Sem ${index}`,
+      fim: formatDateInput(bucketEnd),
+    })
+    cursor = addDays(bucketEnd, 1)
+    index += 1
+  }
+
+  if (buckets.length && buckets[buckets.length - 1].fim !== endIso) {
+    buckets[buckets.length - 1] = {
+      ...buckets[buckets.length - 1],
+      fim: endIso,
+    }
+  }
+
+  return buckets
+}
+
 function InfoTip({ text }) {
   return (
     <span className="relative inline-flex group align-middle">
       <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#CE7028] text-[10px] font-bold text-[#CE7028]">
         ?
       </span>
-      <span className="pointer-events-none absolute right-0 top-full z-30 mt-2 w-72 rounded border border-[#CE7028] bg-[#1E1E1E] px-3 py-2 text-xs font-medium leading-relaxed text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+      <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] -translate-x-1/2 whitespace-normal rounded border border-[#CE7028] bg-[#1E1E1E] px-3 py-2 text-xs font-medium leading-relaxed text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
         {text}
       </span>
     </span>
@@ -75,112 +152,181 @@ function metricValue(row, metric) {
   return Number(row[metric.key]) || 0
 }
 
-function emptyPeriod(range = {}) {
-  return {
-    id: range.id || 'vazio',
-    label: range.label || 'Ao Vivo',
-    inicio: range.inicio,
-    fim: range.fim,
-    hunters: [],
-    closers: [],
-    kpis: { ticketMedio: 0, contratosFechados: 0, receitaTotal: 0, taxaConversao: 0 },
-  }
+function createEmptyRows() {
+  return { hunters: [], closers: [] }
 }
 
 const HUNTER_METRICS = [
   {
+    source: 'hunter',
     key: 'leadsCadastrados',
     label: 'Leads cadastrados',
-    help: 'Leads do período que estão sob sua responsabilidade no funil.',
+    axis: 'Leads cadastrados',
+    help: 'Leads que entraram no funil no periodo e ficaram sob sua responsabilidade.',
   },
   {
+    source: 'hunter',
     key: 'leadsTrabalhados',
     label: 'Leads trabalhados',
-    help: 'Leads que tiveram algum avanço feito por você no período.',
+    axis: 'Leads trabalhados',
+    help: 'Leads que sairam do cadastro ou tiveram algum andamento feito por voce no periodo.',
   },
   {
+    source: 'hunter',
     key: 'leadsContatados',
     label: 'Leads contatados',
-    help: 'Leads em que houve contato real com a empresa, como ligação atendida ou resposta útil.',
+    axis: 'Leads contatados',
+    help: 'Leads em que houve contato real com a empresa, como uma ligacao atendida ou resposta util.',
   },
   {
+    source: 'hunter',
     key: 'diagnosticasAgendadas',
-    label: 'Diagnósticas agendadas',
-    help: 'Reuniões diagnósticas que você marcou no período.',
+    label: 'Diagnosticas agendadas',
+    axis: 'Diagnosticas agendadas',
+    help: 'Reunioes diagnosticas que voce marcou no periodo.',
   },
   {
+    source: 'hunter',
     key: 'diagnosticasRealizadas',
-    label: 'Diagnósticas realizadas',
-    help: 'Diagnósticas que realmente aconteceram no período.',
+    label: 'Diagnosticas realizadas',
+    axis: 'Diagnosticas realizadas',
+    help: 'Diagnosticas que realmente aconteceram no periodo.',
   },
   {
+    source: 'hunter',
     key: 'propostasAgendadas',
     label: 'Propostas agendadas',
-    help: 'Apresentações de proposta agendadas nos seus leads.',
+    axis: 'Propostas agendadas',
+    help: 'Apresentacoes de proposta agendadas em leads trabalhados por voce.',
   },
   {
+    source: 'hunter',
     key: 'propostasRealizadas',
     label: 'Propostas realizadas',
-    help: 'Propostas que foram apresentadas no período.',
+    axis: 'Propostas realizadas',
+    help: 'Propostas apresentadas em leads que vieram da sua prospeccao.',
   },
   {
+    source: 'hunter',
     key: 'noShows',
     label: 'No-shows',
-    help: 'Reuniões que não aconteceram por ausência do lead. No-show de diagnóstica fica com o Hunter.',
+    axis: 'No-shows',
+    help: 'Reunioes em que o lead nao apareceu. No-show de diagnostica fica com o Hunter.',
   },
   {
+    source: 'hunter',
     key: 'perdidos',
     label: 'Perdidos',
-    help: 'Leads marcados como perdidos sob sua responsabilidade no período.',
+    axis: 'Leads perdidos',
+    help: 'Leads enviados para perdidos sob sua responsabilidade no periodo.',
   },
   {
+    source: 'hunter',
     key: 'taxaConversao',
-    label: 'Taxa de conversão',
+    label: 'Taxa de conversao',
+    axis: 'Taxa de conversao',
     isPercent: true,
     compute: row => pct(row.diagnosticasRealizadas, row.leadsTrabalhados),
-    help: 'Mostra quantos leads trabalhados por você chegaram até uma diagnóstica realizada.',
+    help: 'Mostra quantos leads trabalhados por voce chegaram ate uma diagnostica realizada.',
   },
 ]
 
 const CLOSER_METRICS = [
   {
+    source: 'closer',
     key: 'diagnosticasRealizadas',
-    label: 'Diagnósticas realizadas',
-    help: 'Diagnósticas feitas que chegaram para acompanhamento comercial de fechamento.',
+    label: 'Diagnosticas realizadas',
+    axis: 'Diagnosticas realizadas',
+    help: 'Diagnosticas feitas que chegaram para acompanhamento comercial de fechamento.',
   },
   {
+    source: 'closer',
     key: 'propostasAgendadas',
     label: 'Propostas agendadas',
-    help: 'Apresentações de proposta que foram marcadas para você no período.',
+    axis: 'Propostas agendadas',
+    help: 'Apresentacoes de proposta que foram marcadas para voce no periodo.',
   },
   {
+    source: 'closer',
     key: 'propostasRealizadas',
     label: 'Propostas realizadas',
-    help: 'Apresentações de proposta que você realmente fez no período.',
+    axis: 'Propostas realizadas',
+    help: 'Apresentacoes de proposta que voce realmente fez no periodo.',
   },
   {
+    source: 'closer',
     key: 'noShows',
-    label: 'No-shows',
-    help: 'Propostas que não aconteceram por ausência do lead. No-show de proposta fica com o Closer.',
+    label: 'No-shows de proposta',
+    axis: 'No-shows de proposta',
+    help: 'Propostas que nao aconteceram por ausencia do lead. No-show de proposta fica com o Closer.',
   },
   {
+    source: 'closer',
     key: 'emNegociacao',
-    label: 'Em negociação',
-    help: 'Leads que estão em negociação e associados a você.',
+    label: 'Em negociacao',
+    axis: 'Em negociacao',
+    help: 'Leads que estao em negociacao e associados a voce.',
   },
   {
+    source: 'closer',
     key: 'contratosFechados',
     label: 'Contratos',
-    help: 'Contratos fechados por você no período.',
+    axis: 'Contratos',
+    help: 'Contratos fechados por voce no periodo.',
   },
   {
+    source: 'closer',
     key: 'taxaContratos',
     label: 'Taxa de contratos',
+    axis: 'Taxa de contratos',
     isPercent: true,
     compute: row => pct(row.contratosFechados, row.propostasRealizadas),
-    help: 'Mostra quantas propostas apresentadas por você viraram contratos fechados.',
+    help: 'Mostra quantas propostas apresentadas por voce viraram contratos fechados.',
   },
 ]
+
+function getRowsForMetric(period, metric) {
+  if (!period) return []
+  return metric.source === 'closer' ? (period.closers || []) : (period.hunters || [])
+}
+
+function findCurrentRow(rows, matchesCurrentUser) {
+  return rows.find(matchesCurrentUser) || null
+}
+
+function useCurrentIdentity(user, members) {
+  const currentMember = useMemo(() => {
+    const email = normalize(user?.email)
+    return (members || []).find(member =>
+      idsEqual(member.id, user?.id) ||
+      idsEqual(member.id, user?.supabaseId) ||
+      idsEqual(member.supabaseId, user?.id) ||
+      idsEqual(member.supabaseId, user?.supabaseId) ||
+      (email && normalize(member.email) === email)
+    )
+  }, [members, user])
+
+  const identityValues = useMemo(() => new Set([
+    user?.id,
+    user?.supabaseId,
+    user?.email,
+    user?.nome,
+    user?.name,
+    currentMember?.id,
+    currentMember?.supabaseId,
+    currentMember?.email,
+    currentMember?.nome,
+    currentMember?.name,
+  ].map(normalize).filter(Boolean)), [currentMember, user])
+
+  const matchesCurrentUser = useCallback(row => {
+    if (!row) return false
+    const values = [row.userId, row.profileId, row.memberId, row.email, row.nome, row.name]
+    return values.some(value => identityValues.has(normalize(value)))
+  }, [identityValues])
+
+  return { currentMember, matchesCurrentUser }
+}
 
 export default function MeuDesempenho() {
   const { user } = useAuth()
@@ -189,16 +335,20 @@ export default function MeuDesempenho() {
   const [statusMessage, setStatusMessage] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState('aovivo')
-  const [roleView, setRoleView] = useState('hunter')
-  const [selectedMetricKey, setSelectedMetricKey] = useState(HUNTER_METRICS[1].key)
+  const [selectedMetricKey, setSelectedMetricKey] = useState('hunter:leadsTrabalhados')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const loadingSnapshotRef = useRef(false)
+  const { matchesCurrentUser } = useCurrentIdentity(user, members)
 
   const referenceDate = snapshot?.synced_at || new Date().toISOString()
-  const weeks = useMemo(() => buildWeekRanges(referenceDate, 10), [referenceDate])
-  const months = useMemo(() => buildMonthRanges(referenceDate, 8), [referenceDate])
-  const [weekIndex, setWeekIndex] = useState(0)
-  const [monthIndex, setMonthIndex] = useState(0)
+
+  useEffect(() => {
+    const reference = new Date(referenceDate)
+    const defaultStart = buildDefaultStart(reference)
+    setStartDate(current => current || formatDateInput(defaultStart))
+    setEndDate(current => current || formatDateInput(reference))
+  }, [referenceDate])
 
   const loadSnapshot = useCallback(async ({ force = false, silent = false } = {}) => {
     if (loadingSnapshotRef.current) return
@@ -226,298 +376,257 @@ export default function MeuDesempenho() {
     return () => window.removeEventListener('projep:refresh-data', handler)
   }, [loadSnapshot])
 
-  useEffect(() => {
-    setWeekIndex(findCurrentWeekIndex(weeks))
-  }, [weeks])
+  const fullPeriod = useMemo(() => {
+    if (!snapshot?.payload || !startDate || !endDate) return createEmptyRows()
+    return mapComercialSnapshot(snapshot.payload, {
+      members,
+      commercial,
+      range: { id: 'custom', label: 'Periodo selecionado', inicio: startDate, fim: endDate },
+    })
+  }, [commercial, endDate, members, snapshot, startDate])
+
+  const availableMetrics = useMemo(() => {
+    const hasHunter = (fullPeriod.hunters || []).some(matchesCurrentUser)
+    const hasCloser = (fullPeriod.closers || []).some(matchesCurrentUser)
+    const list = [
+      ...(hasHunter ? HUNTER_METRICS : []),
+      ...(hasCloser ? CLOSER_METRICS : []),
+    ]
+    return list.length ? list : HUNTER_METRICS
+  }, [fullPeriod, matchesCurrentUser])
 
   useEffect(() => {
-    setMonthIndex(findCurrentMonthIndex(months))
-  }, [months])
-
-  const dashboardData = useMemo(
-    () => buildRemoteDashboardData(snapshot, members, commercial),
-    [snapshot, members, commercial]
-  )
-
-  const periods = useMemo(() => ({
-    aovivo: dashboardData?.aovivo || emptyPeriod(),
-    semanas: dashboardData?.semanas?.length
-      ? dashboardData.semanas
-      : weeks.map(emptyPeriod),
-    meses: dashboardData?.meses?.length
-      ? dashboardData.meses
-      : months.map(emptyPeriod),
-  }), [dashboardData, weeks, months])
-
-  const activePeriod = viewMode === 'semanal'
-    ? (periods.semanas[weekIndex] || emptyPeriod(weeks[weekIndex]))
-    : viewMode === 'mensal'
-      ? (periods.meses[monthIndex] || emptyPeriod(months[monthIndex]))
-      : periods.aovivo
-
-  const currentMember = useMemo(() => {
-    const email = normalize(user?.email)
-    return (members || []).find(member =>
-      idsEqual(member.id, user?.id) ||
-      idsEqual(member.id, user?.supabaseId) ||
-      idsEqual(member.supabaseId, user?.id) ||
-      idsEqual(member.supabaseId, user?.supabaseId) ||
-      (email && normalize(member.email) === email)
-    )
-  }, [members, user])
-
-  const identityValues = useMemo(() => new Set([
-    user?.id,
-    user?.supabaseId,
-    user?.email,
-    user?.nome,
-    user?.name,
-    currentMember?.id,
-    currentMember?.supabaseId,
-    currentMember?.email,
-    currentMember?.nome,
-    currentMember?.name,
-  ].map(normalize).filter(Boolean)), [currentMember, user])
-
-  const matchesCurrentUser = row => {
-    if (!row) return false
-    const values = [row.userId, row.profileId, row.memberId, row.email, row.nome, row.name]
-    return values.some(value => identityValues.has(normalize(value)))
-  }
-
-  const hunterRows = activePeriod.hunters || []
-  const closerRows = activePeriod.closers || []
-  const hunterRow = hunterRows.find(matchesCurrentUser)
-  const closerRow = closerRows.find(matchesCurrentUser)
-  const hasHunter = Boolean(hunterRow)
-  const hasCloser = Boolean(closerRow)
-
-  useEffect(() => {
-    if (roleView === 'hunter' && !hasHunter && hasCloser) {
-      setRoleView('closer')
-      setSelectedMetricKey(CLOSER_METRICS[0].key)
+    if (!availableMetrics.some(metric => `${metric.source}:${metric.key}` === selectedMetricKey)) {
+      const fallback = availableMetrics[0] || HUNTER_METRICS[1]
+      setSelectedMetricKey(`${fallback.source}:${fallback.key}`)
     }
-    if (roleView === 'closer' && !hasCloser && hasHunter) {
-      setRoleView('hunter')
-      setSelectedMetricKey(HUNTER_METRICS[1].key)
-    }
-  }, [hasCloser, hasHunter, roleView])
+  }, [availableMetrics, selectedMetricKey])
 
-  const metricOptions = roleView === 'closer' ? CLOSER_METRICS : HUNTER_METRICS
-  const roleRows = roleView === 'closer' ? closerRows : hunterRows
-  const currentRow = roleView === 'closer' ? closerRow : hunterRow
-  const selectedMetric = metricOptions.find(metric => metric.key === selectedMetricKey) || metricOptions[0]
+  const selectedMetric = useMemo(() => {
+    return availableMetrics.find(metric => `${metric.source}:${metric.key}` === selectedMetricKey) ||
+      availableMetrics[0] ||
+      HUNTER_METRICS[1]
+  }, [availableMetrics, selectedMetricKey])
+
+  const currentRows = getRowsForMetric(fullPeriod, selectedMetric)
+  const currentRow = findCurrentRow(currentRows, matchesCurrentUser)
   const userValue = metricValue(currentRow, selectedMetric)
-  const teamAverage = average(roleRows.map(row => metricValue(row, selectedMetric)))
+  const teamAverage = average(currentRows.map(row => metricValue(row, selectedMetric)))
 
-  const chartData = [
-    { label: 'Você', valor: userValue },
-    { label: 'Média do time', valor: teamAverage },
-  ]
+  const chartData = useMemo(() => {
+    if (!snapshot?.payload || !startDate || !endDate) return []
+    return buildChartBuckets(startDate, endDate).map(bucket => {
+      const period = mapComercialSnapshot(snapshot.payload, {
+        members,
+        commercial,
+        range: { id: bucket.label, label: bucket.label, inicio: startDate, fim: bucket.fim },
+      })
+      const rows = getRowsForMetric(period, selectedMetric)
+      const row = findCurrentRow(rows, matchesCurrentUser)
+      return {
+        label: bucket.label,
+        voce: metricValue(row, selectedMetric),
+        media: average(rows.map(item => metricValue(item, selectedMetric))),
+      }
+    })
+  }, [commercial, endDate, matchesCurrentUser, members, selectedMetric, snapshot, startDate])
 
-  const periodLabel = viewMode === 'semanal'
-    ? `${activePeriod.label} — ${fmtDate(activePeriod.inicio)} a ${fmtDate(activePeriod.fim)}`
-    : viewMode === 'mensal'
-      ? activePeriod.label
-      : 'Todo o histórico sincronizado'
-
-  const canSeeRoleToggle = hasHunter && hasCloser
+  const hasCommercialLink = Boolean(currentRow)
+  const periodText = startDate && endDate
+    ? `${formatLongDate(startDate)} - ${formatLongDate(endDate)}`
+    : 'periodo selecionado'
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <p className="text-sm text-[#6B7895]">Comercial</p>
-          <h1 className="mt-1 text-3xl font-extrabold text-white">Meu Desempenho</h1>
-          <p className="mt-2 text-[#6B7895]">
-            Escolha uma métrica e compare seu resultado com a média do time.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-            {statusMessage && (
-              <span className="rounded border border-green-900/40 bg-green-950/30 px-3 py-1.5 font-semibold text-green-400">
-                {statusMessage}
-              </span>
-            )}
-            {error && (
-              <span className="rounded border border-yellow-900/40 bg-yellow-950/20 px-3 py-1.5 text-yellow-300">
-                {error}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded border border-[#1E1E1E] bg-[#111111] p-1">
-            {[
-              { key: 'aovivo', label: 'Ao Vivo', Icon: Radio },
-              { key: 'semanal', label: 'Semanal', Icon: Calendar },
-              { key: 'mensal', label: 'Mensal', Icon: BarChart2 },
-            ].map(({ key, label, Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setViewMode(key)}
-                className={`inline-flex items-center gap-2 rounded px-4 py-2 text-sm font-bold transition ${
-                  viewMode === key ? 'bg-[#CE7028] text-white' : 'text-[#8A95AD] hover:text-white'
-                }`}
-              >
-                <Icon size={15} />
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {viewMode === 'semanal' && (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={weekIndex <= 0}
-                onClick={() => setWeekIndex(index => Math.max(0, index - 1))}
-                className="rounded border border-[#1E1E1E] bg-[#111111] p-2 text-[#8A95AD] disabled:opacity-40"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="min-w-[180px] text-center text-sm font-bold text-white">{periodLabel}</span>
-              <button
-                type="button"
-                disabled={weekIndex >= periods.semanas.length - 1}
-                onClick={() => setWeekIndex(index => Math.min(periods.semanas.length - 1, index + 1))}
-                className="rounded border border-[#1E1E1E] bg-[#111111] p-2 text-[#8A95AD] disabled:opacity-40"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
+      <div>
+        <p className="text-sm text-[#6B7895]">Comercial</p>
+        <h1 className="mt-1 text-3xl font-extrabold text-white">Meu Desempenho</h1>
+        <p className="mt-2 text-[#8A95AD]">
+          Escolha uma metrica e compare seu resultado com a media do time.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+          {statusMessage && (
+            <span className="rounded border border-green-900/40 bg-green-950/30 px-3 py-1.5 font-semibold text-green-400">
+              {statusMessage}
+            </span>
           )}
-
-          {viewMode === 'mensal' && (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={monthIndex <= 0}
-                onClick={() => setMonthIndex(index => Math.max(0, index - 1))}
-                className="rounded border border-[#1E1E1E] bg-[#111111] p-2 text-[#8A95AD] disabled:opacity-40"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="min-w-[140px] text-center text-sm font-bold text-white">{periodLabel}</span>
-              <button
-                type="button"
-                disabled={monthIndex >= periods.meses.length - 1}
-                onClick={() => setMonthIndex(index => Math.min(periods.meses.length - 1, index + 1))}
-                className="rounded border border-[#1E1E1E] bg-[#111111] p-2 text-[#8A95AD] disabled:opacity-40"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
+          {error && (
+            <span className="rounded border border-yellow-900/40 bg-yellow-950/20 px-3 py-1.5 text-yellow-300">
+              {error}
+            </span>
           )}
         </div>
       </div>
 
       {loading ? (
-        <div className="flex min-h-[320px] items-center justify-center rounded border border-[#1E1E1E] bg-[#111111]">
+        <div className="flex min-h-[420px] items-center justify-center rounded border border-[#1E1E1E] bg-[#111111]">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#CE7028]/30 border-t-[#CE7028]" />
         </div>
-      ) : !currentRow ? (
+      ) : !hasCommercialLink ? (
         <div className="rounded border border-[#1E1E1E] bg-[#111111] p-10 text-center">
           <User className="mx-auto mb-4 text-[#6B7895]" size={42} />
-          <h2 className="text-xl font-extrabold text-white">Nenhum vínculo comercial encontrado para seu usuário.</h2>
+          <h2 className="text-xl font-extrabold text-white">Nenhum vinculo comercial encontrado para seu usuario.</h2>
           <p className="mx-auto mt-2 max-w-2xl text-[#6B7895]">
             Para aparecer aqui, sua conta precisa estar vinculada como Hunter ou Closer em Comercial &gt; Equipe.
           </p>
         </div>
       ) : (
-        <div className="rounded border border-[#1E1E1E] bg-[#111111] p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <section className="overflow-hidden rounded border border-[#1E1E1E] bg-[#111111] shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+          <div className="flex flex-col gap-6 border-b border-[#1E1E1E] p-6 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <h2 className="text-xl font-extrabold text-white">Você x média do time</h2>
-              <p className="mt-1 text-sm text-[#6B7895]">
-                A média é agregada. A tela não mostra dados individuais de outras pessoas.
+              <h2 className="text-xl font-extrabold text-white">Voce x media do time</h2>
+              <p className="mt-1 text-sm text-[#8A95AD]">
+                A media e agregada. A tela nao mostra dados individuais de outras pessoas.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              {canSeeRoleToggle && (
-                <div className="flex rounded border border-[#1E1E1E] bg-[#0A0A0A] p-1">
-                  {[
-                    { key: 'hunter', label: 'Hunter' },
-                    { key: 'closer', label: 'Closer' },
-                  ].map(option => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => {
-                        setRoleView(option.key)
-                        setSelectedMetricKey(option.key === 'closer' ? CLOSER_METRICS[0].key : HUNTER_METRICS[1].key)
-                      }}
-                      className={`rounded px-4 py-2 text-sm font-bold ${
-                        roleView === option.key ? 'bg-[#CE7028] text-white' : 'text-[#8A95AD] hover:text-white'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Data inicial</span>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={startDate}
+                    max={endDate || undefined}
+                    onChange={event => setStartDate(event.target.value)}
+                    className="h-11 w-full min-w-[150px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
+                  />
+                  <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7895]" size={15} />
                 </div>
-              )}
+              </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-bold uppercase tracking-widest text-[#6B7895]">Métrica</span>
-                <select
-                  value={selectedMetricKey}
-                  onChange={event => setSelectedMetricKey(event.target.value)}
-                  className="min-w-[260px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-4 py-2 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
-                >
-                  {metricOptions.map(metric => (
-                    <option key={metric.key} value={metric.key}>{metric.label}</option>
-                  ))}
-                </select>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Data final</span>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={startDate || undefined}
+                    onChange={event => setEndDate(event.target.value)}
+                    className="h-11 w-full min-w-[150px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
+                  />
+                  <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7895]" size={15} />
+                </div>
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Metrica</span>
+                <div className="relative">
+                  <select
+                    value={selectedMetricKey}
+                    onChange={event => setSelectedMetricKey(event.target.value)}
+                    className="h-11 w-full min-w-[220px] appearance-none rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 pr-9 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
+                  >
+                    {availableMetrics.map(metric => (
+                      <option key={`${metric.source}:${metric.key}`} value={`${metric.source}:${metric.key}`}>
+                        {metric.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white" size={16} />
+                </div>
               </label>
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded border border-[#1E1E1E] bg-[#0A0A0A] px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">{selectedMetric.label}</span>
-              <InfoTip text={selectedMetric.help} />
+          <div className="p-6">
+            <div className="flex flex-col gap-4 rounded border border-[#1E1E1E] bg-[#0A0A0A] px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-extrabold text-white">{selectedMetric.label}</span>
+                <InfoTip text={selectedMetric.help} />
+              </div>
+              <div className="text-sm md:text-right">
+                <p className="font-semibold text-[#8A95AD]">
+                  Voce:{' '}
+                  <strong className="text-[#00D4D4]">{formatMetric(userValue, selectedMetric.isPercent)}</strong>
+                  <span className="mx-3 text-[#39445D]">|</span>
+                  Media do time:{' '}
+                  <strong className="text-[#5975FF]">{formatMetric(teamAverage, selectedMetric.isPercent)}</strong>
+                </p>
+                <p className="mt-1 text-[11px] text-[#6B7895]">
+                  Total acumulado no periodo selecionado ({periodText})
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-4 text-sm">
-              <span className="text-[#8A95AD]">
-                Você: <strong className="text-white">{formatMetric(userValue, selectedMetric.isPercent)}</strong>
-              </span>
-              <span className="text-[#8A95AD]">
-                Média do time: <strong className="text-white">{formatMetric(teamAverage, selectedMetric.isPercent)}</strong>
-              </span>
-            </div>
-          </div>
 
-          <div className="mt-6 h-[430px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 32, right: 28, left: 0, bottom: 8 }}>
-                <CartesianGrid stroke="#1E1E1E" strokeDasharray="3 3" />
-                <XAxis dataKey="label" stroke="#6B7895" tick={{ fill: '#8A95AD', fontSize: 12 }} />
-                <YAxis stroke="#6B7895" tick={{ fill: '#8A95AD', fontSize: 12 }} />
-                <ChartTooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                  contentStyle={{ background: '#111111', border: '1px solid #1E1E1E', borderRadius: 6, color: '#fff' }}
-                  formatter={value => [formatMetric(value, selectedMetric.isPercent), selectedMetric.label]}
-                />
-                <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
-                  <LabelList
-                    dataKey="valor"
-                    position="top"
-                    fill="#FFFFFF"
-                    fontSize={13}
-                    fontWeight={800}
-                    formatter={value => formatMetric(value, selectedMetric.isPercent)}
+            <div className="mt-7 h-[360px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+                  <CartesianGrid stroke="#1E1E1E" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="label"
+                    stroke="#6B7895"
+                    tick={{ fill: '#8A95AD', fontSize: 12 }}
+                    tickLine={false}
                   />
-                  {chartData.map((entry, index) => (
-                    <Cell key={entry.label} fill={index === 0 ? ORANGE : GREEN} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  <YAxis
+                    stroke="#6B7895"
+                    tick={{ fill: '#8A95AD', fontSize: 12 }}
+                    tickLine={false}
+                    label={{
+                      value: selectedMetric.axis || selectedMetric.label,
+                      angle: -90,
+                      position: 'insideLeft',
+                      fill: '#8A95AD',
+                      fontSize: 12,
+                    }}
+                    domain={selectedMetric.isPercent ? [0, 100] : ['auto', 'auto']}
+                    tickFormatter={value => formatMetric(value, selectedMetric.isPercent)}
+                  />
+                  <ChartTooltip
+                    cursor={{ stroke: 'rgba(255,255,255,0.08)' }}
+                    contentStyle={{ background: '#111111', border: '1px solid #1E1E1E', borderRadius: 8, color: '#fff' }}
+                    labelStyle={{ color: '#8A95AD' }}
+                    formatter={(value, name) => [
+                      formatMetric(value, selectedMetric.isPercent),
+                      name === 'voce' ? 'Voce' : 'Media do time',
+                    ]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="voce"
+                    name="Voce"
+                    stroke={CYAN}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, strokeWidth: 2, fill: CYAN }}
+                    activeDot={{ r: 6 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="media"
+                    name="Media do time"
+                    stroke={BLUE}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, strokeWidth: 2, fill: BLUE }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mt-3 flex items-center justify-center gap-6 text-xs font-bold">
+              <span className="inline-flex items-center gap-2 text-white">
+                <span className="h-2 w-5 rounded-full" style={{ backgroundColor: CYAN }} />
+                Voce
+              </span>
+              <span className="inline-flex items-center gap-2 text-white">
+                <span className="h-2 w-5 rounded-full" style={{ backgroundColor: BLUE }} />
+                Media do time
+              </span>
+            </div>
           </div>
-        </div>
+        </section>
       )}
+
+      <div className="rounded border border-[#1E1E1E] bg-[#111111] p-4 text-xs text-[#6B7895]">
+        <div className="flex items-start gap-3">
+          <Activity className="mt-0.5 text-[#CE7028]" size={16} />
+          <p>
+            A comparacao usa apenas a media agregada da equipe configurada em Comercial &gt; Equipe.
+            Os resultados individuais dos outros membros nao aparecem nesta tela.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

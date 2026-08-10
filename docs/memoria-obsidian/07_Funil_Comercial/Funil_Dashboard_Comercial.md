@@ -652,6 +652,16 @@ Atualizacao visual - Meu Desempenho simplificado:
 - Foram removidos cards e grades extras de indicadores para deixar a leitura mais direta.
 - A regra de privacidade permanece: nenhum resultado individual de outros membros e exibido, apenas media agregada.
 
+Atualizacao visual - Meu Desempenho por periodo:
+
+- A tela `Comercial > Meu Desempenho` passou a seguir o modelo visual `Voce x media do time`.
+- O usuario escolhe `Data inicial`, `Data final` e `Metrica`.
+- O grafico mostra uma linha para `Voce` e outra para `Media do time`.
+- Os pontos do grafico sao acumulados dentro do periodo selecionado.
+- O total exibido no topo do grafico representa o acumulado do periodo completo selecionado.
+- O calculo continua usando o snapshot comercial do Pipefy e `mapComercialSnapshot` com `range`.
+- A media do time e sempre agregada por equipe configurada em `Comercial > Equipe`; a tela nao mostra resultados individuais de outros membros.
+
 ## Atualizacao 2026-08-01 - Performance dos snapshots comerciais
 
 Problema observado:
