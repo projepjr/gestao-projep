@@ -27,6 +27,7 @@ export const ACCESS_MODULES = [
     available: true,
     subareas: [
       { key: 'comercial.dashboard', label: 'Dashboard', path: '/comercial', icon: 'dashboard' },
+      { key: 'comercial.gerenciaHunters', label: 'Gerência de Hunters', path: '/comercial/gerencia-hunters', icon: 'target' },
       { key: 'comercial.meuDesempenho', label: 'Meu Desempenho', path: '/comercial/meu-desempenho', icon: 'bar-chart-2' },
       { key: 'comercial.pipeline', label: 'Pipeline', path: '/comercial/pipeline', icon: 'kanban' },
       { key: 'comercial.calendario', label: 'Calendário', path: '/comercial/calendario', icon: 'calendar' },
@@ -150,7 +151,8 @@ export function hasPathAccess(user, pathname) {
   if (!user) return false
   if (pathname === '/perfil') return true
   if (pathname === '/membros') return true
-  if (pathname === '/comercial/leads') return hasSubareaAccess(user, 'comercial.dashboard')
+  if (pathname === '/comercial/leads') return hasSubareaAccess(user, 'comercial.gerenciaHunters')
+  if (pathname.startsWith('/comercial/gerencia-hunters')) return hasSubareaAccess(user, 'comercial.gerenciaHunters')
   if (pathname.startsWith('/projetos/gestao/')) return hasSubareaAccess(user, 'projetos.gestao')
   const access = ROUTE_ACCESS.get(pathname)
   if (!access) return false

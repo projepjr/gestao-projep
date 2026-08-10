@@ -712,3 +712,31 @@ Regra de no-show:
 - Se o valor bater com um Hunter configurado em `Comercial > Equipe`, o no-show entra para o Hunter.
 - Se o valor bater com um Closer configurado em `Comercial > Equipe`, o no-show entra para o Closer.
 - Se o campo nao existir ou nao casar com ninguem, fica o fallback antigo: no-show de diagnostica conta para Hunter; no-show de proposta conta para Closer.
+
+## Atualizacao 2026-08-10 - Gerencia de Hunters
+
+Objetivo:
+
+- Criar uma area dedicada para a gerente de Hunters acompanhar desempenho do time e qualidade dos leads sem misturar isso dentro da Dashboard principal.
+
+Rotas:
+
+- `Comercial > Gerencia de Hunters`: `/comercial/gerencia-hunters`
+- Aba interna `Hunters`: `/comercial/gerencia-hunters`
+- Aba interna `Leads`: `/comercial/gerencia-hunters/leads`
+- A rota antiga `/comercial/leads` redireciona para `/comercial/gerencia-hunters/leads`.
+
+Implementacao:
+
+- Nova pagina: `src/pages/comercial/GerenciaHunters.jsx`.
+- A tela `Hunters` reutiliza a mesma fonte de dados da Dashboard Comercial: snapshot Pipefy/Supabase via `fetchLatestComercialSnapshot` e `mapComercialSnapshot`.
+- A tabela de Hunters replica os indicadores da Dashboard Comercial para manter uma leitura consistente.
+- O grafico de linhas permite selecionar quais Hunters analisar, selecionar todos, limpar selecao e escolher a metrica.
+- A linha de `Media do time` aparece junto com as linhas dos Hunters selecionados.
+- A pagina de Leads por CNAE/segmento foi movida para dentro dessa area, mantendo o componente `src/pages/comercial/Leads.jsx`.
+
+Permissao:
+
+- Nova subarea de acesso: `comercial.gerenciaHunters`.
+- O acesso deve ser liberado em `Presidencia > Seguranca`, dentro dos acessos detalhados do setor Comercial.
+- Quem nao tiver essa subarea liberada nao deve ver nem acessar a area de Gerencia de Hunters.

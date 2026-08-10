@@ -191,6 +191,10 @@ export default function Layout({ children }) {
   const handleClearAll = () => clearAllNotifications(notifications.map(n => n.id))
   const unreadCount = notifications.filter(n => !n.read).length
   const activeSector = SECTORS.find(s => s.path && location.pathname.startsWith(s.path))
+  const activeSubItem = activeSector?.subItems?.find(item =>
+    location.pathname === item.path ||
+    (item.path && item.path !== activeSector.path && location.pathname.startsWith(`${item.path}/`))
+  )
   const sidebarOrder = navigation?.sidebarOrder || {}
   const normalizeText = value => `${value || ''}`
     .normalize('NFD')
@@ -376,7 +380,8 @@ export default function Layout({ children }) {
                       )}
                       {visibleSubItems.map((item, itemIndex) => {
                         const SubIcon = item.icon
-                        const subActive = location.pathname === item.path
+                        const subActive = location.pathname === item.path ||
+                          (item.path && item.path !== sector.path && location.pathname.startsWith(`${item.path}/`))
                         const itemContent = (
                           <>
                             <SubIcon className="w-3.5 h-3.5 flex-shrink-0" />
@@ -474,7 +479,7 @@ export default function Layout({ children }) {
                   <>
                     <ChevronRight className="w-3.5 h-3.5 text-gray-700" />
                     <span className="text-gray-300 font-medium">
-                      {activeSector.subItems.find(s => s.path === location.pathname)?.label ||
+                      {activeSubItem?.label ||
                         (location.pathname === '/comercial/leads' ? 'Leads' : '')}
                     </span>
                   </>

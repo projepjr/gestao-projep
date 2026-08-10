@@ -9,7 +9,7 @@ import Login from './pages/Login'
 import { getDefaultPath, hasPathAccess } from './config/accessControl'
 
 const ComercialDashboard = lazy(() => import('./pages/comercial/Dashboard'))
-const LeadsInsights = lazy(() => import('./pages/comercial/Leads'))
+const GerenciaHunters = lazy(() => import('./pages/comercial/GerenciaHunters'))
 const MeuDesempenho = lazy(() => import('./pages/comercial/MeuDesempenho'))
 const Pipeline = lazy(() => import('./pages/comercial/Pipeline'))
 const Calendario = lazy(() => import('./pages/comercial/Calendario'))
@@ -73,7 +73,9 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to={user ? defaultHome(user) : '/login'} replace />} />
 
       <Route path="/comercial"           element={<ProtectedRoute><ComercialDashboard /></ProtectedRoute>} />
-      <Route path="/comercial/leads"     element={<ProtectedRoute><LeadsInsights /></ProtectedRoute>} />
+      <Route path="/comercial/leads"     element={<ProtectedRoute requiredPath="/comercial/gerencia-hunters"><Navigate to="/comercial/gerencia-hunters/leads" replace /></ProtectedRoute>} />
+      <Route path="/comercial/gerencia-hunters" element={<ProtectedRoute><GerenciaHunters /></ProtectedRoute>} />
+      <Route path="/comercial/gerencia-hunters/leads" element={<ProtectedRoute><GerenciaHunters /></ProtectedRoute>} />
       <Route path="/comercial/meu-desempenho" element={<ProtectedRoute><MeuDesempenho /></ProtectedRoute>} />
       <Route path="/comercial/pipeline"  element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
       <Route path="/comercial/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
