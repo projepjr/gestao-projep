@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, User } from 'lucide-react'
+import { Calendar, ChevronDown, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import {
@@ -101,31 +101,22 @@ function daysBetween(start, end) {
   return Math.max(1, Math.round((end - start) / 86400000) + 1)
 }
 
-function buildNavigationRange(referenceDate, mode) {
-  const reference = new Date(referenceDate)
-  reference.setHours(0, 0, 0, 0)
+function buildDefaultRange(referenceDate, mode) {
+  const end = new Date(referenceDate)
+  end.setHours(0, 0, 0, 0)
+  const start = new Date(end)
 
   if (mode === 'monthly') {
-    const start = new Date(reference.getFullYear(), reference.getMonth(), 1)
-    const end = new Date(reference.getFullYear(), reference.getMonth() + 1, 0)
-    return { start: formatDateInput(start), end: formatDateInput(end) }
+    start.setMonth(start.getMonth() - 5)
+    start.setDate(1)
+  } else {
+    start.setDate(start.getDate() - (MAX_WEEKLY_DAYS - 1))
   }
 
-  const start = new Date(reference)
-  start.setDate(reference.getDate() - reference.getDay())
-  const end = addDays(start, 6)
-  return { start: formatDateInput(start), end: formatDateInput(end) }
-}
-
-function shiftRange(mode, startIso, amount) {
-  const start = parseDate(startIso)
-  if (!start) return null
-
-  if (mode === 'monthly') {
-    return buildNavigationRange(addMonths(start, amount), mode)
+  return {
+    start: formatDateInput(start),
+    end: formatDateInput(end),
   }
-
-  return buildNavigationRange(addDays(start, amount * 7), mode)
 }
 
 function enforcePeriodBounds(mode, startIso, endIso, changed = 'end') {
@@ -417,9 +408,6 @@ export default function MeuDesempenho() {
   const [periodMode, setPeriodMode] = useState('weekly')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [customPeriodOpen, setCustomPeriodOpen] = useState(false)
-  const [draftStartDate, setDraftStartDate] = useState('')
-  const [draftEndDate, setDraftEndDate] = useState('')
   const loadingSnapshotRef = useRef(false)
   const { matchesCurrentUser } = useCurrentIdentity(user, members)
 
@@ -427,16 +415,10 @@ export default function MeuDesempenho() {
 
   useEffect(() => {
     if (startDate && endDate) return
-    const range = buildNavigationRange(referenceDate, periodMode)
+    const range = buildDefaultRange(referenceDate, periodMode)
     setStartDate(current => current || range.start)
     setEndDate(current => current || range.end)
   }, [endDate, periodMode, referenceDate, startDate])
-
-  useEffect(() => {
-    if (!customPeriodOpen) return
-    setDraftStartDate(startDate)
-    setDraftEndDate(endDate)
-  }, [customPeriodOpen, endDate, startDate])
 
   const loadSnapshot = useCallback(async ({ force = false, silent = false } = {}) => {
     if (loadingSnapshotRef.current) return
@@ -558,39 +540,25 @@ export default function MeuDesempenho() {
       ? 'todo o historico disponivel'
       : `${formatLongDate(startDate)} - ${formatLongDate(endDate)}`
     : 'periodo selecionado'
-  const periodLabel = periodMode === 'live'
-    ? 'Todo o histórico'
-    : startDate && endDate
-      ? `${formatLongDate(startDate)} a ${formatLongDate(endDate)}`
-      : 'Período selecionado'
-  const customLimitText = periodMode === 'weekly'
-    ? 'Limite de até 8 semanas.'
-    : 'Limite de até 6 meses.'
 
   const handleModeChange = mode => {
     setPeriodMode(mode)
-    setCustomPeriodOpen(false)
     if (mode === 'live') return
-    const range = buildNavigationRange(referenceDate, mode)
+    const range = buildDefaultRange(referenceDate, mode)
     setStartDate(range.start)
     setEndDate(range.end)
   }
 
-  const handleShiftPeriod = amount => {
-    if (periodMode === 'live') return
-    const range = shiftRange(periodMode, startDate, amount)
-    if (!range) return
-    setStartDate(range.start)
-    setEndDate(range.end)
-    setCustomPeriodOpen(false)
-  }
-
-  const handleApplyCustomPeriod = () => {
-    if (periodMode === 'live') return
-    const adjusted = enforcePeriodBounds(periodMode, draftStartDate, draftEndDate || draftStartDate, 'end')
+  const handleStartDateChange = value => {
+    const adjusted = enforcePeriodBounds(periodMode, value, endDate || value, 'start')
     setStartDate(adjusted.start)
     setEndDate(adjusted.end)
-    setCustomPeriodOpen(false)
+  }
+
+  const handleEndDateChange = value => {
+    const adjusted = enforcePeriodBounds(periodMode, startDate || value, value, 'end')
+    setStartDate(adjusted.start)
+    setEndDate(adjusted.end)
   }
 
   return (
@@ -639,7 +607,7 @@ export default function MeuDesempenho() {
               <h2 className="text-center text-xl font-extrabold text-white xl:text-left">Você x média do time</h2>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[auto_auto_220px]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[auto_150px_150px_220px]">
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Visualizacao</span>
                 <div className="flex h-11 rounded border border-[#1E1E1E] bg-[#0A0A0A] p-1">
@@ -660,45 +628,35 @@ export default function MeuDesempenho() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Período</span>
-                <div className="flex h-11 min-w-[300px] items-center gap-2">
-                  <button
-                    type="button"
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Data inicial</span>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={startDate}
                     disabled={periodMode === 'live'}
-                    onClick={() => handleShiftPeriod(-1)}
-                    className="flex h-11 w-11 items-center justify-center rounded border border-[#1E1E1E] bg-[#0A0A0A] text-[#8A95AD] transition hover:border-[#CE7028] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                    title={periodMode === 'monthly' ? 'Mês anterior' : 'Semana anterior'}
-                  >
-                    <ChevronLeft size={17} />
-                  </button>
-                  <div className="flex h-11 min-w-[190px] items-center justify-center rounded border border-[#1E1E1E] bg-[#0A0A0A] px-4 text-center text-sm font-bold text-white">
-                    {periodLabel}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={periodMode === 'live'}
-                    onClick={() => handleShiftPeriod(1)}
-                    className="flex h-11 w-11 items-center justify-center rounded border border-[#1E1E1E] bg-[#0A0A0A] text-[#8A95AD] transition hover:border-[#CE7028] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                    title={periodMode === 'monthly' ? 'Próximo mês' : 'Próxima semana'}
-                  >
-                    <ChevronRight size={17} />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={periodMode === 'live'}
-                    onClick={() => setCustomPeriodOpen(current => !current)}
-                    className={`flex h-11 w-11 items-center justify-center rounded border transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                      customPeriodOpen
-                        ? 'border-[#CE7028] bg-[#CE7028]/15 text-[#CE7028]'
-                        : 'border-[#1E1E1E] bg-[#0A0A0A] text-[#8A95AD] hover:border-[#CE7028] hover:text-white'
-                    }`}
-                    title="Selecionar período personalizado"
-                  >
-                    <SlidersHorizontal size={16} />
-                  </button>
+                    max={endDate || undefined}
+                    onChange={event => handleStartDateChange(event.target.value)}
+                    className="h-11 w-full min-w-[150px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028] disabled:cursor-not-allowed disabled:opacity-40"
+                  />
+                  <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7895]" size={15} />
                 </div>
-              </div>
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Data final</span>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={endDate}
+                    disabled={periodMode === 'live'}
+                    min={startDate || undefined}
+                    onChange={event => handleEndDateChange(event.target.value)}
+                    className="h-11 w-full min-w-[150px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028] disabled:cursor-not-allowed disabled:opacity-40"
+                  />
+                  <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7895]" size={15} />
+                </div>
+              </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Metrica</span>
@@ -719,45 +677,6 @@ export default function MeuDesempenho() {
               </label>
             </div>
           </div>
-
-          {customPeriodOpen && periodMode !== 'live' && (
-            <div className="grid gap-3 border-b border-[#1E1E1E] bg-[#0D0D0D] px-6 py-4 sm:grid-cols-[180px_180px_auto_1fr] sm:items-end">
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Data inicial</span>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={draftStartDate}
-                    max={draftEndDate || undefined}
-                    onChange={event => setDraftStartDate(event.target.value)}
-                    className="h-11 w-full rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
-                  />
-                  <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7895]" size={15} />
-                </div>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Data final</span>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={draftEndDate}
-                    min={draftStartDate || undefined}
-                    onChange={event => setDraftEndDate(event.target.value)}
-                    className="h-11 w-full rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
-                  />
-                  <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7895]" size={15} />
-                </div>
-              </label>
-              <button
-                type="button"
-                onClick={handleApplyCustomPeriod}
-                className="h-11 rounded bg-[#CE7028] px-5 text-sm font-bold text-white transition hover:bg-[#B8621F]"
-              >
-                Aplicar período
-              </button>
-              <p className="text-xs text-[#6B7895]">{customLimitText}</p>
-            </div>
-          )}
 
           <div className="p-6">
             <div className="flex flex-col gap-4 rounded border border-[#1E1E1E] bg-[#0A0A0A] px-4 py-3 md:flex-row md:items-center md:justify-between">
