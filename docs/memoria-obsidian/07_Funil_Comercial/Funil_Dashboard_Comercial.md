@@ -740,3 +740,9 @@ Permissao:
 - Nova subarea de acesso: `comercial.gerenciaHunters`.
 - O acesso deve ser liberado em `Presidencia > Seguranca`, dentro dos acessos detalhados do setor Comercial.
 - Quem nao tiver essa subarea liberada nao deve ver nem acessar a area de Gerencia de Hunters.
+
+Performance:
+
+- A selecao/deselecao de Hunters no grafico nao deve recalcular o snapshot comercial inteiro.
+- O grafico calcula os pontos por periodo/metrica uma vez e usa chaves estaveis por Hunter para apenas mostrar ou esconder linhas.
+- Evitar recolocar `selectedRows` como dependencia do mapeamento do snapshot, pois isso faz a tela travar em interacoes simples.

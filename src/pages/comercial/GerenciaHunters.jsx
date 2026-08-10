@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { Calendar, ChevronDown, Search, Target, Users } from 'lucide-react'
+import { ChevronDown, Search, Target, Users } from 'lucide-react'
 import { useData } from '../../contexts/DataContext'
 import {
   fetchLatestComercialSnapshot,
@@ -298,7 +298,11 @@ function HunterAnalysis() {
   }, [hunterKeyList])
 
   const selectedMetric = HUNTER_METRICS.find(metric => metric.key === selectedMetricKey) || HUNTER_METRICS[0]
-  const selectedRows = hunters.filter(row => selectedHunters.includes(hunterId(row)))
+  const selectedHunterSet = useMemo(() => new Set(selectedHunters), [selectedHunters])
+  const selectedRows = useMemo(
+    () => hunters.filter(row => selectedHunterSet.has(hunterId(row))),
+    [hunters, selectedHunterSet]
+  )
   const teamAverage = average(hunters.map(row => rowMetric(row, selectedMetric)))
   const selectedAverage = average(selectedRows.map(row => rowMetric(row, selectedMetric)))
 
@@ -314,9 +318,8 @@ function HunterAnalysis() {
         label,
         media: average(rows.map(row => rowMetric(row, selectedMetric))),
       }
-      selectedRows.forEach((row, index) => {
-        const same = rows.find(item => hunterId(item) === hunterId(row))
-        point[`hunter_${index}`] = rowMetric(same, selectedMetric)
+      rows.forEach(row => {
+        point[`hunter_${hunterId(row)}`] = rowMetric(row, selectedMetric)
       })
       return point
     }
@@ -336,7 +339,7 @@ function HunterAnalysis() {
         fim: bucket.fim,
       })
     )
-  }, [commercial, endDate, members, periodData, periodMode, selectedMetric, selectedRows, snapshot, startDate])
+  }, [commercial, endDate, members, periodData, periodMode, selectedMetric, snapshot, startDate])
 
   const handleModeChange = mode => {
     setPeriodMode(mode)
@@ -358,14 +361,17 @@ function HunterAnalysis() {
     setEndDate(adjusted.end)
   }
 
-  const toggleHunter = key => {
+  const toggleHunter = useCallback(key => {
     setSelectedHunters(current =>
       current.includes(key) ? current.filter(item => item !== key) : [...current, key]
     )
-  }
+  }, [])
 
-  const filteredHunters = hunters.filter(row =>
-    row.nome?.toLowerCase().includes(hunterSearch.trim().toLowerCase())
+  const filteredHunters = useMemo(() =>
+    hunters.filter(row =>
+      row.nome?.toLowerCase().includes(hunterSearch.trim().toLowerCase())
+    ),
+    [hunterSearch, hunters]
   )
 
   return (
@@ -618,7 +624,7 @@ function HunterAnalysis() {
                     <Line
                       key={hunterId(row)}
                       type="monotone"
-                      dataKey={`hunter_${index}`}
+                      dataKey={`hunter_${hunterId(row)}`}
                       name={row.nome}
                       stroke={COLORS[index % COLORS.length]}
                       strokeWidth={2}
