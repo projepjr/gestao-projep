@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { Activity, Calendar, ChevronDown, User } from 'lucide-react'
+import { Calendar, ChevronDown, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import {
@@ -17,9 +17,14 @@ import {
 } from '../../services/comercialDashboardData'
 import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 
-const ORANGE = '#CE7028'
 const CYAN = '#00D4D4'
 const BLUE = '#5975FF'
+const PERIOD_MODES = [
+  { id: 'live', label: 'Ao Vivo' },
+  { id: 'weekly', label: 'Semanal' },
+  { id: 'monthly', label: 'Mensal' },
+]
+const MAX_WEEKLY_DAYS = 56
 
 function normalize(value) {
   return `${value ?? ''}`
@@ -90,12 +95,68 @@ function daysBetween(start, end) {
   return Math.max(1, Math.round((end - start) / 86400000) + 1)
 }
 
-function buildDefaultStart(referenceDate) {
-  const reference = new Date(referenceDate)
-  reference.setHours(0, 0, 0, 0)
-  const start = new Date(reference)
-  start.setDate(reference.getDate() - 41)
-  return start
+function buildDefaultRange(referenceDate, mode) {
+  const end = new Date(referenceDate)
+  end.setHours(0, 0, 0, 0)
+  const start = new Date(end)
+
+  if (mode === 'monthly') {
+    start.setMonth(start.getMonth() - 5)
+    start.setDate(1)
+  } else {
+    start.setDate(start.getDate() - (MAX_WEEKLY_DAYS - 1))
+  }
+
+  return {
+    start: formatDateInput(start),
+    end: formatDateInput(end),
+  }
+}
+
+function enforcePeriodBounds(mode, startIso, endIso, changed = 'end') {
+  if (mode === 'live') return { start: startIso, end: endIso }
+
+  const start = parseDate(startIso)
+  const end = parseDate(endIso)
+  if (!start || !end) return { start: startIso, end: endIso }
+
+  if (start > end) {
+    return changed === 'start'
+      ? { start: startIso, end: startIso }
+      : { start: endIso, end: endIso }
+  }
+
+  if (mode === 'weekly' && daysBetween(start, end) > MAX_WEEKLY_DAYS) {
+    if (changed === 'start') {
+      const adjustedEnd = addDays(start, MAX_WEEKLY_DAYS - 1)
+      return { start: startIso, end: formatDateInput(adjustedEnd) }
+    }
+    const adjustedStart = addDays(end, -(MAX_WEEKLY_DAYS - 1))
+    return { start: formatDateInput(adjustedStart), end: endIso }
+  }
+
+  if (mode === 'monthly') {
+    const maxEnd = addDays(addMonths(start, 6), -1)
+    if (end > maxEnd) {
+      if (changed === 'start') {
+        return { start: startIso, end: formatDateInput(maxEnd) }
+      }
+      const adjustedStart = addDays(addMonths(end, -6), 1)
+      return { start: formatDateInput(adjustedStart), end: endIso }
+    }
+  }
+
+  return { start: startIso, end: endIso }
+}
+
+function formatSyncDate(value) {
+  if (!value) return ''
+  return new Date(value).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function buildChartBuckets(startIso, endIso) {
@@ -336,6 +397,7 @@ export default function MeuDesempenho() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [selectedMetricKey, setSelectedMetricKey] = useState('hunter:leadsTrabalhados')
+  const [periodMode, setPeriodMode] = useState('weekly')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const loadingSnapshotRef = useRef(false)
@@ -344,11 +406,11 @@ export default function MeuDesempenho() {
   const referenceDate = snapshot?.synced_at || new Date().toISOString()
 
   useEffect(() => {
-    const reference = new Date(referenceDate)
-    const defaultStart = buildDefaultStart(reference)
-    setStartDate(current => current || formatDateInput(defaultStart))
-    setEndDate(current => current || formatDateInput(reference))
-  }, [referenceDate])
+    if (startDate && endDate) return
+    const range = buildDefaultRange(referenceDate, periodMode)
+    setStartDate(current => current || range.start)
+    setEndDate(current => current || range.end)
+  }, [endDate, periodMode, referenceDate, startDate])
 
   const loadSnapshot = useCallback(async ({ force = false, silent = false } = {}) => {
     if (loadingSnapshotRef.current) return
@@ -376,14 +438,34 @@ export default function MeuDesempenho() {
     return () => window.removeEventListener('projep:refresh-data', handler)
   }, [loadSnapshot])
 
+  useEffect(() => {
+    if (periodMode === 'live') return
+    if (!startDate || !endDate) return
+    const adjusted = enforcePeriodBounds(periodMode, startDate, endDate)
+    if (adjusted.start !== startDate) setStartDate(adjusted.start)
+    if (adjusted.end !== endDate) setEndDate(adjusted.end)
+  }, [endDate, periodMode, startDate])
+
+  const activeRange = useMemo(() => {
+    if (periodMode === 'live') return null
+    if (!startDate || !endDate) return null
+    return {
+      id: periodMode,
+      label: periodMode === 'weekly' ? 'Periodo semanal' : 'Periodo mensal',
+      inicio: startDate,
+      fim: endDate,
+    }
+  }, [endDate, periodMode, startDate])
+
   const fullPeriod = useMemo(() => {
-    if (!snapshot?.payload || !startDate || !endDate) return createEmptyRows()
+    if (!snapshot?.payload) return createEmptyRows()
+    if (periodMode !== 'live' && (!startDate || !endDate)) return createEmptyRows()
     return mapComercialSnapshot(snapshot.payload, {
       members,
       commercial,
-      range: { id: 'custom', label: 'Periodo selecionado', inicio: startDate, fim: endDate },
+      range: activeRange,
     })
-  }, [commercial, endDate, members, snapshot, startDate])
+  }, [activeRange, commercial, endDate, members, periodMode, snapshot, startDate])
 
   const availableMetrics = useMemo(() => {
     const hasHunter = (fullPeriod.hunters || []).some(matchesCurrentUser)
@@ -414,7 +496,20 @@ export default function MeuDesempenho() {
   const teamAverage = average(currentRows.map(row => metricValue(row, selectedMetric)))
 
   const chartData = useMemo(() => {
-    if (!snapshot?.payload || !startDate || !endDate) return []
+    if (!snapshot?.payload) return []
+
+    if (periodMode === 'live') {
+      const rows = getRowsForMetric(fullPeriod, selectedMetric)
+      const row = findCurrentRow(rows, matchesCurrentUser)
+      const value = metricValue(row, selectedMetric)
+      const media = average(rows.map(item => metricValue(item, selectedMetric)))
+      return [
+        { label: 'Inicio', voce: value, media },
+        { label: 'Total', voce: value, media },
+      ]
+    }
+
+    if (!startDate || !endDate) return []
     return buildChartBuckets(startDate, endDate).map(bucket => {
       const period = mapComercialSnapshot(snapshot.payload, {
         members,
@@ -429,12 +524,34 @@ export default function MeuDesempenho() {
         media: average(rows.map(item => metricValue(item, selectedMetric))),
       }
     })
-  }, [commercial, endDate, matchesCurrentUser, members, selectedMetric, snapshot, startDate])
+  }, [commercial, endDate, fullPeriod, matchesCurrentUser, members, periodMode, selectedMetric, snapshot, startDate])
 
   const hasCommercialLink = Boolean(currentRow)
   const periodText = startDate && endDate
-    ? `${formatLongDate(startDate)} - ${formatLongDate(endDate)}`
+    ? periodMode === 'live'
+      ? 'todo o historico disponivel'
+      : `${formatLongDate(startDate)} - ${formatLongDate(endDate)}`
     : 'periodo selecionado'
+
+  const handleModeChange = mode => {
+    setPeriodMode(mode)
+    if (mode === 'live') return
+    const range = buildDefaultRange(referenceDate, mode)
+    setStartDate(range.start)
+    setEndDate(range.end)
+  }
+
+  const handleStartDateChange = value => {
+    const adjusted = enforcePeriodBounds(periodMode, value, endDate || value, 'start')
+    setStartDate(adjusted.start)
+    setEndDate(adjusted.end)
+  }
+
+  const handleEndDateChange = value => {
+    const adjusted = enforcePeriodBounds(periodMode, startDate || value, value, 'end')
+    setStartDate(adjusted.start)
+    setEndDate(adjusted.end)
+  }
 
   return (
     <div className="space-y-6">
@@ -448,6 +565,11 @@ export default function MeuDesempenho() {
           {statusMessage && (
             <span className="rounded border border-green-900/40 bg-green-950/30 px-3 py-1.5 font-semibold text-green-400">
               {statusMessage}
+            </span>
+          )}
+          {snapshot?.synced_at && (
+            <span className="rounded border border-[#1E1E1E] bg-[#111111] px-3 py-1.5 text-[#8A95AD]">
+              Ultima sincronizacao: {formatSyncDate(snapshot.synced_at)}
             </span>
           )}
           {error && (
@@ -475,21 +597,39 @@ export default function MeuDesempenho() {
           <div className="flex flex-col gap-6 border-b border-[#1E1E1E] p-6 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <h2 className="text-xl font-extrabold text-white">Voce x media do time</h2>
-              <p className="mt-1 text-sm text-[#8A95AD]">
-                A media e agregada. A tela nao mostra dados individuais de outras pessoas.
-              </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[auto_150px_150px_220px]">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Visualizacao</span>
+                <div className="flex h-11 rounded border border-[#1E1E1E] bg-[#0A0A0A] p-1">
+                  {PERIOD_MODES.map(mode => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => handleModeChange(mode.id)}
+                      className={`rounded px-3 text-sm font-bold transition ${
+                        periodMode === mode.id
+                          ? 'bg-[#CE7028] text-white'
+                          : 'text-[#8A95AD] hover:text-white'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <label className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6B7895]">Data inicial</span>
                 <div className="relative">
                   <input
                     type="date"
                     value={startDate}
+                    disabled={periodMode === 'live'}
                     max={endDate || undefined}
-                    onChange={event => setStartDate(event.target.value)}
-                    className="h-11 w-full min-w-[150px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
+                    onChange={event => handleStartDateChange(event.target.value)}
+                    className="h-11 w-full min-w-[150px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028] disabled:cursor-not-allowed disabled:opacity-40"
                   />
                   <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7895]" size={15} />
                 </div>
@@ -501,9 +641,10 @@ export default function MeuDesempenho() {
                   <input
                     type="date"
                     value={endDate}
+                    disabled={periodMode === 'live'}
                     min={startDate || undefined}
-                    onChange={event => setEndDate(event.target.value)}
-                    className="h-11 w-full min-w-[150px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
+                    onChange={event => handleEndDateChange(event.target.value)}
+                    className="h-11 w-full min-w-[150px] rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 text-sm font-bold text-white outline-none focus:border-[#CE7028] disabled:cursor-not-allowed disabled:opacity-40"
                   />
                   <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7895]" size={15} />
                 </div>
@@ -515,7 +656,7 @@ export default function MeuDesempenho() {
                   <select
                     value={selectedMetricKey}
                     onChange={event => setSelectedMetricKey(event.target.value)}
-                    className="h-11 w-full min-w-[220px] appearance-none rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 pr-9 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
+                    className="h-11 w-full min-w-[200px] appearance-none rounded border border-[#1E1E1E] bg-[#0A0A0A] px-3 pr-9 text-sm font-bold text-white outline-none focus:border-[#CE7028]"
                   >
                     {availableMetrics.map(metric => (
                       <option key={`${metric.source}:${metric.key}`} value={`${metric.source}:${metric.key}`}>
@@ -618,15 +759,6 @@ export default function MeuDesempenho() {
         </section>
       )}
 
-      <div className="rounded border border-[#1E1E1E] bg-[#111111] p-4 text-xs text-[#6B7895]">
-        <div className="flex items-start gap-3">
-          <Activity className="mt-0.5 text-[#CE7028]" size={16} />
-          <p>
-            A comparacao usa apenas a media agregada da equipe configurada em Comercial &gt; Equipe.
-            Os resultados individuais dos outros membros nao aparecem nesta tela.
-          </p>
-        </div>
-      </div>
     </div>
   )
 }

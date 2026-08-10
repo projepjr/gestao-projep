@@ -655,12 +655,17 @@ Atualizacao visual - Meu Desempenho simplificado:
 Atualizacao visual - Meu Desempenho por periodo:
 
 - A tela `Comercial > Meu Desempenho` passou a seguir o modelo visual `Voce x media do time`.
-- O usuario escolhe `Data inicial`, `Data final` e `Metrica`.
+- O usuario escolhe `Ao Vivo`, `Semanal` ou `Mensal`, alem da metrica comparada.
 - O grafico mostra uma linha para `Voce` e outra para `Media do time`.
 - Os pontos do grafico sao acumulados dentro do periodo selecionado.
 - O total exibido no topo do grafico representa o acumulado do periodo completo selecionado.
 - O calculo continua usando o snapshot comercial do Pipefy e `mapComercialSnapshot` com `range`.
 - A media do time e sempre agregada por equipe configurada em `Comercial > Equipe`; a tela nao mostra resultados individuais de outros membros.
+- A interface exibe a ultima sincronizacao do snapshot Pipefy.
+- `Ao Vivo` usa todo o historico disponivel e mostra linhas retas com o total acumulado.
+- `Semanal` limita a janela de analise a no maximo 8 semanas.
+- `Mensal` limita a janela de analise a no maximo 6 meses.
+- Frases explicativas sobre privacidade foram removidas da interface por serem redundantes para o usuario final.
 
 ## Atualizacao 2026-08-01 - Performance dos snapshots comerciais
 
