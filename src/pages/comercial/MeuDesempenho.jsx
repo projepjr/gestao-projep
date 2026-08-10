@@ -87,6 +87,17 @@ function addDays(date, amount) {
   return next
 }
 
+function startOfWeekSunday(date) {
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - start.getDay())
+  return start
+}
+
+function endOfWeekSaturday(date) {
+  return addDays(startOfWeekSunday(date), 6)
+}
+
 function addMonths(date, amount) {
   const next = new Date(date)
   next.setMonth(next.getMonth() + amount)
@@ -110,7 +121,10 @@ function buildDefaultRange(referenceDate, mode) {
     start.setMonth(start.getMonth() - 5)
     start.setDate(1)
   } else {
-    start.setDate(start.getDate() - (MAX_WEEKLY_DAYS - 1))
+    const weekStart = startOfWeekSunday(end)
+    const weekEnd = endOfWeekSaturday(end)
+    start.setTime(addDays(weekStart, -(MAX_WEEKLY_DAYS - 7)).getTime())
+    end.setTime(weekEnd.getTime())
   }
 
   return {
@@ -165,22 +179,38 @@ function formatSyncDate(value) {
   })
 }
 
-function buildChartBuckets(startIso, endIso) {
+function buildChartBuckets(startIso, endIso, mode = 'weekly') {
   const start = parseDate(startIso)
   const end = parseDate(endIso)
   if (!start || !end || start > end) return []
 
   const totalDays = daysBetween(start, end)
-  const useMonths = totalDays > 120
-  const maxPoints = 8
+  const useMonths = mode === 'monthly' || totalDays > 120
+  const maxPoints = mode === 'weekly' ? 9 : 8
   const buckets = []
+
+  if (!useMonths) {
+    let cursor = startOfWeekSunday(start)
+    const lastWeekStart = startOfWeekSunday(end)
+
+    while (cursor <= lastWeekStart && buckets.length < maxPoints) {
+      const bucketEnd = endOfWeekSaturday(cursor)
+      const bucketStartIso = formatDateInput(cursor)
+      const bucketEndIso = formatDateInput(bucketEnd)
+      buckets.push({
+        label: `${formatShortDate(bucketStartIso)} a ${formatShortDate(bucketEndIso)}`,
+        fim: bucketEndIso,
+      })
+      cursor = addDays(cursor, 7)
+    }
+
+    return buckets
+  }
+
   let cursor = new Date(start)
-  let index = 1
 
   while (cursor <= end && buckets.length < maxPoints) {
-    const nextBoundary = useMonths
-      ? addDays(addMonths(cursor, 1), -1)
-      : addDays(cursor, 6)
+    const nextBoundary = addDays(addMonths(cursor, 1), -1)
     const bucketEnd = clampDate(nextBoundary, end)
     const bucketStart = formatDateInput(cursor)
     const bucketEndIso = formatDateInput(bucketEnd)
@@ -189,7 +219,6 @@ function buildChartBuckets(startIso, endIso) {
       fim: bucketEndIso,
     })
     cursor = addDays(bucketEnd, 1)
-    index += 1
   }
 
   if (buckets.length && buckets[buckets.length - 1].fim !== endIso) {
@@ -518,7 +547,7 @@ export default function MeuDesempenho() {
     }
 
     if (!startDate || !endDate) return []
-    return buildChartBuckets(startDate, endDate).map(bucket => {
+    return buildChartBuckets(startDate, endDate, periodMode).map(bucket => {
       const period = mapComercialSnapshot(snapshot.payload, {
         members,
         commercial,
@@ -567,7 +596,7 @@ export default function MeuDesempenho() {
         <p className="text-sm text-[#6B7895]">Comercial</p>
         <h1 className="mt-1 text-3xl font-extrabold text-white">Meu Desempenho</h1>
         <p className="mt-2 text-[#8A95AD]">
-          Escolha uma metrica e compare seu resultado com a media do time.
+          Escolha uma métrica e compare seu resultado com a média do time.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
           {statusMessage && (

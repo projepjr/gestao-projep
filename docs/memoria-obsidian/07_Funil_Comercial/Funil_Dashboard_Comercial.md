@@ -747,3 +747,16 @@ Performance:
 - O grafico calcula os pontos por periodo/metrica uma vez e usa chaves estaveis por Hunter para apenas mostrar ou esconder linhas.
 - Evitar recolocar `selectedRows` como dependencia do mapeamento do snapshot, pois isso faz a tela travar em interacoes simples.
 - A linha `Media do time` deve ser selecionavel separadamente dos Hunters, permitindo analisar apenas a media agregada em visao semanal, mensal ou ao vivo.
+
+## Atualizacao 2026-08-10 - Semanas no Meu Desempenho
+
+Problema:
+
+- A tela `Comercial > Meu Desempenho` montava os pontos semanais do grafico em blocos de 7 dias a partir da data inicial selecionada.
+- Isso gerava rotulos como `04/08 a 10/08`, mesmo quando a semana de calendario correta deveria ser domingo a sabado, por exemplo `09/08 a 15/08`.
+
+Regra atual:
+
+- No modo `Semanal`, os pontos do grafico devem sempre respeitar semanas de calendario de domingo a sabado.
+- A janela semanal padrao tambem passa a nascer alinhada em semanas completas, usando a semana atual como referencia.
+- A logica acumulada do grafico foi preservada: cada ponto continua representando o acumulado do periodo selecionado ate o fim daquela semana.
