@@ -66,6 +66,12 @@ function formatLongDate(iso) {
   return `${day}/${month}/${year}`
 }
 
+function formatShortDate(iso) {
+  if (!iso) return ''
+  const [, month, day] = iso.split('-')
+  return `${day}/${month}`
+}
+
 function parseDate(iso) {
   if (!iso) return null
   const [year, month, day] = iso.split('-').map(Number)
@@ -176,9 +182,11 @@ function buildChartBuckets(startIso, endIso) {
       ? addDays(addMonths(cursor, 1), -1)
       : addDays(cursor, 6)
     const bucketEnd = clampDate(nextBoundary, end)
+    const bucketStart = formatDateInput(cursor)
+    const bucketEndIso = formatDateInput(bucketEnd)
     buckets.push({
-      label: useMonths ? `Mes ${index}` : `Sem ${index}`,
-      fim: formatDateInput(bucketEnd),
+      label: `${formatShortDate(bucketStart)} a ${formatShortDate(bucketEndIso)}`,
+      fim: bucketEndIso,
     })
     cursor = addDays(bucketEnd, 1)
     index += 1
@@ -596,7 +604,7 @@ export default function MeuDesempenho() {
         <section className="overflow-hidden rounded border border-[#1E1E1E] bg-[#111111] shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
           <div className="flex flex-col gap-6 border-b border-[#1E1E1E] p-6 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <h2 className="text-xl font-extrabold text-white">Voce x media do time</h2>
+              <h2 className="text-center text-xl font-extrabold text-white xl:text-left">Você x média do time</h2>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[auto_150px_150px_220px]">
@@ -678,10 +686,10 @@ export default function MeuDesempenho() {
               </div>
               <div className="text-sm md:text-right">
                 <p className="font-semibold text-[#8A95AD]">
-                  Voce:{' '}
+                  Você:{' '}
                   <strong className="text-[#00D4D4]">{formatMetric(userValue, selectedMetric.isPercent)}</strong>
                   <span className="mx-3 text-[#39445D]">|</span>
-                  Media do time:{' '}
+                  Média do time:{' '}
                   <strong className="text-[#5975FF]">{formatMetric(teamAverage, selectedMetric.isPercent)}</strong>
                 </p>
                 <p className="mt-1 text-[11px] text-[#6B7895]">
@@ -720,13 +728,13 @@ export default function MeuDesempenho() {
                     labelStyle={{ color: '#8A95AD' }}
                     formatter={(value, name) => [
                       formatMetric(value, selectedMetric.isPercent),
-                      name === 'voce' ? 'Voce' : 'Media do time',
+                      name === 'voce' ? 'Você' : 'Média do time',
                     ]}
                   />
                   <Line
                     type="monotone"
                     dataKey="voce"
-                    name="Voce"
+                    name="Você"
                     stroke={CYAN}
                     strokeWidth={2.5}
                     dot={{ r: 4, strokeWidth: 2, fill: CYAN }}
@@ -735,7 +743,7 @@ export default function MeuDesempenho() {
                   <Line
                     type="monotone"
                     dataKey="media"
-                    name="Media do time"
+                    name="Média do time"
                     stroke={BLUE}
                     strokeWidth={2.5}
                     dot={{ r: 4, strokeWidth: 2, fill: BLUE }}
@@ -748,11 +756,11 @@ export default function MeuDesempenho() {
             <div className="mt-3 flex items-center justify-center gap-6 text-xs font-bold">
               <span className="inline-flex items-center gap-2 text-white">
                 <span className="h-2 w-5 rounded-full" style={{ backgroundColor: CYAN }} />
-                Voce
+                Você
               </span>
               <span className="inline-flex items-center gap-2 text-white">
                 <span className="h-2 w-5 rounded-full" style={{ backgroundColor: BLUE }} />
-                Media do time
+                Média do time
               </span>
             </div>
           </div>

@@ -665,6 +665,7 @@ Atualizacao visual - Meu Desempenho por periodo:
 - `Ao Vivo` usa todo o historico disponivel e mostra linhas retas com o total acumulado.
 - `Semanal` limita a janela de analise a no maximo 8 semanas.
 - `Mensal` limita a janela de analise a no maximo 6 meses.
+- Os pontos do grafico exibem o intervalo real analisado no eixo X, no formato `dd/mm a dd/mm`, em vez de rotulos genericos como `Sem 1`.
 - Frases explicativas sobre privacidade foram removidas da interface por serem redundantes para o usuario final.
 
 ## Atualizacao 2026-08-01 - Performance dos snapshots comerciais
