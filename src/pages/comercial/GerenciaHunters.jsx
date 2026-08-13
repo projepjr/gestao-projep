@@ -84,7 +84,9 @@ function buildDefaultRange(referenceDate, mode) {
   end.setHours(0, 0, 0, 0)
   const start = new Date(end)
 
-  if (mode === 'monthly') {
+  if (mode === 'custom') {
+    start.setDate(1)
+  } else if (mode === 'monthly') {
     start.setMonth(start.getMonth() - 5)
     start.setDate(1)
   } else {
@@ -275,7 +277,11 @@ function HunterAnalysis() {
     if (!startDate || !endDate) return null
     return {
       id: periodMode,
-      label: periodMode === 'weekly' ? 'Período semanal' : 'Período mensal',
+      label: periodMode === 'weekly'
+        ? 'Período semanal'
+        : periodMode === 'monthly'
+          ? 'Período mensal'
+          : 'Período personalizado',
       inicio: startDate,
       fim: endDate,
     }
@@ -351,12 +357,14 @@ function HunterAnalysis() {
   }
 
   const handleStartDateChange = value => {
+    if (!value) return
     const adjusted = enforcePeriodBounds(periodMode, value, endDate || value, 'start')
     setStartDate(adjusted.start)
     setEndDate(adjusted.end)
   }
 
   const handleEndDateChange = value => {
+    if (!value) return
     const adjusted = enforcePeriodBounds(periodMode, startDate || value, value, 'end')
     setStartDate(adjusted.start)
     setEndDate(adjusted.end)
@@ -405,6 +413,7 @@ function HunterAnalysis() {
               ['live', 'Ao Vivo'],
               ['weekly', 'Semanal'],
               ['monthly', 'Mensal'],
+              ['custom', 'Personalizado'],
             ].map(([key, label]) => (
               <button
                 key={key}

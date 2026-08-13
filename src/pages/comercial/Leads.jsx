@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, ArrowUpDown, BarChart2, Calendar, ChevronLeft, ChevronRight,
+  AlertCircle, ArrowUpDown, BarChart2, Calendar, CalendarRange, ChevronLeft, ChevronRight,
   FileCheck, PhoneCall, Radio, Search, Target, Users,
 } from 'lucide-react'
 import { fetchLatestComercialSnapshot } from '../../services/comercialDashboardData'
@@ -103,7 +103,10 @@ function HelpTip({ text, align = 'left' }) {
   )
 }
 
-function PeriodSelector({ mode, setMode, weeks, weekIndex, setWeekIndex, months, monthIndex, setMonthIndex }) {
+function PeriodSelector({
+  mode, setMode, weeks, weekIndex, setWeekIndex, months, monthIndex, setMonthIndex,
+  customStart, customEnd, onCustomStartChange, onCustomEndChange,
+}) {
   const currentWeek = weeks[weekIndex]
   const currentMonth = months[monthIndex]
 
@@ -114,6 +117,7 @@ function PeriodSelector({ mode, setMode, weeks, weekIndex, setWeekIndex, months,
           { id: 'aovivo', label: 'Ao Vivo', Icon: Radio },
           { id: 'semanal', label: 'Semanal', Icon: Calendar },
           { id: 'mensal', label: 'Mensal', Icon: BarChart2 },
+          { id: 'personalizado', label: 'Personalizado', Icon: CalendarRange },
         ].map(item => (
           <button
             key={item.id}
@@ -152,6 +156,31 @@ function PeriodSelector({ mode, setMode, weeks, weekIndex, setWeekIndex, months,
           </button>
         </div>
       )}
+
+      {mode === 'personalizado' && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="space-y-1">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-600">Data inicial</span>
+            <input
+              type="date"
+              value={customStart}
+              max={customEnd || undefined}
+              onChange={event => onCustomStartChange(event.target.value)}
+              className="rounded border border-[#1E1E1E] bg-[#0D0D0D] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-[#CE7028]"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-600">Data final</span>
+            <input
+              type="date"
+              value={customEnd}
+              min={customStart || undefined}
+              onChange={event => onCustomEndChange(event.target.value)}
+              className="rounded border border-[#1E1E1E] bg-[#0D0D0D] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-[#CE7028]"
+            />
+          </label>
+        </div>
+      )}
     </div>
   )
 }
@@ -184,6 +213,11 @@ export default function LeadsInsights() {
   const months = useMemo(() => buildMonthRanges(referenceDate, 8), [referenceDate])
   const [weekIndex, setWeekIndex] = useState(() => findCurrentIndex(buildWeekRanges(new Date(), 10)))
   const [monthIndex, setMonthIndex] = useState(() => findCurrentIndex(buildMonthRanges(new Date(), 8)))
+  const [customStart, setCustomStart] = useState(() => {
+    const today = new Date()
+    return isoDate(new Date(today.getFullYear(), today.getMonth(), 1))
+  })
+  const [customEnd, setCustomEnd] = useState(() => isoDate(new Date()))
 
   useEffect(() => {
     snapshotRef.current = snapshot
@@ -235,8 +269,28 @@ export default function LeadsInsights() {
   const selectedRange = useMemo(() => {
     if (mode === 'semanal') return weeks[weekIndex] || null
     if (mode === 'mensal') return months[monthIndex] || null
+    if (mode === 'personalizado') {
+      return {
+        id: `personalizado-${customStart}-${customEnd}`,
+        label: 'Período personalizado',
+        inicio: customStart,
+        fim: customEnd,
+      }
+    }
     return null
-  }, [mode, monthIndex, months, weekIndex, weeks])
+  }, [customEnd, customStart, mode, monthIndex, months, weekIndex, weeks])
+
+  const handleCustomStartChange = useCallback((value) => {
+    if (!value) return
+    setCustomStart(value)
+    setCustomEnd(current => current && value > current ? value : current)
+  }, [])
+
+  const handleCustomEndChange = useCallback((value) => {
+    if (!value) return
+    setCustomEnd(value)
+    setCustomStart(current => current && value < current ? value : current)
+  }, [])
 
   const insights = useMemo(
     () => mapLeadSegmentInsights(snapshot?.payload, { range: selectedRange }),
@@ -296,6 +350,10 @@ export default function LeadsInsights() {
           months={months}
           monthIndex={monthIndex}
           setMonthIndex={setMonthIndex}
+          customStart={customStart}
+          customEnd={customEnd}
+          onCustomStartChange={handleCustomStartChange}
+          onCustomEndChange={handleCustomEndChange}
         />
       </div>
 

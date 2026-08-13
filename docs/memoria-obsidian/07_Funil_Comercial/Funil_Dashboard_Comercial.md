@@ -760,3 +760,27 @@ Regra atual:
 - No modo `Semanal`, os pontos do grafico devem sempre respeitar semanas de calendario de domingo a sabado.
 - A janela semanal padrao tambem passa a nascer alinhada em semanas completas, usando a semana atual como referencia.
 - A logica acumulada do grafico foi preservada: cada ponto continua representando o acumulado do periodo selecionado ate o fim daquela semana.
+
+## Atualizacao 2026-08-13 - Intervalo personalizado nas analises comerciais
+
+Telas atualizadas:
+
+- `Comercial > Dashboard`;
+- `Comercial > Gerencia de Hunters > Hunters`;
+- `Comercial > Gerencia de Hunters > Leads`.
+
+Regra atual:
+
+- As tres telas oferecem o modo `Personalizado`, com data inicial e data final.
+- O intervalo e inclusivo: eventos ocorridos tanto na data inicial quanto na data final entram no calculo.
+- Se a data inicial for posterior a data final, a outra ponta e ajustada automaticamente para manter um intervalo valido.
+- Os campos nao podem permanecer vazios, evitando que um intervalo incompleto seja interpretado como analise de todo o historico.
+- Dashboard e Gerencia de Hunters usam `mapComercialSnapshot` com o intervalo selecionado.
+- Leads por CNAE/segmento usa `mapLeadSegmentInsights` com o mesmo intervalo.
+- O modo personalizado nao usa mocks, `localStorage` ou outra fonte paralela: os calculos continuam vindo do snapshot Pipefy armazenado no Supabase.
+- Na Dashboard, a comparacao com periodo anterior fica desativada no modo personalizado, pois nao existe uma semana ou mes anterior equivalente definido automaticamente.
+
+Banco e integracoes:
+
+- Nenhuma mudanca de schema foi necessaria.
+- Nenhuma alteracao foi feita no Pipefy ou no n8n.

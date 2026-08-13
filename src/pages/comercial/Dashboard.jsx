@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, CartesianGrid, Legend, ReferenceLine,
 } from 'recharts'
 import {
-  ChevronLeft, ChevronRight, Radio, Calendar, BarChart2,
+  ChevronLeft, ChevronRight, Radio, Calendar, CalendarRange, BarChart2,
   TrendingUp, TrendingDown, DollarSign, FileCheck,
   Percent, Target, Users,
 } from 'lucide-react'
@@ -15,6 +15,7 @@ import {
   buildRemoteDashboardData as buildCachedRemoteDashboardData,
   fetchLatestComercialSnapshot,
 } from '../../services/comercialDashboardData'
+import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 
 const DASHBOARD_REFRESH_MS = 5 * 60 * 1000
 
@@ -159,7 +160,11 @@ function DeltaTag({ curr, prev, label = '' }) {
 }
 
 // ── Seletor de período ────────────────────────────────────────
-function PeriodNav({ viewMode, setViewMode, semaIdx, setSemaIdx, mesIdx, setMesIdx, semanas, meses, aovivo }) {
+function PeriodNav({
+  viewMode, setViewMode, semaIdx, setSemaIdx, mesIdx, setMesIdx,
+  semanas, meses, aovivo, customStart, customEnd,
+  onCustomStartChange, onCustomEndChange,
+}) {
   const semana = semanas[semaIdx]
   const mes    = meses[mesIdx]
 
@@ -195,6 +200,16 @@ function PeriodNav({ viewMode, setViewMode, semaIdx, setSemaIdx, mesIdx, setMesI
         >
           <BarChart2 className="w-3 h-3" />
           Mensal
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('personalizado')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+            viewMode === 'personalizado' ? 'bg-[#CE7028] text-white' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <CalendarRange className="w-3 h-3" />
+          Personalizado
         </button>
       </div>
 
@@ -253,6 +268,31 @@ function PeriodNav({ viewMode, setViewMode, semaIdx, setSemaIdx, mesIdx, setMesI
           {new Date(aovivo.ultimaAtualizacao).toLocaleTimeString('pt-BR', {
             hour: '2-digit', minute: '2-digit',
           })}
+        </div>
+      )}
+
+      {viewMode === 'personalizado' && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="space-y-1">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-600">Data inicial</span>
+            <input
+              type="date"
+              value={customStart}
+              max={customEnd || undefined}
+              onChange={event => onCustomStartChange(event.target.value)}
+              className="rounded border border-[#1E1E1E] bg-[#0D0D0D] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-[#CE7028]"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-600">Data final</span>
+            <input
+              type="date"
+              value={customEnd}
+              min={customStart || undefined}
+              onChange={event => onCustomEndChange(event.target.value)}
+              className="rounded border border-[#1E1E1E] bg-[#0D0D0D] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-[#CE7028]"
+            />
+          </label>
         </div>
       )}
     </div>
@@ -939,6 +979,11 @@ export default function ComercialDashboard() {
   const [viewMode, setViewMode] = useState('semanal')
   const [semaIdx,  setSemaIdx]  = useState(() => findCurrentWeekIndex(semanas))
   const [mesIdx,   setMesIdx]   = useState(() => findCurrentMonthIndex(meses))
+  const [customStart, setCustomStart] = useState(() => {
+    const today = new Date()
+    return isoDate(new Date(today.getFullYear(), today.getMonth(), 1))
+  })
+  const [customEnd, setCustomEnd] = useState(() => isoDate(new Date()))
 
   useEffect(() => {
     remoteSnapshotRef.current = remoteSnapshot
@@ -989,6 +1034,34 @@ export default function ComercialDashboard() {
     }
   }, [fetchLatestSnapshot])
 
+  const handleCustomStartChange = useCallback((value) => {
+    if (!value) return
+    setCustomStart(value)
+    setCustomEnd(current => current && value > current ? value : current)
+  }, [])
+
+  const handleCustomEndChange = useCallback((value) => {
+    if (!value) return
+    setCustomEnd(value)
+    setCustomStart(current => current && value < current ? value : current)
+  }, [])
+
+  const customRange = useMemo(() => ({
+    id: `personalizado-${customStart}-${customEnd}`,
+    label: 'Período personalizado',
+    inicio: customStart,
+    fim: customEnd,
+  }), [customEnd, customStart])
+
+  const customPeriod = useMemo(() => {
+    if (!customStart || !customEnd) return emptyPeriodFromRange(customRange)
+    if (!remoteSnapshot?.payload) return emptyPeriodFromRange(customRange)
+    return normalizeDashboardPeriod(
+      mapComercialSnapshot(remoteSnapshot.payload, { members, commercial, range: customRange }),
+      customRange,
+    )
+  }, [commercial, customEnd, customRange, customStart, members, remoteSnapshot])
+
   useEffect(() => {
     const handleRefresh = () => fetchLatestSnapshot({ force: true })
     window.addEventListener('projep:refresh-data', handleRefresh)
@@ -999,13 +1072,15 @@ export default function ComercialDashboard() {
   const currentPeriod = useMemo(() => {
     if (viewMode === 'aovivo')  return aovivo
     if (viewMode === 'semanal') return semanas[semaIdx] || emptyPeriodFromRange(buildWeekRanges(referenceDate, 1)[0])
+    if (viewMode === 'personalizado') return customPeriod
     return meses[mesIdx] || emptyPeriodFromRange(buildMonthRanges(referenceDate, 1)[0])
-  }, [aovivo, meses, mesIdx, referenceDate, semaIdx, semanas, viewMode])
+  }, [aovivo, customPeriod, meses, mesIdx, referenceDate, semaIdx, semanas, viewMode])
 
   // TODO: [Supabase] carregar período anterior para delta comparativo
   const prevPeriod = useMemo(() => {
     if (viewMode === 'aovivo')  return semanas[findCurrentWeekIndex(semanas)]
     if (viewMode === 'semanal') return semaIdx > 0 ? semanas[semaIdx - 1] : null
+    if (viewMode === 'personalizado') return null
     return mesIdx > 0 ? meses[mesIdx - 1] : null
   }, [meses, mesIdx, semaIdx, semanas, viewMode])
 
@@ -1059,6 +1134,10 @@ export default function ComercialDashboard() {
             mesIdx={mesIdx}     setMesIdx={setMesIdx}
             semanas={semanas}   meses={meses}
             aovivo={aovivo}
+            customStart={customStart}
+            customEnd={customEnd}
+            onCustomStartChange={handleCustomStartChange}
+            onCustomEndChange={handleCustomEndChange}
           />
         </div>
       </div>
