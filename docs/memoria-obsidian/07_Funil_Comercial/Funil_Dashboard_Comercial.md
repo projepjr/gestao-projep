@@ -784,3 +784,25 @@ Banco e integracoes:
 
 - Nenhuma mudanca de schema foi necessaria.
 - Nenhuma alteracao foi feita no Pipefy ou no n8n.
+
+## Atualizacao 2026-08-14 - Timeout na leitura do snapshot comercial
+
+Problema confirmado:
+
+- A busca compartilhada carregava os cinco snapshots recentes com o campo `payload` completo.
+- Cada payload contem todos os cards brutos do Pipefy e pode ter varios megabytes.
+- Em medicao local, cinco snapshots transferiram aproximadamente 29,6 MB, enquanto apenas o snapshot mais recente tinha aproximadamente 5,9 MB.
+- Em conexoes mais lentas, esse volume ultrapassava o timeout defensivo e exibia `Tempo esgotado ao carregar dados comerciais do Supabase`.
+
+Correcao:
+
+- `fetchLatestComercialSnapshot` agora consulta primeiro somente `id` e `synced_at` dos registros recentes.
+- Depois, baixa o `payload` apenas do snapshot mais recente valido para o pipeline comercial.
+- Snapshots anteriores so sao baixados se um `pipe_id` explicito provar que o registro mais recente pertence a outro pipeline.
+- Consultas que atingem o timeout agora sao abortadas com `AbortController`, evitando requisicoes antigas continuarem consumindo rede e recursos em segundo plano.
+- O cache em memoria e a deduplicacao de chamadas simultaneas foram preservados.
+
+Escopo:
+
+- Nenhuma formula comercial foi alterada.
+- Nenhuma mudanca de banco, Supabase policy, Pipefy ou n8n foi necessaria.

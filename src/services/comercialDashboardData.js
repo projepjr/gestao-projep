@@ -12,6 +12,22 @@ let snapshotCacheAt = 0
 let snapshotFetchPromise = null
 const dashboardDataCache = new Map()
 
+async function executeSupabaseQuery(query, timeoutMs) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const result = await query.abortSignal(controller.signal)
+    if (controller.signal.aborted) throw new Error('timeout')
+    return result
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('timeout')
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 const MONTHS_PT = [
   'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
@@ -152,34 +168,67 @@ export async function fetchLatestComercialSnapshot({
 
   snapshotFetchPromise = (async () => {
     try {
-      const result = await Promise.race([
+      // Fetch lightweight metadata first. Snapshot payloads contain all Pipefy
+      // cards and can be several megabytes each, so downloading the whole
+      // lookback multiplies transfer time and can freeze slower clients.
+      const metadataResult = await executeSupabaseQuery(
         supabase
           .from('comercial_dashboard_snapshots')
-          .select('id, payload, synced_at')
+          .select('id, synced_at')
           .eq('source', 'pipefy')
           .order('synced_at', { ascending: false })
           .limit(lookback),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
-      ])
+        timeoutMs,
+      )
 
-      if (result.error) {
+      if (metadataResult.error) {
         if (snapshotCache?.snapshot) return snapshotCache
-        return { snapshot: null, statusMessage: '', error: result.error.message || 'Erro ao carregar snapshot comercial.' }
-      }
-
-      const snapshots = Array.isArray(result.data) ? result.data : []
-      const selected = selectComercialSnapshot(snapshots)
-      if (!selected.snapshot) {
         return {
           snapshot: null,
           statusMessage: '',
-          error: snapshots.length ? 'Nenhum snapshot do pipeline comercial encontrado.' : 'Nenhum snapshot comercial encontrado.',
+          error: metadataResult.error.message || 'Erro ao carregar snapshot comercial.',
         }
       }
 
-      snapshotCache = { ...selected, error: '' }
-      snapshotCacheAt = Date.now()
-      return snapshotCache
+      const metadata = Array.isArray(metadataResult.data) ? metadataResult.data : []
+      if (!metadata.length) {
+        return { snapshot: null, statusMessage: '', error: 'Nenhum snapshot comercial encontrado.' }
+      }
+
+      // Usually the first row is accepted. Older payloads are loaded only when
+      // an explicit pipe id proves that a newer row belongs to another pipe.
+      for (const item of metadata) {
+        const payloadResult = await executeSupabaseQuery(
+          supabase
+            .from('comercial_dashboard_snapshots')
+            .select('id, payload, synced_at')
+            .eq('id', item.id)
+            .maybeSingle(),
+          timeoutMs,
+        )
+
+        if (payloadResult.error) {
+          if (snapshotCache?.snapshot) return snapshotCache
+          return {
+            snapshot: null,
+            statusMessage: '',
+            error: payloadResult.error.message || 'Erro ao carregar snapshot comercial.',
+          }
+        }
+
+        const selected = selectComercialSnapshot(payloadResult.data ? [payloadResult.data] : [])
+        if (!selected.snapshot) continue
+
+        snapshotCache = { ...selected, error: '' }
+        snapshotCacheAt = Date.now()
+        return snapshotCache
+      }
+
+      return {
+        snapshot: null,
+        statusMessage: '',
+        error: 'Nenhum snapshot do pipeline comercial encontrado.',
+      }
     } catch (error) {
       if (snapshotCache?.snapshot) return snapshotCache
       return {
