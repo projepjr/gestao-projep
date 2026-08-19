@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   CartesianGrid,
@@ -224,6 +224,71 @@ function emptyPeriod() {
   return { hunters: [], closers: [] }
 }
 
+const HunterComparisonChart = memo(function HunterComparisonChart({
+  chartData,
+  selectedRows,
+  selectedMetric,
+  showTeamAverage,
+}) {
+  if (chartData.length === 0 || (!showTeamAverage && selectedRows.length === 0)) {
+    return (
+      <div className="flex h-[330px] items-center justify-center text-sm text-gray-600">
+        Selecione ao menos um hunter para visualizar o gráfico.
+      </div>
+    )
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={340}>
+      <LineChart data={chartData} margin={{ top: 24, right: 28, left: -18, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1A1A1A" />
+        <XAxis dataKey="label" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={{ stroke: '#374151' }} tickLine={false} />
+        <YAxis tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={{ stroke: '#374151' }} tickLine={false} />
+        <ChartTooltip
+          content={({ active, payload, label }) => {
+            if (!active || !payload?.length) return null
+            return (
+              <div className="rounded-md border border-[#1E1E1E] bg-[#111111] p-3 text-xs shadow-xl">
+                <p className="mb-2 font-semibold text-white">{label}</p>
+                {payload.map(item => (
+                  <p key={item.dataKey} style={{ color: item.color }} className="font-semibold">
+                    {item.name}: {formatMetric(item.value, selectedMetric.isPercent)}
+                  </p>
+                ))}
+              </div>
+            )
+          }}
+        />
+        {showTeamAverage && (
+          <Line
+            type="monotone"
+            dataKey="media"
+            name="Média do time"
+            stroke="#5975FF"
+            strokeWidth={2.5}
+            dot={{ r: 4 }}
+            activeDot={{ r: 6 }}
+            isAnimationActive={false}
+          />
+        )}
+        {selectedRows.map((row, index) => (
+          <Line
+            key={hunterId(row)}
+            type="monotone"
+            dataKey={`hunter_${hunterId(row)}`}
+            name={row.nome}
+            stroke={COLORS[index % COLORS.length]}
+            strokeWidth={2}
+            dot={{ r: 3 }}
+            activeDot={{ r: 5 }}
+            isAnimationActive={false}
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  )
+})
+
 function HunterAnalysis() {
   const { members, commercial } = useData()
   const initialSnapshotResult = useMemo(() => getCachedComercialSnapshot(), [])
@@ -302,7 +367,7 @@ function HunterAnalysis() {
     if (!snapshot?.payload) return emptyPeriod()
     if (periodMode !== 'live' && (!startDate || !endDate)) return emptyPeriod()
     return mapComercialSnapshot(snapshot.payload, { members, commercial, range: activeRange })
-  }, [activeRange, commercial, endDate, members, periodMode, snapshot, startDate])
+  }, [activeRange, commercial, members, periodMode, snapshot?.payload, startDate, endDate])
 
   const hunters = periodData.hunters || []
   const hunterKeyList = hunters.map(hunterId).join('|')
@@ -321,43 +386,56 @@ function HunterAnalysis() {
     () => hunters.filter(row => selectedHunterSet.has(hunterId(row))),
     [hunters, selectedHunterSet]
   )
-  const teamAverage = average(hunters.map(row => rowMetric(row, selectedMetric)))
-  const selectedAverage = average(selectedRows.map(row => rowMetric(row, selectedMetric)))
+  const teamAverage = useMemo(
+    () => average(hunters.map(row => rowMetric(row, selectedMetric))),
+    [hunters, selectedMetric],
+  )
+  const selectedAverage = useMemo(
+    () => average(selectedRows.map(row => rowMetric(row, selectedMetric))),
+    [selectedMetric, selectedRows],
+  )
 
-  const chartData = useMemo(() => {
+  const chartPeriods = useMemo(() => {
     if (!snapshot?.payload) return []
-
-    const buildPoint = (label, range) => {
-      const mapped = range
-        ? mapComercialSnapshot(snapshot.payload, { members, commercial, range })
-        : periodData
-      const rows = mapped.hunters || []
-      const point = {
-        label,
-        media: average(rows.map(row => rowMetric(row, selectedMetric))),
-      }
-      rows.forEach(row => {
-        point[`hunter_${hunterId(row)}`] = rowMetric(row, selectedMetric)
-      })
-      return point
-    }
 
     if (periodMode === 'live') {
       return [
-        buildPoint('Início', null),
-        buildPoint('Total', null),
+        { label: 'Início', rows: hunters },
+        { label: 'Total', rows: hunters },
       ]
     }
 
-    return buildChartBuckets(startDate, endDate).map(bucket =>
-      buildPoint(bucket.label, {
+    return buildChartBuckets(startDate, endDate).map(bucket => {
+      const mapped = mapComercialSnapshot(snapshot.payload, { members, commercial, range: {
         id: bucket.label,
         label: bucket.label,
         inicio: startDate,
         fim: bucket.fim,
-      })
-    )
-  }, [commercial, endDate, members, periodData, periodMode, selectedMetric, snapshot, startDate])
+      } })
+      return { label: bucket.label, rows: mapped.hunters || [] }
+    })
+  }, [commercial, endDate, hunters, members, periodMode, snapshot?.payload, startDate])
+
+  const chartData = useMemo(() => chartPeriods.map(({ label, rows }) => {
+    const point = {
+      label,
+      media: average(rows.map(row => rowMetric(row, selectedMetric))),
+    }
+    rows.forEach(row => {
+      point[`hunter_${hunterId(row)}`] = rowMetric(row, selectedMetric)
+    })
+    return point
+  }), [chartPeriods, selectedMetric])
+
+  const deferredSelectedHunters = useDeferredValue(selectedHunters)
+  const chartHunterSet = useMemo(
+    () => new Set(deferredSelectedHunters),
+    [deferredSelectedHunters],
+  )
+  const chartSelectedRows = useMemo(
+    () => hunters.filter(row => chartHunterSet.has(hunterId(row))),
+    [chartHunterSet, hunters],
+  )
 
   const handleModeChange = mode => {
     setPeriodMode(mode)
@@ -630,49 +708,12 @@ function HunterAnalysis() {
           </div>
 
           <div className="min-h-[360px] rounded-md border border-[#1E1E1E] bg-[#0D0D0D] p-4">
-            {chartData.length === 0 || (!showTeamAverage && selectedRows.length === 0) ? (
-              <div className="flex h-[330px] items-center justify-center text-sm text-gray-600">
-                Selecione ao menos um hunter para visualizar o gráfico.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={340}>
-                <LineChart data={chartData} margin={{ top: 24, right: 28, left: -18, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1A1A1A" />
-                  <XAxis dataKey="label" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={{ stroke: '#374151' }} tickLine={false} />
-                  <YAxis tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={{ stroke: '#374151' }} tickLine={false} />
-                  <ChartTooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length) return null
-                      return (
-                        <div className="rounded-md border border-[#1E1E1E] bg-[#111111] p-3 text-xs shadow-xl">
-                          <p className="mb-2 font-semibold text-white">{label}</p>
-                          {payload.map(item => (
-                            <p key={item.dataKey} style={{ color: item.color }} className="font-semibold">
-                              {item.name}: {formatMetric(item.value, selectedMetric.isPercent)}
-                            </p>
-                          ))}
-                        </div>
-                      )
-                    }}
-                  />
-                  {showTeamAverage && (
-                    <Line type="monotone" dataKey="media" name="Média do time" stroke="#5975FF" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  )}
-                  {selectedRows.map((row, index) => (
-                    <Line
-                      key={hunterId(row)}
-                      type="monotone"
-                      dataKey={`hunter_${hunterId(row)}`}
-                      name={row.nome}
-                      stroke={COLORS[index % COLORS.length]}
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+            <HunterComparisonChart
+              chartData={chartData}
+              selectedRows={chartSelectedRows}
+              selectedMetric={selectedMetric}
+              showTeamAverage={showTeamAverage}
+            />
           </div>
         </div>
       </section>

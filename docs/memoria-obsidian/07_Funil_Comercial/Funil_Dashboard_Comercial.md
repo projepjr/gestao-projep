@@ -853,3 +853,25 @@ Navegacao comercial:
 - as subpaginas `Pipeline`, `Ranking` e `Contratos` foram removidas da navegacao e das rotas do Comercial;
 - os arquivos antigos foram mantidos no repositorio para evitar exclusao destrutiva de implementacoes que ainda possam servir de referencia;
 - nenhuma mudanca de banco, Supabase, Pipefy ou n8n foi necessaria.
+
+## Atualizacao 2026-08-19 - Desempenho da Gerencia de Hunters
+
+Problema:
+
+- A pagina `Comercial > Gerencia de Hunters` percorria e remapeava o snapshot completo do Pipefy para cada ponto do grafico.
+- Trocar a metrica ou marcar/desmarcar Hunters repetia processamento pesado e as animacoes do Recharts agravavam os travamentos.
+- A subpagina de Leads repetia parte do mesmo processamento por intervalo.
+
+Correcao:
+
+- `src/services/comercialSnapshotMapper.js` passou a reutilizar, por sessao, resultados calculados para a mesma combinacao de payload, intervalo, membros e configuracao comercial.
+- O cache usa `WeakMap`, e portanto nao transforma `localStorage` em fonte operacional nem impede que um novo snapshot seja processado.
+- `src/pages/comercial/GerenciaHunters.jsx` separa o mapeamento pesado dos periodos da projecao da metrica escolhida. Trocar apenas a metrica nao percorre novamente todos os cards do Pipefy.
+- A selecao de Hunters e adiada com `useDeferredValue`, preservando a resposta imediata dos controles enquanto o grafico e atualizado.
+- O grafico comparativo foi isolado em componente memoizado e suas animacoes foram desativadas para reduzir trabalho de SVG e renderizacoes repetidas.
+- A analise de CNAE/segmento da subpagina Leads reaproveita o resultado por intervalo.
+
+Escopo:
+
+- Nenhuma formula, atribuicao de Hunter, filtro de periodo ou formato de snapshot foi alterado.
+- Nenhuma mudanca foi feita em Supabase, Pipefy, n8n ou schema de banco.

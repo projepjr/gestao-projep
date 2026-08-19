@@ -1290,7 +1290,21 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
   }
 }
 
+const leadInsightsCache = new WeakMap()
+const comercialSnapshotCache = new WeakMap()
+
+function rangeCacheKey(range) {
+  if (!range?.inicio || !range?.fim) return 'live'
+  return `${range.inicio}|${range.fim}`
+}
+
 export function mapLeadSegmentInsights(payload, { range = null } = {}) {
+  if (payload && typeof payload === 'object') {
+    const payloadCache = leadInsightsCache.get(payload)
+    const cached = payloadCache?.get(rangeCacheKey(range))
+    if (cached) return cached
+  }
+
   const cards = getCards(payload)
   const groups = new Map()
 
@@ -1372,7 +1386,7 @@ export function mapLeadSegmentInsights(payload, { range = null } = {}) {
     lost: 0,
   })
 
-  return {
+  const result = {
     rows,
     totals: {
       ...totals,
@@ -1383,10 +1397,32 @@ export function mapLeadSegmentInsights(payload, { range = null } = {}) {
     },
     missingSegmentCount: rows.find(row => row.segment === 'Sem CNAE informado')?.total || 0,
   }
+
+  if (payload && typeof payload === 'object') {
+    let payloadCache = leadInsightsCache.get(payload)
+    if (!payloadCache) {
+      payloadCache = new Map()
+      leadInsightsCache.set(payload, payloadCache)
+    }
+    payloadCache.set(rangeCacheKey(range), result)
+  }
+
+  return result
 }
 
 export function mapComercialSnapshot(payload, { members = [], commercial = {}, range = null } = {}) {
   if (!payload) return null
+
+  if (typeof payload === 'object') {
+    const entries = comercialSnapshotCache.get(payload) || []
+    const key = rangeCacheKey(range)
+    const cached = entries.find(entry => (
+      entry.key === key
+      && entry.members === members
+      && entry.commercial === commercial
+    ))
+    if (cached) return cached.result
+  }
 
   // TODO: substituir este payload por chamadas normalizadas do Supabase quando
   // o n8n gravar cards e metadados separados por tabela.
@@ -1427,7 +1463,7 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
   pipeline.agendamentosPendentes = pipeline.agendamentosPendentes || pipeline.noShow || 0
   delete pipeline.noShow
 
-  return {
+  const result = {
     id: range?.id || payload.periodo?.id || 'pipefy-live',
     label: range?.label || payload.periodo?.label || 'Pipefy ao vivo',
     inicio: range?.inicio || new Date().toISOString().split('T')[0],
@@ -1456,6 +1492,22 @@ export function mapComercialSnapshot(payload, { members = [], commercial = {}, r
     cardsMapeados: cards.length,
     totalCardsSnapshot: allCards.length,
   }
+
+  if (typeof payload === 'object') {
+    const entries = comercialSnapshotCache.get(payload) || []
+    entries.push({
+      key: rangeCacheKey(range),
+      members,
+      commercial,
+      result,
+    })
+    // Um snapshot pode ser consultado em vários intervalos. O limite evita
+    // crescimento indefinido sem descartar os períodos usados recentemente.
+    if (entries.length > 32) entries.splice(0, entries.length - 32)
+    comercialSnapshotCache.set(payload, entries)
+  }
+
+  return result
 }
 
 function normalizeCompanyForMatch(value) {
