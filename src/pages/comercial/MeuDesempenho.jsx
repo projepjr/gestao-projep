@@ -12,7 +12,9 @@ import { Calendar, ChevronDown, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import {
+  COMERCIAL_SNAPSHOT_REFRESH_MS,
   fetchLatestComercialSnapshot,
+  getCachedComercialSnapshot,
   isoDate,
 } from '../../services/comercialDashboardData'
 import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
@@ -429,10 +431,11 @@ function useCurrentIdentity(user, members) {
 export default function MeuDesempenho() {
   const { user } = useAuth()
   const { members, commercial } = useData()
-  const [snapshot, setSnapshot] = useState(null)
-  const [statusMessage, setStatusMessage] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
+  const initialSnapshotResult = useMemo(() => getCachedComercialSnapshot(), [])
+  const [snapshot, setSnapshot] = useState(() => initialSnapshotResult?.snapshot || null)
+  const [statusMessage, setStatusMessage] = useState(() => initialSnapshotResult?.statusMessage || '')
+  const [error, setError] = useState(() => initialSnapshotResult?.error || '')
+  const [loading, setLoading] = useState(() => !initialSnapshotResult?.snapshot)
   const [selectedMetricKey, setSelectedMetricKey] = useState('hunter:leadsTrabalhados')
   const [periodMode, setPeriodMode] = useState('weekly')
   const [startDate, setStartDate] = useState('')
@@ -466,7 +469,15 @@ export default function MeuDesempenho() {
   }, [])
 
   useEffect(() => {
-    loadSnapshot()
+    const initialLoadId = window.setTimeout(loadSnapshot, 0)
+    const intervalId = window.setInterval(
+      () => loadSnapshot({ silent: true }),
+      COMERCIAL_SNAPSHOT_REFRESH_MS,
+    )
+    return () => {
+      window.clearTimeout(initialLoadId)
+      window.clearInterval(intervalId)
+    }
   }, [loadSnapshot])
 
   useEffect(() => {

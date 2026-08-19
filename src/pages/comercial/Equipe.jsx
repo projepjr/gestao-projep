@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Edit2, Link2, Plus, Search, Trash2, Users, X } from 'lucide-react'
 import { useData } from '../../contexts/DataContext'
-import { fetchLatestComercialSnapshot } from '../../services/comercialDashboardData'
+import {
+  COMERCIAL_SNAPSHOT_REFRESH_MS,
+  fetchLatestComercialSnapshot,
+  getCachedComercialSnapshot,
+} from '../../services/comercialDashboardData'
 import { extractPipefyPeopleFromSnapshot } from '../../services/comercialSnapshotMapper'
 import UserAvatar from '../../components/UserAvatar'
 
@@ -127,7 +131,7 @@ export default function EquipeComercial() {
   const [role, setRole] = useState('hunters')
   const [form, setForm] = useState(emptyForm)
   const [query, setQuery] = useState('')
-  const [snapshot, setSnapshot] = useState(null)
+  const [snapshot, setSnapshot] = useState(() => getCachedComercialSnapshot()?.snapshot || null)
   const [message, setMessage] = useState('')
   const currentPipeId = `${commercial.pipefyPipeId || commercial.integracaoPipefy?.pipeId || PIPEFY_COMERCIAL_PIPE_ID}`.trim()
   const [pipeIdDraft, setPipeIdDraft] = useState(currentPipeId)
@@ -145,7 +149,12 @@ export default function EquipeComercial() {
   }, [currentPipeId])
 
   useEffect(() => {
-    loadSnapshot()
+    const initialLoadId = window.setTimeout(loadSnapshot, 0)
+    const intervalId = window.setInterval(loadSnapshot, COMERCIAL_SNAPSHOT_REFRESH_MS)
+    return () => {
+      window.clearTimeout(initialLoadId)
+      window.clearInterval(intervalId)
+    }
   }, [loadSnapshot])
 
   useEffect(() => {

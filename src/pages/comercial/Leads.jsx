@@ -3,7 +3,11 @@ import {
   AlertCircle, ArrowUpDown, BarChart2, Calendar, CalendarRange, ChevronLeft, ChevronRight,
   FileCheck, PhoneCall, Radio, Search, Target, Users,
 } from 'lucide-react'
-import { fetchLatestComercialSnapshot } from '../../services/comercialDashboardData'
+import {
+  COMERCIAL_SNAPSHOT_REFRESH_MS,
+  fetchLatestComercialSnapshot,
+  getCachedComercialSnapshot,
+} from '../../services/comercialDashboardData'
 import { mapLeadSegmentInsights } from '../../services/comercialSnapshotMapper'
 
 const MONTHS_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -199,8 +203,13 @@ function ConversionBar({ value, count, total, color = '#CE7028' }) {
 }
 
 export default function LeadsInsights() {
-  const [snapshot, setSnapshot] = useState(null)
-  const [status, setStatus] = useState({ loading: true, error: '', message: '' })
+  const initialSnapshotResult = useMemo(() => getCachedComercialSnapshot(), [])
+  const [snapshot, setSnapshot] = useState(() => initialSnapshotResult?.snapshot || null)
+  const [status, setStatus] = useState(() => ({
+    loading: !initialSnapshotResult?.snapshot,
+    error: initialSnapshotResult?.error || '',
+    message: initialSnapshotResult?.statusMessage || '',
+  }))
   const [mode, setMode] = useState('aovivo')
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState('contactRate')
@@ -253,7 +262,10 @@ export default function LeadsInsights() {
     }
 
     load()
-    const intervalId = window.setInterval(() => load({ silent: true }), 5 * 60 * 1000)
+    const intervalId = window.setInterval(
+      () => load({ silent: true }),
+      COMERCIAL_SNAPSHOT_REFRESH_MS,
+    )
     return () => {
       cancelled = true
       window.clearInterval(intervalId)

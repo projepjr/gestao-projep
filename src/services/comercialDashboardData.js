@@ -4,13 +4,18 @@ import { mapComercialSnapshot } from './comercialSnapshotMapper'
 export const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
 export const COMERCIAL_SNAPSHOT_LOOKBACK = 5
 export const COMERCIAL_SNAPSHOT_TIMEOUT_MS = 15000
-const COMERCIAL_SNAPSHOT_CACHE_TTL_MS = 60 * 1000
+export const COMERCIAL_SNAPSHOT_REFRESH_MS = 15 * 60 * 1000
+const COMERCIAL_SNAPSHOT_CACHE_TTL_MS = COMERCIAL_SNAPSHOT_REFRESH_MS
 const DASHBOARD_DATA_CACHE_LIMIT = 6
 
 let snapshotCache = null
 let snapshotCacheAt = 0
 let snapshotFetchPromise = null
 const dashboardDataCache = new Map()
+
+export function getCachedComercialSnapshot() {
+  return snapshotCache
+}
 
 async function executeSupabaseQuery(query, timeoutMs) {
   const controller = new AbortController()

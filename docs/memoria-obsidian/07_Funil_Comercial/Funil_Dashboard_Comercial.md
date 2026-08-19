@@ -806,3 +806,27 @@ Escopo:
 
 - Nenhuma formula comercial foi alterada.
 - Nenhuma mudanca de banco, Supabase policy, Pipefy ou n8n foi necessaria.
+
+## Atualizacao 2026-08-19 - Cache compartilhado na navegacao comercial
+
+Problema:
+
+- Cada troca de rota desmontava a tela comercial e iniciava uma nova leitura do snapshot no Supabase ao retornar.
+- Dashboard e Leads tambem verificavam novamente os dados a cada cinco minutos; a Dashboard ainda repetia a verificacao ao recuperar foco da janela.
+- Mesmo com deduplicacao de requisicoes simultaneas, esse ciclo causava esperas e processamento desnecessario durante a navegacao.
+
+Correcao:
+
+- `src/services/comercialDashboardData.js` mantem o ultimo snapshot comercial em um cache de modulo compartilhado por todas as rotas.
+- O prazo do cache foi alinhado ao ciclo do n8n: 15 minutos.
+- Dashboard, Leads, Equipe, Gerencia de Hunters, Meu Desempenho e Calendario iniciam com o snapshot ja armazenado, sem tela de carregamento nem nova transferencia ao alternar entre essas paginas.
+- A pagina comercial que estiver aberta faz uma verificacao silenciosa a cada 15 minutos para receber o snapshot gerado pelo n8n.
+- O evento global `projep:refresh-data`, disparado pelo botao manual de atualizacao, continua forcando uma leitura nova e ignora o cache.
+- A atualizacao automatica por foco da janela foi removida da Dashboard.
+- O cache dos dados ja mapeados da Dashboard continua ativo, evitando recalcular o payload quando snapshot, membros e configuracao comercial nao mudaram.
+
+Escopo:
+
+- Nenhuma formula, filtro de periodo ou atribuicao de Hunter/Closer foi alterada.
+- Nenhuma mudanca de schema, Supabase policy, Pipefy ou n8n foi necessaria.
+- O cache e apenas de sessao e nao usa `localStorage` como fonte operacional.

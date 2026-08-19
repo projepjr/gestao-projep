@@ -13,11 +13,11 @@ import {
 import { useData } from '../../contexts/DataContext'
 import {
   buildRemoteDashboardData as buildCachedRemoteDashboardData,
+  COMERCIAL_SNAPSHOT_REFRESH_MS,
   fetchLatestComercialSnapshot,
+  getCachedComercialSnapshot,
 } from '../../services/comercialDashboardData'
 import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
-
-const DASHBOARD_REFRESH_MS = 5 * 60 * 1000
 
 // ── Helpers ───────────────────────────────────────────────────
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -940,14 +940,15 @@ function buildMonthRanges(referenceDate, count = 6) {
 
 export default function ComercialDashboard() {
   const { commercial, members } = useData()
-  const [remoteSnapshot, setRemoteSnapshot] = useState(null)
+  const initialSnapshotResult = useMemo(() => getCachedComercialSnapshot(), [])
+  const [remoteSnapshot, setRemoteSnapshot] = useState(() => initialSnapshotResult?.snapshot || null)
   const remoteSnapshotRef = useRef(remoteSnapshot)
   const snapshotIdRef = useRef(remoteSnapshot?.id || null)
   const fetchingSnapshotRef = useRef(false)
   const [remoteStatus, setRemoteStatus] = useState(() => ({
-    loading: true,
-    error: '',
-    message: '',
+    loading: !initialSnapshotResult?.snapshot,
+    error: initialSnapshotResult?.error || '',
+    message: initialSnapshotResult?.statusMessage || '',
   }))
   const remoteDashboardData = useMemo(
     () => buildCachedRemoteDashboardData(remoteSnapshot, members, commercial),
@@ -1024,13 +1025,13 @@ export default function ComercialDashboard() {
   useEffect(() => {
     let cancelled = false
     fetchLatestSnapshot()
-    const intervalId = window.setInterval(() => { if (!cancelled) fetchLatestSnapshot({ silent: true }) }, DASHBOARD_REFRESH_MS)
-    const onFocus = () => { if (!cancelled) fetchLatestSnapshot({ silent: true }) }
-    window.addEventListener('focus', onFocus)
+    const intervalId = window.setInterval(
+      () => { if (!cancelled) fetchLatestSnapshot({ silent: true }) },
+      COMERCIAL_SNAPSHOT_REFRESH_MS,
+    )
     return () => {
       cancelled = true
       window.clearInterval(intervalId)
-      window.removeEventListener('focus', onFocus)
     }
   }, [fetchLatestSnapshot])
 

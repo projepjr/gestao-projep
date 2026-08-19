@@ -12,7 +12,9 @@ import {
 import { ChevronDown, Search, Target, Users } from 'lucide-react'
 import { useData } from '../../contexts/DataContext'
 import {
+  COMERCIAL_SNAPSHOT_REFRESH_MS,
   fetchLatestComercialSnapshot,
+  getCachedComercialSnapshot,
   isoDate,
 } from '../../services/comercialDashboardData'
 import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
@@ -224,10 +226,11 @@ function emptyPeriod() {
 
 function HunterAnalysis() {
   const { members, commercial } = useData()
-  const [snapshot, setSnapshot] = useState(null)
-  const [statusMessage, setStatusMessage] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
+  const initialSnapshotResult = useMemo(() => getCachedComercialSnapshot(), [])
+  const [snapshot, setSnapshot] = useState(() => initialSnapshotResult?.snapshot || null)
+  const [statusMessage, setStatusMessage] = useState(() => initialSnapshotResult?.statusMessage || '')
+  const [error, setError] = useState(() => initialSnapshotResult?.error || '')
+  const [loading, setLoading] = useState(() => !initialSnapshotResult?.snapshot)
   const [periodMode, setPeriodMode] = useState('weekly')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -256,7 +259,15 @@ function HunterAnalysis() {
   }, [])
 
   useEffect(() => {
-    loadSnapshot()
+    const initialLoadId = window.setTimeout(loadSnapshot, 0)
+    const intervalId = window.setInterval(
+      () => loadSnapshot({ silent: true }),
+      COMERCIAL_SNAPSHOT_REFRESH_MS,
+    )
+    return () => {
+      window.clearTimeout(initialLoadId)
+      window.clearInterval(intervalId)
+    }
   }, [loadSnapshot])
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, X, Clock, Building2,
   User, Video, Phone, MessageCircle, Edit2, Trash2, CheckCircle2,
@@ -7,7 +7,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
-import { fetchLatestComercialSnapshot } from '../../services/comercialDashboardData'
+import {
+  COMERCIAL_SNAPSHOT_REFRESH_MS,
+  fetchLatestComercialSnapshot,
+  getCachedComercialSnapshot,
+} from '../../services/comercialDashboardData'
 import { resolvePipefyMeetingResponsibles } from '../../services/comercialSnapshotMapper'
 
 const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -487,22 +491,29 @@ export default function CalendarioComercial() {
   const [query, setQuery] = useState('')
   const [modalMeeting, setModalMeeting] = useState(null)
   const [showModal, setShowModal] = useState(false)
-  const [pipefySnapshot, setPipefySnapshot] = useState(null)
+  const [pipefySnapshot, setPipefySnapshot] = useState(
+    () => getCachedComercialSnapshot()?.snapshot?.payload || null,
+  )
+
+  const loadPipefySnapshot = useCallback(async ({ force = false } = {}) => {
+    const result = await fetchLatestComercialSnapshot({ force })
+    if (result?.snapshot?.payload) setPipefySnapshot(result.snapshot.payload)
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    fetchLatestComercialSnapshot()
-      .then(result => {
-        if (!cancelled) setPipefySnapshot(result?.snapshot?.payload || null)
-      })
-      .catch(() => {
-        if (!cancelled) setPipefySnapshot(null)
-      })
-
+    const initialLoadId = window.setTimeout(loadPipefySnapshot, 0)
+    const intervalId = window.setInterval(loadPipefySnapshot, COMERCIAL_SNAPSHOT_REFRESH_MS)
     return () => {
-      cancelled = true
+      window.clearTimeout(initialLoadId)
+      window.clearInterval(intervalId)
     }
-  }, [])
+  }, [loadPipefySnapshot])
+
+  useEffect(() => {
+    const handleRefresh = () => loadPipefySnapshot({ force: true })
+    window.addEventListener('projep:refresh-data', handleRefresh)
+    return () => window.removeEventListener('projep:refresh-data', handleRefresh)
+  }, [loadPipefySnapshot])
 
   const normalizedMeetings = useMemo(
     () => meetings.map(meeting => normalizeMeeting(meeting, leads, members, commercial, pipefySnapshot)),
