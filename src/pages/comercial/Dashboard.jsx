@@ -488,56 +488,91 @@ function PipelineGrid({ pipeline }) {
   )
 }
 
-function ComplementaryMetrics({ funil, historico }) {
-  const h = historico || funil
-  const leads = h.leadsCadastrados || funil.leadsCadastrados || 0
-  const worked = h.leadsTrabalhados || 0
-  const contacts = h.leadsContatados || 0
+function formatRate(value, total) {
+  if (!total) return '0%'
+  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format((value / total) * 100)}%`
+}
 
-  const makeRate = (label, numerator, denominator, tip, tone = 'text-blue-400') => ({
-    label,
-    value: pct(numerator, denominator),
-    suffix: '%',
-    tone,
-    tip,
-    detail: String(numerator || 0) + '/' + String(denominator || 0),
-  })
-
+function MeetingIndicatorGroup({ title, scheduled, expected, completed, notCompleted, explicitNoShows }) {
+  const noShows = Math.min(explicitNoShows || 0, notCompleted || 0)
+  const pending = Math.max((notCompleted || 0) - noShows, 0)
   const cards = [
-    makeRate('Leads Trabalhados', worked, leads, 'Mostra a parte dos leads do período que já saiu do cadastro e recebeu algum andamento comercial.'),
-    makeRate('Tentativa de Contato', h.tentativasContato || 0, leads, 'Mostra quantos leads do período chegaram na fase de tentativa de contato.'),
-    makeRate('Leads Contatados', contacts, leads, 'Mostra quantos leads responderam ou avançaram para uma etapa que indica contato real. A fase de Tentativa de Contato sozinha não conta aqui.'),
-    makeRate('Diag. Agendada', h.diagnosticasAgendadas || 0, contacts || leads, 'Mostra quantos leads contatados avançaram para uma diagnóstica agendada.'),
-    makeRate('Diag. Realizada', h.diagnosticasRealizadas || 0, h.diagnosticasAgendadas || 0, 'Mostra quantas diagnósticas agendadas realmente aconteceram.', 'text-green-400'),
-    makeRate('Proposta Agendada', h.propostasAgendadas || 0, h.diagnosticasRealizadas || 0, 'Mostra quantas diagnósticas realizadas viraram proposta agendada.'),
-    makeRate('Proposta Realizada', h.propostasRealizadas || 0, h.propostasAgendadas || 0, 'Mostra quantas propostas agendadas realmente foram apresentadas.', 'text-green-400'),
-    makeRate('Negociação', h.negociacoes || 0, h.propostasRealizadas || 0, 'Mostra quantas propostas apresentadas entraram em negociação.'),
-    makeRate('Contrato', h.contratosFechados || 0, h.negociacoes || 0, 'Mostra quantas negociações viraram contratos fechados.', 'text-green-400'),
-    makeRate('Lead -> Contrato', h.contratosFechados || 0, leads, 'Mostra quantos leads cadastrados no período chegaram até contrato fechado.', 'text-green-400'),
-    makeRate('No-show Diagnóstica', h.noShowsDiagnostica || 0, h.diagnosticasAgendadas || 0, 'Mostra a taxa de bolo em diagnósticas. Essa responsabilidade fica com o Hunter.', 'text-red-400'),
-    makeRate('No-show Proposta', h.noShowsProposta || 0, h.propostasAgendadas || 0, 'Mostra a taxa de bolo em apresentações de proposta. Essa responsabilidade fica com o Closer.', 'text-red-400'),
-    makeRate('Perda Geral', h.perdidos || 0, leads, 'Mostra quantos leads do período terminaram como perdidos.', 'text-red-400'),
-    makeRate('Pendência/No-show', h.pendentesNoShow || 0, leads, 'Mostra quantos leads do período estão aguardando nova ação ou foram marcados como no-show.', 'text-yellow-400'),
+    {
+      label: 'Agendadas',
+      value: scheduled,
+      caption: 'durante o período',
+      tip: 'Reuniões que foram marcadas durante o período selecionado, mesmo que estejam previstas para outra data.',
+    },
+    {
+      label: 'Previstas',
+      value: expected,
+      caption: 'para acontecer',
+      tip: 'Reuniões com data marcada para acontecer dentro do período selecionado.',
+      highlight: true,
+    },
+    {
+      label: 'Realizadas',
+      value: completed,
+      caption: 'no período',
+      tip: 'Reuniões registradas como realizadas dentro do período selecionado.',
+    },
+    {
+      label: 'Não realizadas',
+      value: notCompleted,
+      caption: `${noShows} no-show + ${pending} sem desfecho`,
+      tip: 'Reuniões previstas para o período que não têm realização registrada. Inclui no-shows e reuniões ainda sem desfecho.',
+      highlight: true,
+    },
+    {
+      label: 'Taxa de no-show',
+      value: formatRate(notCompleted, expected),
+      caption: `${notCompleted || 0} de ${expected || 0} previstas`,
+      tip: 'Mostra a parcela das reuniões previstas no período que não foi realizada.',
+    },
   ]
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-2">
-      {cards.map(card => {
-        return (
-          <div key={card.label} className="bg-[#0D0D0D] border border-[#1E1E1E] rounded-md p-3">
-            <p className="text-[10px] text-gray-600 font-semibold uppercase tracking-wider flex items-center">
-              {card.label}
+    <section>
+      <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">{title}</h3>
+      <div className="grid grid-cols-2 overflow-hidden rounded-md border border-[#1E1E1E] sm:grid-cols-3 xl:grid-cols-5">
+        {cards.map(card => (
+          <div
+            key={card.label}
+            className={`min-h-[92px] border-b border-r border-[#1E1E1E] px-3 py-3 text-center last:border-r-0 sm:last:border-b-0 xl:border-b-0 ${card.highlight ? 'bg-[#CE7028]/10' : 'bg-[#0D0D0D]'}`}
+          >
+            <p className="flex items-center justify-center text-2xl font-bold text-white">
+              {card.value || 0}
               <InfoTooltip text={card.tip} />
             </p>
-            <div className="flex items-end justify-between gap-3 mt-2">
-              <span className={'text-xl font-bold ' + card.tone}>{card.value}{card.suffix}</span>
-              <span className="text-[10px] text-gray-700">
-                {card.detail || ''}
-              </span>
-            </div>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-gray-300">{card.label}</p>
+            <p className="mt-0.5 text-[9px] text-gray-600">{card.caption}</p>
           </div>
-        )
-      })}
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function MeetingIndicators({ historico }) {
+  const h = historico || {}
+  return (
+    <div className="space-y-5">
+      <MeetingIndicatorGroup
+        title="Indicadores para Reuniões Diagnósticas"
+        scheduled={h.diagnosticasAgendadas || 0}
+        expected={h.diagnosticasPrevistas || 0}
+        completed={h.diagnosticasRealizadas || 0}
+        notCompleted={h.diagnosticasNaoRealizadas || 0}
+        explicitNoShows={h.noShowsDiagnostica || 0}
+      />
+      <MeetingIndicatorGroup
+        title="Indicadores para Reuniões de Propostas"
+        scheduled={h.propostasAgendadas || 0}
+        expected={h.propostasPrevistas || 0}
+        completed={h.propostasRealizadas || 0}
+        notCompleted={h.propostasNaoRealizadas || 0}
+        explicitNoShows={h.noShowsProposta || 0}
+      />
     </div>
   )
 }
@@ -1196,9 +1231,9 @@ export default function ComercialDashboard() {
 
         <div className="border-t border-[#1E1E1E] pt-5">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-            Indicadores Comerciais
+            Indicadores de Reuniões
           </p>
-          <ComplementaryMetrics funil={currentPeriod.funil} historico={currentPeriod.historico} />
+          <MeetingIndicators historico={currentPeriod.historico} />
         </div>
       </div>
 

@@ -830,3 +830,26 @@ Escopo:
 - Nenhuma formula, filtro de periodo ou atribuicao de Hunter/Closer foi alterada.
 - Nenhuma mudanca de schema, Supabase policy, Pipefy ou n8n foi necessaria.
 - O cache e apenas de sessao e nao usa `localStorage` como fonte operacional.
+
+## Atualizacao 2026-08-19 - Indicadores compactos de reunioes
+
+A secao `Indicadores Comerciais` da Dashboard foi substituida por dois grupos:
+
+- Indicadores para Reunioes Diagnosticas;
+- Indicadores para Reunioes de Propostas.
+
+Cada grupo apresenta cinco valores calculados para o periodo selecionado:
+
+- `Agendadas`: reunioes cujo registro do agendamento ocorreu no intervalo, usando o campo de data de entrada/marcacao do agendamento;
+- `Previstas`: reunioes cuja data marcada para acontecer esta dentro do intervalo;
+- `Realizadas`: reunioes com data de realizacao dentro do intervalo;
+- `Nao realizadas`: reunioes previstas no intervalo que nao possuem realizacao registrada nele, incluindo no-show e ausencia de desfecho;
+- `Taxa de no-show`: `Nao realizadas / Previstas * 100`, com zero quando nao existem reunioes previstas.
+
+As datas de marcacao, previsao e realizacao continuam independentes. Assim, uma reuniao marcada no periodo para acontecer futuramente entra em `Agendadas`, mas so entra em `Previstas` no periodo correspondente a data marcada para a reuniao.
+
+Navegacao comercial:
+
+- as subpaginas `Pipeline`, `Ranking` e `Contratos` foram removidas da navegacao e das rotas do Comercial;
+- os arquivos antigos foram mantidos no repositorio para evitar exclusao destrutiva de implementacoes que ainda possam servir de referencia;
+- nenhuma mudanca de banco, Supabase, Pipefy ou n8n foi necessaria.

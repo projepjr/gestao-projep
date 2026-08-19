@@ -8,12 +8,16 @@ const EMPTY_FUNIL = {
   ligacoesRealizadas: 0,
   interesseFuturo: 0,
   diagnosticasAgendadas: 0,
+  diagnosticasPrevistas: 0,
   diagnosticasRealizadas: 0,
+  diagnosticasNaoRealizadas: 0,
   noShowsDiagnostica: 0,
   reunioesMarcadas: 0,
   reunioesRealizadas: 0,
   propostasAgendadas: 0,
+  propostasPrevistas: 0,
   propostasRealizadas: 0,
+  propostasNaoRealizadas: 0,
   noShowsProposta: 0,
   propostas: 0,
   negociacoes: 0,
@@ -347,6 +351,10 @@ function buildCardConversionFlags(card, range) {
     FUNNEL_RANKS.diagnosticScheduled,
   )
 
+  // A data em que a reuniao foi marcada e a data prevista para ela acontecer
+  // representam eventos diferentes e precisam respeitar o periodo separadamente.
+  const diagnosticExpected = fieldEventInPeriod(card, EVENT_LABELS.diagnosticScheduled, range)
+
   const diagnosticStatus = getDiagnosticStatus(card)
   const diagnosticDone = canCountStage(card, FUNNEL_RANKS.diagnosticDone) && (eventStatusInPeriod(
     card,
@@ -379,6 +387,8 @@ function buildCardConversionFlags(card, range) {
     range,
     FUNNEL_RANKS.proposalScheduled,
   )
+
+  const proposalExpected = fieldEventInPeriod(card, EVENT_LABELS.proposalScheduled, range)
 
   const proposalStatus = getProposalStatus(card)
   const proposalDone = canCountStage(card, FUNNEL_RANKS.proposalDone) && (eventStatusInPeriod(
@@ -451,9 +461,11 @@ function buildCardConversionFlags(card, range) {
     worked,
     successfulContact,
     diagnosticScheduled,
+    diagnosticExpected,
     diagnosticDone,
     diagnosticNoShow,
     proposalScheduled,
+    proposalExpected,
     proposalDone,
     proposalNoShow,
     inNegotiation,
@@ -1125,9 +1137,11 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       worked,
       successfulContact,
       diagnosticScheduled,
+      diagnosticExpected,
       diagnosticDone,
       diagnosticNoShow,
       proposalScheduled,
+      proposalExpected,
       proposalDone,
       proposalNoShow,
       inNegotiation,
@@ -1150,6 +1164,10 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       historico.diagnosticasAgendadas += 1
       historico.reunioesMarcadas += 1
     }
+    if (diagnosticExpected) {
+      historico.diagnosticasPrevistas += 1
+      if (!diagnosticDone) historico.diagnosticasNaoRealizadas += 1
+    }
     if (diagnosticDone) {
       historico.diagnosticasRealizadas += 1
       historico.reunioesRealizadas += 1
@@ -1158,6 +1176,10 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     if (proposalScheduled) {
       historico.propostasAgendadas += 1
       historico.propostas += 1
+    }
+    if (proposalExpected) {
+      historico.propostasPrevistas += 1
+      if (!proposalDone) historico.propostasNaoRealizadas += 1
     }
     if (proposalDone) historico.propostasRealizadas += 1
     if (proposalNoShow) historico.noShowsProposta += 1
