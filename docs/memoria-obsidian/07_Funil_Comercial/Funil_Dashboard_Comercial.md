@@ -902,6 +902,24 @@ A regra foi aplicada a:
 
 Campos especificos conhecidos incluem `Data de entrada na diagnostica agendada`, `Data de entrada na proposta agendada`, `Data da diagnostica realizada`, `Data da proposta realizada`, `Data de entrada em negociacao`, `Data da assinatura do contrato`, `Data de entrada na fase perdidos` e `Data do no-show`.
 
+## Atualizacao 2026-08-21 - Serie semanal nao cumulativa na Gerencia de Hunters
+
+Problema:
+
+- O grafico comparativo da Gerencia de Hunters usava a data inicial global em todos os pontos e alterava apenas a data final.
+- Assim, cada semana incorporava as semanas anteriores. O valor exibido no ultimo ponto representava o total acumulado do intervalo, e nao o resultado daquela semana.
+
+Correcao:
+
+- Cada bloco temporal agora guarda seu proprio inicio e fim.
+- O `mapComercialSnapshot` recebe exclusivamente o intervalo daquele ponto do grafico.
+- Em visualizacao semanal, cada ponto representa apenas os eventos ocorridos naquela semana; os valores deixam de ser acumulativos.
+- A tabela acima do grafico continua mostrando o total do periodo completo selecionado.
+
+Escopo:
+
+- Nenhuma formula comercial, campo do Pipefy, snapshot, banco, n8n ou regra de atribuicao de Hunter foi alterada.
+
 Verificacao:
 
 - O smoke test possui regressoes para impedir que uma data generica de outra fase conte diagnostica, proposta ou perda.

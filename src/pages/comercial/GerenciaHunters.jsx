@@ -146,6 +146,7 @@ function buildChartBuckets(startIso, endIso) {
     const bucketEndIso = formatDateInput(bucketEnd)
     buckets.push({
       label: `${formatShortDate(bucketStartIso)} a ${formatShortDate(bucketEndIso)}`,
+      inicio: bucketStartIso,
       fim: bucketEndIso,
     })
     cursor = addDays(bucketEnd, 1)
@@ -409,7 +410,7 @@ function HunterAnalysis() {
       const mapped = mapComercialSnapshot(snapshot.payload, { members, commercial, range: {
         id: bucket.label,
         label: bucket.label,
-        inicio: startDate,
+        inicio: bucket.inicio,
         fim: bucket.fim,
       } })
       return { label: bucket.label, rows: mapped.hunters || [] }
