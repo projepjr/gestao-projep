@@ -925,3 +925,12 @@ Verificacao:
 - O smoke test possui regressoes para impedir que uma data generica de outra fase conte diagnostica, proposta ou perda.
 - Tambem verifica que uma data especifica fora do periodo nao seja substituida por um movimento de fase dentro do periodo.
 - O fallback pelo historico continua funcionando quando o campo especifico estiver ausente.
+## Correcao 2026-08-21 - Snapshot comercial excedendo tamanho
+
+- O workflow ativo `Site Projep` falhava no no `Salvar metricas no Supabase` ao enviar o snapshot comercial.
+- A causa era a duplicacao integral dos cards em `payload.raw.cards` e `payload.raw.data.allCards.edges`, elevando o payload de aproximadamente 3 MB para 6,3 MB e causando erro 520/timeout no caminho n8n -> Supabase.
+- O no `Transformar em metricas comerciais` passou a salvar uma unica colecao em `payload.raw.cards`.
+- Os cards tambem passaram a ser compactados sem perder os campos usados pelo front-end: fase atual, historico de fases, responsaveis, campos, datas e identificacao do pipeline oficial `307256948`.
+- O workflow foi republicado e validado por execucao via webhook; o snapshot voltou a ser salvo com sucesso.
+- Validacao funcional: o card `POSTO ESPACO BOTANICO LTDA` passou a chegar ao Supabase com `Data e hora da proposta agendada = 25/08/2026 11:00`.
+- Nao registrar URL de webhook, tokens ou chaves do n8n/Supabase nesta memoria.
