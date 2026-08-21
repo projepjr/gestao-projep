@@ -875,3 +875,35 @@ Escopo:
 
 - Nenhuma formula, atribuicao de Hunter, filtro de periodo ou formato de snapshot foi alterado.
 - Nenhuma mudanca foi feita em Supabase, Pipefy, n8n ou schema de banco.
+
+## Atualizacao 2026-08-21 - Datas especificas por etapa nas metricas comerciais
+
+Problema:
+
+- O payload achatado do Pipefy pode conter varios campos diferentes com o mesmo rotulo generico `Data de entrada`.
+- Esse rotulo estava sendo aceito como data de marcacao de diagnostica, proposta e perda.
+- Como resultado, uma movimentacao de outra fase dentro da semana podia inflar a metrica. Um Hunter com uma diagnostica realmente marcada no periodo podia aparecer com varias.
+
+Regra canonica adotada:
+
+1. Se existir o campo operacional especifico da etapa, sua data e autoritativa para o filtro semanal, mensal ou personalizado.
+2. O historico de entrada na fase exata e usado apenas quando o campo especifico nao existe.
+3. O rotulo generico `Data de entrada` nunca deve ser usado para inferir uma etapa em payloads com campos achatados.
+4. A distribuicao atual do pipeline continua usando a fase atual; eventos historicos e estoque atual permanecem conceitos separados.
+
+A regra foi aplicada a:
+
+- diagnostica agendada e realizada;
+- proposta agendada e realizada;
+- entrada em negociacao;
+- contrato fechado;
+- entrada em perdidos;
+- no-show de diagnostica ou proposta.
+
+Campos especificos conhecidos incluem `Data de entrada na diagnostica agendada`, `Data de entrada na proposta agendada`, `Data da diagnostica realizada`, `Data da proposta realizada`, `Data de entrada em negociacao`, `Data da assinatura do contrato`, `Data de entrada na fase perdidos` e `Data do no-show`.
+
+Verificacao:
+
+- O smoke test possui regressoes para impedir que uma data generica de outra fase conte diagnostica, proposta ou perda.
+- Tambem verifica que uma data especifica fora do periodo nao seja substituida por um movimento de fase dentro do periodo.
+- O fallback pelo historico continua funcionando quando o campo especifico estiver ausente.

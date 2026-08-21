@@ -347,6 +347,7 @@ function buildCardConversionFlags(card, range) {
     card,
     EVENT_LABELS.diagnosticScheduled,
     EVENT_LABELS.diagnosticMarked,
+    STAGE_KEYWORDS.diagnosticScheduled,
     range,
     FUNNEL_RANKS.diagnosticScheduled,
   )
@@ -371,19 +372,20 @@ function buildCardConversionFlags(card, range) {
     FUNNEL_RANKS.diagnosticDone,
   ))
 
-  const diagnosticNoShow = isNoShowFor(card, 'diagnostica', range) || eventStatusInPeriod(
+  const diagnosticNoShow = noShowInPeriod(
     card,
+    'diagnostica',
     diagnosticStatus,
     EVENT_LABELS.diagnosticScheduled,
     STAGE_KEYWORDS.diagnosticScheduled,
     range,
-    statusIsNoShow,
   )
 
   const proposalScheduled = scheduledEventMarkedInPeriod(
     card,
     EVENT_LABELS.proposalScheduled,
     EVENT_LABELS.proposalMarked,
+    STAGE_KEYWORDS.proposalScheduled,
     range,
     FUNNEL_RANKS.proposalScheduled,
   )
@@ -406,13 +408,13 @@ function buildCardConversionFlags(card, range) {
     FUNNEL_RANKS.proposalDone,
   ))
 
-  const proposalNoShow = isNoShowFor(card, 'proposta', range) || eventStatusInPeriod(
+  const proposalNoShow = noShowInPeriod(
     card,
+    'proposta',
     proposalStatus,
     EVENT_LABELS.proposalScheduled,
     STAGE_KEYWORDS.proposalScheduled,
     range,
-    statusIsNoShow,
   )
 
   const inNegotiation = eventReachedInPeriod(
@@ -543,7 +545,6 @@ const EVENT_LABELS = {
     'data de marcacao da diagnostica',
     'data de entrada na diagnostica agendada',
     'data de entrada do card na diagnostica agendada',
-    'data de entrada',
   ],
   proposalScheduled: [
     'data e hora da proposta agendada',
@@ -560,7 +561,6 @@ const EVENT_LABELS = {
     'data de marcacao da proposta',
     'data de entrada na proposta agendada',
     'data de entrada do card na proposta agendada',
-    'data de entrada',
   ],
   proposalDone: [
     'data da proposta realizada',
@@ -632,10 +632,6 @@ const NO_SHOW_RESPONSIBLE_LABELS = [
   'responsavel do no-show',
   'responsavel do no show',
   'responsavel pelo reagendamento',
-]
-
-const LOSS_STAGE_ENTRY_LABELS = [
-  'data de entrada',
 ]
 
 const STAGE_KEYWORDS = {
@@ -721,15 +717,12 @@ function currentStageInPeriod(card, stageKeywords, range) {
 
 function lostInPeriod(card, range) {
   const isLostStage = currentStageMatches(card, STAGE_KEYWORDS.lost)
-  const dateLabels = isLostStage
-    ? [...EVENT_LABELS.lost, ...LOSS_STAGE_ENTRY_LABELS]
-    : EVENT_LABELS.lost
-  const hasLostDate = hasFieldValue(card, dateLabels)
+  const hasLostDate = hasFieldValue(card, EVENT_LABELS.lost)
 
   if (!isLostStage && !hasLostDate) return false
   if (range?.inicio && range?.fim) {
-    return hasFieldDateInRange(card, dateLabels, range) ||
-      (isLostStage && enteredStageInRange(card, STAGE_KEYWORDS.lost, range))
+    if (hasLostDate) return hasFieldDateInRange(card, EVENT_LABELS.lost, range)
+    return isLostStage && enteredStageInRange(card, STAGE_KEYWORDS.lost, range)
   }
   return isLostStage || hasLostDate
 }
@@ -768,6 +761,7 @@ function diagnosticScheduledForHunterInPeriod(card, range) {
     card,
     EVENT_LABELS.diagnosticScheduled,
     EVENT_LABELS.diagnosticMarked,
+    STAGE_KEYWORDS.diagnosticScheduled,
     range,
     FUNNEL_RANKS.diagnosticScheduled,
   )
@@ -778,6 +772,7 @@ function proposalScheduledForCloserInPeriod(card, range) {
     card,
     EVENT_LABELS.proposalScheduled,
     EVENT_LABELS.proposalMarked,
+    STAGE_KEYWORDS.proposalScheduled,
     range,
     FUNNEL_RANKS.proposalScheduled,
   )
@@ -790,7 +785,8 @@ function stageEventInPeriod(card, keywords, range) {
 function eventStatusInPeriod(card, status, labels, stageKeywords, range, predicate) {
   if (!predicate(status)) return false
   if (range?.inicio && range?.fim) {
-    return fieldEventInPeriod(card, labels, range) || stageEventInPeriod(card, stageKeywords, range)
+    if (hasFieldValue(card, labels)) return fieldEventInPeriod(card, labels, range)
+    return stageEventInPeriod(card, stageKeywords, range)
   }
   return true
 }
@@ -811,15 +807,26 @@ function hasReachedStage(card, stageKeywords, fieldLabels = []) {
 function eventReachedInPeriod(card, fieldLabels, stageKeywords, range, targetRank = null) {
   if (targetRank && !canCountStage(card, targetRank)) return false
   if (!range?.inicio || !range?.fim) return hasReachedStage(card, stageKeywords, fieldLabels)
-  if (enteredStageInRange(card, stageKeywords, range)) return true
-  if (!hasReachedStage(card, stageKeywords, fieldLabels)) return false
-  return hasFieldDateInRange(card, fieldLabels, range)
+  if (hasFieldValue(card, fieldLabels)) return hasFieldDateInRange(card, fieldLabels, range)
+  return enteredStageInRange(card, stageKeywords, range)
 }
 
-function scheduledEventMarkedInPeriod(card, scheduledLabels, markedLabels, range, targetRank = null) {
+function scheduledEventMarkedInPeriod(
+  card,
+  scheduledLabels,
+  markedLabels,
+  stageKeywords,
+  range,
+  targetRank = null,
+) {
   if (targetRank && !canCountStage(card, targetRank)) return false
   if (!hasFieldValue(card, scheduledLabels)) return false
-  return fieldEventInPeriod(card, markedLabels, range)
+  const hasMarkedDate = hasFieldValue(card, markedLabels)
+  if (!range?.inicio || !range?.fim) {
+    return hasMarkedDate || enteredStageInRange(card, stageKeywords, null)
+  }
+  if (hasMarkedDate) return hasFieldDateInRange(card, markedLabels, range)
+  return enteredStageInRange(card, stageKeywords, range)
 }
 
 function isNoShowFor(card, type, range) {
@@ -830,8 +837,27 @@ function isNoShowFor(card, type, range) {
   const typeMatches = noShowType === type
   if ((!hasNoShowFlag && !hasNoShowDate) || !typeMatches) return false
   if (!range?.inicio || !range?.fim) return true
-  return hasFieldDateInRange(card, EVENT_LABELS.noShow, range) ||
-    enteredStageInRange(card, STAGE_KEYWORDS.pendingScheduling, range)
+  if (hasNoShowDate) return hasFieldDateInRange(card, EVENT_LABELS.noShow, range)
+  return enteredStageInRange(card, STAGE_KEYWORDS.pendingScheduling, range)
+}
+
+function noShowInPeriod(card, type, status, scheduledLabels, stageKeywords, range) {
+  const noShowType = getNoShowStageType(card)
+  const flagValue = getFieldValue(card, ['no-show confirmado', 'no show confirmado', 'foi no-show', 'foi no show'])
+  const hasExplicitNoShow = Boolean(noShowType) ||
+    hasFieldValue(card, EVENT_LABELS.noShow) ||
+    includesAny(flagValue, ['sim', 'true', 'yes', 'no-show', 'no show', 'noshow'])
+
+  if (hasExplicitNoShow) return isNoShowFor(card, type, range)
+
+  return eventStatusInPeriod(
+    card,
+    status,
+    scheduledLabels,
+    stageKeywords,
+    range,
+    statusIsNoShow,
+  )
 }
 
 function contractWasClosed(card) {

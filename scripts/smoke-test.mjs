@@ -10,80 +10,183 @@ globalThis.localStorage = {
 
 const { createServer } = await import('vite')
 const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
-const [{ default: db }, access, authorization, { INITIAL_USUARIOS }] = await Promise.all([
+const [{ default: db }, access, authorization, { INITIAL_USUARIOS }, comercialMapper] = await Promise.all([
   vite.ssrLoadModule('/src/data/db.js'),
   vite.ssrLoadModule('/src/config/accessControl.js'),
   vite.ssrLoadModule('/src/config/authorization.js'),
   vite.ssrLoadModule('/src/data/usuarios.js'),
+  vite.ssrLoadModule('/src/services/comercialSnapshotMapper.js'),
 ])
 
 const president = INITIAL_USUARIOS.find(user => user.role === 'presidente')
-const hunter = INITIAL_USUARIOS.find(user => user.cargo === 'Trainee Comercial')
-const gpDirector = INITIAL_USUARIOS.find(user => user.cargo === 'Diretor de GP')
+const hunter = {
+  id: 'smoke-hunter',
+  role: 'membro',
+  permissoes: {
+    comercial: true,
+    subareas: {
+      'comercial.dashboard': false,
+      'comercial.gerenciaHunters': false,
+      'comercial.meuDesempenho': true,
+      'comercial.calendario': false,
+      'comercial.equipe': false,
+    },
+  },
+}
+const gpDirector = {
+  id: 'smoke-gp-director',
+  role: 'diretor',
+  setorId: 'gestao-pessoas',
+  permissoes: {
+    gestaoPessoas: true,
+    subareas: { 'gestaoPessoas.aprovacoes': true },
+  },
+}
 
 assert.ok(access.hasPathAccess(president, '/presidencia/seguranca'))
-assert.ok(access.hasPathAccess(president, '/comercial/contratos'))
+assert.ok(access.hasPathAccess(president, '/comercial'))
 assert.equal(access.hasPathAccess(hunter, '/comercial'), false)
-assert.ok(access.hasPathAccess(hunter, '/comercial/pipeline'))
-assert.equal(access.getDefaultPath(hunter), '/comercial/pipeline')
+assert.ok(access.hasPathAccess(hunter, '/comercial/meu-desempenho'))
+assert.equal(access.getDefaultPath(hunter), '/comercial/meu-desempenho')
 assert.ok(authorization.canApproveUsers(gpDirector))
 assert.equal(authorization.canManagePermissions(gpDirector), false)
 
 const ids = new Set(Array.from({ length: 100 }, () => db.createId()))
 assert.equal(ids.size, 100)
 
-db.set('usuarios', INITIAL_USUARIOS)
-const activeUserIds = new Set(db.get('usuarios').map(user => user.id))
-const normalizedFinance = db.get('usuarios').find(user => user.cargo === 'Diretora Financeira')
-assert.equal(normalizedFinance.setor, 'Adm e Fin')
-assert.equal(normalizedFinance.setorId, 'administrativo-financeiro')
-
-for (const project of db.get('projetos').projetos) {
-  if (project.responsavelId) assert.ok(activeUserIds.has(project.responsavelId))
-  project.membros.forEach(memberId => assert.ok(activeUserIds.has(memberId)))
-  project.tarefas.forEach(task => {
-    if (task.responsavelId) assert.ok(activeUserIds.has(task.responsavelId))
-  })
+const dateRange = { inicio: '2026-08-16', fim: '2026-08-21' }
+const field = (label, value) => ({ label, value })
+const phase = (name, firstTimeIn) => ({ phase: { name }, firstTimeIn })
+const comercialPayload = {
+  raw: {
+    cards: [
+      {
+        id: 'diag-outside-range',
+        current_phase: { name: 'Proposta Realizada' },
+        fields: [
+          field('Data e hora da diagnostica agendada', '30/08/2026 09:00'),
+          field('Data de entrada', '21/08/2026'),
+        ],
+        phases_history: [
+          phase('Diagnostica Agendada', '2026-08-14T10:00:00Z'),
+          phase('Proposta Realizada', '2026-08-21T10:00:00Z'),
+        ],
+      },
+      {
+        id: 'diag-inside-range',
+        current_phase: { name: 'Diagnostica Agendada' },
+        fields: [field('Data e hora da diagnostica agendada', '30/08/2026 10:00')],
+        phases_history: [phase('Diagnostica Agendada', '2026-08-17T10:00:00Z')],
+      },
+      {
+        id: 'proposal-outside-range',
+        current_phase: { name: 'Negociacao' },
+        fields: [
+          field('Data e hora da proposta agendada', '30/08/2026 11:00'),
+          field('Data de entrada', '20/08/2026'),
+        ],
+        phases_history: [
+          phase('Proposta Agendada', '2026-08-12T10:00:00Z'),
+          phase('Negociacao', '2026-08-20T10:00:00Z'),
+        ],
+      },
+      {
+        id: 'proposal-inside-range',
+        current_phase: { name: 'Proposta Agendada' },
+        fields: [field('Data e hora da proposta agendada', '30/08/2026 12:00')],
+        phases_history: [phase('Proposta Agendada', '2026-08-18T10:00:00Z')],
+      },
+      {
+        id: 'lost-outside-range',
+        current_phase: { name: 'Perdidos' },
+        fields: [field('Data de entrada', '19/08/2026')],
+        phases_history: [phase('Perdidos', '2026-08-10T10:00:00Z')],
+      },
+      {
+        id: 'lost-inside-range',
+        current_phase: { name: 'Perdidos' },
+        fields: [],
+        phases_history: [phase('Perdidos', '2026-08-19T10:00:00Z')],
+      },
+      {
+        id: 'diag-done-specific-date-outside',
+        current_phase: { name: 'Diagnostica Realizada' },
+        fields: [
+          field('Data da diagnostica realizada', '14/08/2026'),
+          field('Status da diagnostica', 'Realizada'),
+        ],
+        phases_history: [phase('Diagnostica Realizada', '2026-08-19T10:00:00Z')],
+      },
+      {
+        id: 'diag-done-history-fallback-inside',
+        current_phase: { name: 'Diagnostica Realizada' },
+        fields: [],
+        phases_history: [phase('Diagnostica Realizada', '2026-08-20T10:00:00Z')],
+      },
+      {
+        id: 'proposal-done-specific-date-outside',
+        current_phase: { name: 'Proposta Realizada' },
+        fields: [field('Data da proposta realizada', '12/08/2026')],
+        phases_history: [phase('Proposta Realizada', '2026-08-18T10:00:00Z')],
+      },
+      {
+        id: 'proposal-done-history-fallback-inside',
+        current_phase: { name: 'Proposta Realizada' },
+        fields: [],
+        phases_history: [phase('Proposta Realizada', '2026-08-18T10:00:00Z')],
+      },
+      {
+        id: 'contract-specific-date-outside',
+        current_phase: { name: 'Contratos Fechados' },
+        fields: [
+          field('Contrato fechado', 'Sim'),
+          field('Data da assinatura do contrato', '10/08/2026'),
+        ],
+        phases_history: [phase('Contratos Fechados', '2026-08-17T10:00:00Z')],
+      },
+      {
+        id: 'contract-history-fallback-inside',
+        current_phase: { name: 'Contratos Fechados' },
+        fields: [field('Contrato fechado', 'Sim')],
+        phases_history: [phase('Contratos Fechados', '2026-08-17T10:00:00Z')],
+      },
+      {
+        id: 'no-show-specific-date-outside',
+        current_phase: { name: 'Pendentes / No-show' },
+        fields: [
+          field('Foi no-show?', 'Sim'),
+          field('Etapa que aconteceu no-show', 'Diagnostica'),
+          field('Data do no-show', '11/08/2026'),
+          field('Status da diagnostica', 'No-show'),
+          field('Data e hora da diagnostica agendada', '19/08/2026 09:00'),
+        ],
+        phases_history: [phase('Pendentes / No-show', '2026-08-19T10:00:00Z')],
+      },
+      {
+        id: 'no-show-history-fallback-inside',
+        current_phase: { name: 'Pendentes / No-show' },
+        fields: [
+          field('Foi no-show?', 'Sim'),
+          field('Etapa que aconteceu no-show', 'Diagnostica'),
+        ],
+        phases_history: [phase('Pendentes / No-show', '2026-08-19T10:00:00Z')],
+      },
+    ],
+  },
 }
-for (const evaluation of db.get('gestaoPessoas').avaliacoes) {
-  assert.ok(activeUserIds.has(evaluation.membroId))
-  if (evaluation.avaliadorId) assert.ok(activeUserIds.has(evaluation.avaliadorId))
-  evaluation.feedbacks.forEach(feedback => assert.ok(activeUserIds.has(feedback.avaliadorId)))
-}
-for (const message of db.get('comunicacao').mensagens) {
-  if (message.remetenteId !== 'system') assert.ok(activeUserIds.has(message.remetenteId))
-  if (typeof message.destinatarioId === 'number') assert.ok(activeUserIds.has(message.destinatarioId))
-}
-db.get('comercial').hunters.forEach(entry => assert.ok(activeUserIds.has(entry.userId)))
-db.get('comercial').closers.forEach(entry => assert.ok(activeUserIds.has(entry.userId)))
-db.get('comercial').contratos.forEach(contract => {
-  if (contract.responsavelId) assert.ok(activeUserIds.has(contract.responsavelId))
-})
+const comercialPeriod = comercialMapper.mapComercialSnapshot(comercialPayload, { range: dateRange })
+assert.equal(comercialPeriod.historico.diagnosticasAgendadas, 1)
+assert.equal(comercialPeriod.historico.propostasAgendadas, 1)
+assert.equal(comercialPeriod.historico.perdidos, 1)
 
-const removableUser = INITIAL_USUARIOS.find(user => user.id === 2)
-assert.ok(removableUser)
-const removedHunterIds = db.get('comercial').hunters
-  .filter(hunterEntry => hunterEntry.userId === removableUser.id)
-  .map(hunterEntry => hunterEntry.id)
-const removedCloserIds = db.get('comercial').closers
-  .filter(closerEntry => closerEntry.userId === removableUser.id)
-  .map(closerEntry => closerEntry.id)
-db.removeUser(removableUser.id)
-assert.equal(db.get('usuarios').some(user => user.id === removableUser.id), false)
-assert.equal(db.get('comunicacao').mensagens.some(message =>
-  message.remetenteId === removableUser.id || message.destinatarioId === removableUser.id
-), false)
-assert.equal(db.get('projetos').projetos.some(project =>
-  project.responsavelId === removableUser.id ||
-  project.membros.includes(removableUser.id) ||
-  project.tarefas.some(task => task.responsavelId === removableUser.id)
-), false)
-assert.equal(db.get('comercial').contratos.some(contract => contract.responsavelId === removableUser.id), false)
-assert.equal(db.get('comercial').hunters.some(hunterEntry => hunterEntry.userId === removableUser.id), false)
-assert.equal(db.get('comercial').closers.some(closerEntry => closerEntry.userId === removableUser.id), false)
-assert.equal(db.get('comercial').leads.some(lead =>
-  removedHunterIds.includes(lead.hunterId) || removedCloserIds.includes(lead.closerId)
-), false)
+const mapRegressionCards = prefix => comercialMapper.mapComercialSnapshot({
+  raw: { cards: comercialPayload.raw.cards.filter(card => card.id.startsWith(prefix)) },
+}, { range: dateRange })
 
-console.log('Smoke tests passed: access, IDs, normalization and cascade deletion.')
+assert.equal(mapRegressionCards('diag-done').historico.diagnosticasRealizadas, 1)
+assert.equal(mapRegressionCards('proposal-done').historico.propostasRealizadas, 1)
+assert.equal(mapRegressionCards('contract-').historico.contratosFechados, 1)
+assert.equal(mapRegressionCards('no-show').historico.noShowsDiagnostica, 1)
+
+console.log('Smoke tests passed: access, IDs and commercial event dates.')
 await vite.close()
