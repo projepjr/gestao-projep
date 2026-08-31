@@ -596,6 +596,15 @@ const DIAGNOSTIC_SCHEDULER_LABELS = [
   'responsaveis pela diagnostica',
 ]
 
+const DIAGNOSTIC_RESPONSIBLE_LABELS = [
+  'responsaveis pela diagnostica',
+  'responsáveis pela diagnóstica',
+  'responsavel pela diagnostica',
+  'responsável pela diagnóstica',
+  'quem realizou a diagnostica',
+  'quem realizou o diagnostico',
+]
+
 const PROPOSAL_SCHEDULER_LABELS = [
   'quem marcou proposta',
   'quem marcou proposta?',
@@ -1023,6 +1032,23 @@ function getLossResponsibleTeamMember(card, teamIndex) {
   return null
 }
 
+function getTeamMembersByLabels(card, labels, teamIndex) {
+  const matched = new Map()
+
+  for (const value of getFieldValues(card, labels)) {
+    const member = matchTeamValue(value, teamIndex)
+    if (!member) continue
+    const key = String(member.id || member.userId || normalize(member.nome || member.name))
+    if (key) matched.set(key, member)
+  }
+
+  return [...matched.values()]
+}
+
+function getDiagnosticResponsibleTeamMembers(card, teamIndex) {
+  return getTeamMembersByLabels(card, DIAGNOSTIC_RESPONSIBLE_LABELS, teamIndex)
+}
+
 function getNoShowResponsibleTeamMember(card, hunterIndex, closerIndex) {
   const values = getFieldValues(card, NO_SHOW_RESPONSIBLE_LABELS)
 
@@ -1225,12 +1251,19 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
         hunter.leadsContatados += 1
         hunter.contatadas += 1
       }
-      if (diagnosticDone) {
-        hunter.diagnosticasRealizadas += 1
-        hunter.reunioesRealizadas += 1
-      }
       if (proposalScheduled) hunter.propostasAgendadas += 1
       if (proposalDone) hunter.propostasRealizadas += 1
+    }
+
+    if (diagnosticDone) {
+      const diagnosticHunters = getDiagnosticResponsibleTeamMembers(card, hunterIndex)
+      const realizedHunters = diagnosticHunters.length ? diagnosticHunters : (hunter ? [hunter] : [])
+      for (const member of realizedHunters) {
+        const diagnosticHunter = findOrCreateRow(hunters, member)
+        if (!diagnosticHunter) continue
+        diagnosticHunter.diagnosticasRealizadas += 1
+        diagnosticHunter.reunioesRealizadas += 1
+      }
     }
 
     if (lost) {
@@ -1256,13 +1289,20 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
 
     const closer = findOrCreateRow(closers, getResponsibleTeamMember(card, 'closer', closerIndex))
     if (closer) {
-      if (diagnosticDone) closer.diagnosticasRealizadas += 1
       if (proposalDone) {
         closer.propostasRealizadas += 1
         closer.reunioesRealizadas += 1
       }
       if (inNegotiation && !contractClosed) closer.emNegociacao += 1
       if (contractClosed) closer.contratosFechados += 1
+    }
+    if (diagnosticDone) {
+      const diagnosticClosers = getDiagnosticResponsibleTeamMembers(card, closerIndex)
+      const realizedClosers = diagnosticClosers.length ? diagnosticClosers : (closer ? [closer] : [])
+      for (const member of realizedClosers) {
+        const diagnosticCloser = findOrCreateRow(closers, member)
+        if (diagnosticCloser) diagnosticCloser.diagnosticasRealizadas += 1
+      }
     }
 
     if (diagnosticNoShow || proposalNoShow) {

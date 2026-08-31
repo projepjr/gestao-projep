@@ -52,6 +52,11 @@ Este arquivo resume problemas ja corrigidos ou investigados no projeto, com base
 - No-show de diagnostica/proposta podia ser classificado incorretamente.
   - Regra: usar campo que indique em qual etapa ocorreu o no-show.
 
+- Reuniao diagnostica realizada podia ser atribuida ao Hunter errado ou nao aparecer para todos os responsaveis.
+  - Causa: o mapper usava um responsavel generico do card, como quem marcou a reuniao, para contabilizar `Diag. Real.`, ignorando o campo especifico `Responsaveis pela diagnostica` e seus multiplos membros.
+  - Correcao em 2026-08-31: diagnosticas realizadas passaram a ser atribuidas aos membros configurados que aparecem no campo especifico do evento, com deduplicacao e suporte a varios responsaveis. O responsavel generico so e usado quando o campo especifico estiver ausente.
+  - Validacao: o card `MOURA FUNDACOES LTDA`, realizado em 18/08/2026 por Julia Franco Dantas e Luisa Lucas Totoli, passou a contabilizar a reuniao para Julia no recorte de agosto; build de producao aprovado.
+
 ## Projetos
 
 - Status `Conclu?do` aparecia nos cards da Base de Conhecimento.
