@@ -188,5 +188,82 @@ assert.equal(mapRegressionCards('proposal-done').historico.propostasRealizadas, 
 assert.equal(mapRegressionCards('contract-').historico.contratosFechados, 1)
 assert.equal(mapRegressionCards('no-show').historico.noShowsDiagnostica, 1)
 
-console.log('Smoke tests passed: access, IDs and commercial event dates.')
+const lossNoShowMembers = [
+  { id: 'julia', nome: 'Julia Franco Dantas', email: 'julia@projepjr.com' },
+  { id: 'closer', nome: 'Closer Teste', email: 'closer@projepjr.com' },
+]
+const lossNoShowCommercial = {
+  equipe: {
+    hunters: [{ id: 'hunter-julia', userId: 'julia', pipefyName: 'Julia Franco Dantas', active: true }],
+    closers: [{ id: 'closer-teste', userId: 'closer', pipefyName: 'Closer Teste', active: true }],
+  },
+}
+const lossNoShowPayload = {
+  raw: {
+    cards: [
+      {
+        id: 'lost-unanswered-diagnostic',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data de entrada na fase perdidos', '19/08/2026'),
+          field('Motivo comercial da perda', 'Sem resposta no follow up'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+          field('Data e hora da diagnostica agendada', '18/08/2026 09:00'),
+        ],
+        phases_history: [
+          phase('Diagnostica Agendada', '2026-08-17T10:00:00Z'),
+          phase('Perdidos', '2026-08-19T10:00:00Z'),
+        ],
+      },
+      {
+        id: 'lost-unanswered-proposal',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data de entrada na fase perdidos', '20/08/2026'),
+          field('Motivo comercial da perda', 'Sem resposta no follow-up'),
+          field('Responsavel pela perda', 'Closer Teste'),
+          field('Data e hora da proposta agendada', '20/08/2026 14:00'),
+        ],
+        phases_history: [
+          phase('Proposta Agendada', '2026-08-18T10:00:00Z'),
+          phase('Perdidos', '2026-08-20T10:00:00Z'),
+        ],
+      },
+      {
+        id: 'lost-other-reason',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data de entrada na fase perdidos', '20/08/2026'),
+          field('Motivo comercial da perda', 'Sem fit comercial'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+          field('Data e hora da diagnostica agendada', '20/08/2026 15:00'),
+        ],
+        phases_history: [phase('Perdidos', '2026-08-20T10:00:00Z')],
+      },
+      {
+        id: 'lost-unanswered-outside-range',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data de entrada na fase perdidos', '15/08/2026'),
+          field('Motivo comercial da perda', 'Sem resposta no follow up'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+          field('Data e hora da diagnostica agendada', '14/08/2026 09:00'),
+        ],
+        phases_history: [phase('Perdidos', '2026-08-15T10:00:00Z')],
+      },
+    ],
+  },
+}
+const lossNoShowPeriod = comercialMapper.mapComercialSnapshot(lossNoShowPayload, {
+  members: lossNoShowMembers,
+  commercial: lossNoShowCommercial,
+  range: dateRange,
+})
+assert.equal(lossNoShowPeriod.historico.noShowsDiagnostica, 1)
+assert.equal(lossNoShowPeriod.historico.noShowsProposta, 1)
+assert.equal(lossNoShowPeriod.historico.perdidos, 3)
+assert.equal(lossNoShowPeriod.hunters.find(row => row.userId === 'julia')?.noShows, 1)
+assert.equal(lossNoShowPeriod.closers.find(row => row.userId === 'closer')?.noShows, 1)
+
+console.log('Smoke tests passed: access, IDs, commercial event dates and loss no-shows.')
 await vite.close()

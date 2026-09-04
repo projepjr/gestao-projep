@@ -934,3 +934,12 @@ Verificacao:
 - O workflow foi republicado e validado por execucao via webhook; o snapshot voltou a ser salvo com sucesso.
 - Validacao funcional: o card `POSTO ESPACO BOTANICO LTDA` passou a chegar ao Supabase com `Data e hora da proposta agendada = 25/08/2026 11:00`.
 - Nao registrar URL de webhook, tokens ou chaves do n8n/Supabase nesta memoria.
+
+## Correcao 2026-09-04 - Perda sem resposta no follow-up como no-show
+
+- Um card na fase `Perdidos` passa a contar tambem como no-show quando o campo `Motivo comercial da perda` estiver preenchido com `Sem resposta no follow up` (incluindo variacoes com hifen).
+- A ocorrencia respeita o periodo selecionado usando a data especifica de entrada em `Perdidos`; perdas fora da semana ou do mes analisado nao entram no indicador.
+- O no-show e atribuido pelo campo `Responsavel pela perda`, tanto nos totais gerais quanto nas tabelas individuais de Hunters e Closers.
+- A classificacao exige evidencia de uma reuniao agendada. Quando o tipo nao estiver explicitamente informado, uma proposta agendada classifica o no-show como proposta; caso contrario, uma diagnostica agendada o classifica como diagnostica.
+- A ocorrencia continua contando como perda e entra apenas uma vez no no-show. Outros motivos de perda nao sao reclassificados.
+- A regra foi implementada no mapper comercial compartilhado, sem alteracoes no banco, no Pipefy ou no n8n.

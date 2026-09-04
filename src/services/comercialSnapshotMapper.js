@@ -372,7 +372,7 @@ function buildCardConversionFlags(card, range) {
     FUNNEL_RANKS.diagnosticDone,
   ))
 
-  const diagnosticNoShow = noShowInPeriod(
+  const explicitDiagnosticNoShow = noShowInPeriod(
     card,
     'diagnostica',
     diagnosticStatus,
@@ -408,7 +408,7 @@ function buildCardConversionFlags(card, range) {
     FUNNEL_RANKS.proposalDone,
   ))
 
-  const proposalNoShow = noShowInPeriod(
+  const explicitProposalNoShow = noShowInPeriod(
     card,
     'proposta',
     proposalStatus,
@@ -435,6 +435,11 @@ function buildCardConversionFlags(card, range) {
   const futureInterest = currentStageInPeriod(card, STAGE_KEYWORDS.futureInterest, range)
   const pendingNoShow = currentStageInPeriod(card, STAGE_KEYWORDS.pendingScheduling, range)
   const lost = lostInPeriod(card, range)
+  const lossNoShowType = isUnansweredFollowUpLoss(card, range)
+    ? getUnansweredFollowUpNoShowType(card)
+    : ''
+  const diagnosticNoShow = explicitDiagnosticNoShow || lossNoShowType === 'diagnostica'
+  const proposalNoShow = explicitProposalNoShow || lossNoShowType === 'proposta'
   const successfulContact = futureInterest ||
     diagnosticScheduled ||
     diagnosticDone ||
@@ -475,6 +480,7 @@ function buildCardConversionFlags(card, range) {
     futureInterest,
     pendingNoShow,
     lost,
+    lossNoShowType,
   }
 }
 
@@ -629,6 +635,19 @@ const LOSS_RESPONSIBLE_LABELS = [
   'quem marcou como perdido',
 ]
 
+const LOSS_REASON_LABELS = [
+  'motivo comercial da perda',
+  'motivo da perda',
+  'razao comercial da perda',
+  'razão comercial da perda',
+]
+
+const UNANSWERED_FOLLOW_UP_REASONS = [
+  'sem resposta no follow up',
+  'sem resposta no follow-up',
+  'sem resposta no followup',
+]
+
 const NO_SHOW_RESPONSIBLE_LABELS = [
   'quem fez o follow-up',
   'quem fez follow-up',
@@ -734,6 +753,30 @@ function lostInPeriod(card, range) {
     return isLostStage && enteredStageInRange(card, STAGE_KEYWORDS.lost, range)
   }
   return isLostStage || hasLostDate
+}
+
+function isUnansweredFollowUpLoss(card, range) {
+  if (!currentStageMatches(card, STAGE_KEYWORDS.lost)) return false
+  const lossReason = getFieldValue(card, LOSS_REASON_LABELS)
+  if (!includesAny(lossReason, UNANSWERED_FOLLOW_UP_REASONS)) return false
+  return lostInPeriod(card, range)
+}
+
+function getUnansweredFollowUpNoShowType(card) {
+  const explicitType = getNoShowStageType(card)
+  if (explicitType) return explicitType
+
+  if (
+    hasFieldValue(card, EVENT_LABELS.proposalScheduled) ||
+    maxHistoricalRank(card) >= FUNNEL_RANKS.proposalScheduled
+  ) return 'proposta'
+
+  if (
+    hasFieldValue(card, EVENT_LABELS.diagnosticScheduled) ||
+    maxHistoricalRank(card) >= FUNNEL_RANKS.diagnosticScheduled
+  ) return 'diagnostica'
+
+  return ''
 }
 
 function hasFieldValue(card, keywords) {
@@ -1032,6 +1075,23 @@ function getLossResponsibleTeamMember(card, teamIndex) {
   return null
 }
 
+function getLossNoShowResponsibleTeamMember(card, type, hunterIndex, closerIndex) {
+  const primaryType = type === 'proposta' ? 'closer' : 'hunter'
+  const primaryIndex = type === 'proposta' ? closerIndex : hunterIndex
+  const secondaryType = type === 'proposta' ? 'hunter' : 'closer'
+  const secondaryIndex = type === 'proposta' ? hunterIndex : closerIndex
+
+  for (const value of getFieldValues(card, LOSS_RESPONSIBLE_LABELS)) {
+    const primary = matchTeamValue(value, primaryIndex)
+    if (primary) return { type: primaryType, member: primary }
+
+    const secondary = matchTeamValue(value, secondaryIndex)
+    if (secondary) return { type: secondaryType, member: secondary }
+  }
+
+  return null
+}
+
 function getTeamMembersByLabels(card, labels, teamIndex) {
   const matched = new Map()
 
@@ -1201,6 +1261,7 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       futureInterest,
       pendingNoShow,
       lost,
+      lossNoShowType,
     } = buildCardConversionFlags(card, range)
 
     if (leadCreated) historico.leadsCadastrados += 1
@@ -1306,7 +1367,9 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     }
 
     if (diagnosticNoShow || proposalNoShow) {
-      const noShowOwner = getNoShowResponsibleTeamMember(card, hunterIndex, closerIndex)
+      const noShowOwner = lossNoShowType
+        ? getLossNoShowResponsibleTeamMember(card, lossNoShowType, hunterIndex, closerIndex)
+        : getNoShowResponsibleTeamMember(card, hunterIndex, closerIndex)
       if (noShowOwner?.type === 'hunter') {
         const noShowHunter = findOrCreateRow(hunters, noShowOwner.member)
         if (noShowHunter) noShowHunter.noShows += 1
