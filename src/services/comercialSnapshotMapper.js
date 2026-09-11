@@ -435,12 +435,13 @@ function buildCardConversionFlags(card, range) {
   const futureInterest = currentStageInPeriod(card, STAGE_KEYWORDS.futureInterest, range)
   const pendingNoShow = currentStageInPeriod(card, STAGE_KEYWORDS.pendingScheduling, range)
   const lost = lostInPeriod(card, range)
+  const successfulContactFromLoss = successfulLossContactInPeriod(card, range)
   const lossNoShowType = isUnansweredFollowUpLoss(card, range)
     ? getUnansweredFollowUpNoShowType(card)
     : ''
   const diagnosticNoShow = explicitDiagnosticNoShow || lossNoShowType === 'diagnostica'
   const proposalNoShow = explicitProposalNoShow || lossNoShowType === 'proposta'
-  const successfulContact = futureInterest ||
+  const successfulContactFromFunnel = futureInterest ||
     diagnosticScheduled ||
     diagnosticDone ||
     proposalScheduled ||
@@ -448,6 +449,7 @@ function buildCardConversionFlags(card, range) {
     inNegotiation ||
     pendingNoShow ||
     contractClosed
+  const successfulContact = successfulContactFromFunnel || successfulContactFromLoss
 
   const worked = contactStage ||
     contactAttempted ||
@@ -467,6 +469,8 @@ function buildCardConversionFlags(card, range) {
     contactStage,
     worked,
     successfulContact,
+    successfulContactFromFunnel,
+    successfulContactFromLoss,
     diagnosticScheduled,
     diagnosticExpected,
     diagnosticDone,
@@ -642,6 +646,14 @@ const LOSS_REASON_LABELS = [
   'razão comercial da perda',
 ]
 
+const SUCCESSFUL_CONTACT_LOSS_REASONS = [
+  'sem interesse',
+  'nao qualificado',
+  'não qualificado',
+  'preco',
+  'preço',
+]
+
 const UNANSWERED_FOLLOW_UP_REASONS = [
   'sem resposta no follow up',
   'sem resposta no follow-up',
@@ -753,6 +765,22 @@ function lostInPeriod(card, range) {
     return isLostStage && enteredStageInRange(card, STAGE_KEYWORDS.lost, range)
   }
   return isLostStage || hasLostDate
+}
+
+function successfulLossContactInPeriod(card, range) {
+  if (!currentStageMatches(card, STAGE_KEYWORDS.lost)) return false
+
+  const lossReason = getFieldValue(card, LOSS_REASON_LABELS)
+  if (!includesAny(lossReason, SUCCESSFUL_CONTACT_LOSS_REASONS)) return false
+  if (!range?.inicio || !range?.fim) return true
+
+  // A ligacao e a evidencia mais precisa. A data da perda so e usada quando
+  // o card nao possui uma data de contato valida.
+  const hasContactDate = getFieldValues(card, EVENT_LABELS.contact)
+    .some(value => Boolean(parseDateValue(value)))
+  if (hasContactDate) return hasFieldDateInRange(card, EVENT_LABELS.contact, range)
+
+  return lostInPeriod(card, range)
 }
 
 function isUnansweredFollowUpLoss(card, range) {
@@ -1248,6 +1276,8 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
       contactStage,
       worked,
       successfulContact,
+      successfulContactFromFunnel,
+      successfulContactFromLoss,
       diagnosticScheduled,
       diagnosticExpected,
       diagnosticDone,
@@ -1304,16 +1334,26 @@ function buildMetricsFromCards(cards, members, commercial, payload, range = null
     }
     if (lost) historico.perdidos += 1
 
-    const hunter = findOrCreateRow(hunters, getResponsibleTeamMember(card, 'hunter', hunterIndex))
+    const responsibleHunter = getResponsibleTeamMember(card, 'hunter', hunterIndex)
+    const hunter = findOrCreateRow(hunters, responsibleHunter)
     if (hunter) {
       if (leadCreated) hunter.leadsCadastrados += 1
       if (worked) hunter.leadsTrabalhados += 1
-      if (successfulContact) {
-        hunter.leadsContatados += 1
-        hunter.contatadas += 1
-      }
       if (proposalScheduled) hunter.propostasAgendadas += 1
       if (proposalDone) hunter.propostasRealizadas += 1
+    }
+
+    if (successfulContact) {
+      const contactHunter = findOrCreateRow(
+        hunters,
+        successfulContactFromLoss && !successfulContactFromFunnel
+          ? getLossResponsibleTeamMember(card, hunterIndex) || responsibleHunter
+          : responsibleHunter,
+      )
+      if (contactHunter) {
+        contactHunter.leadsContatados += 1
+        contactHunter.contatadas += 1
+      }
     }
 
     if (diagnosticDone) {

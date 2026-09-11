@@ -265,5 +265,88 @@ assert.equal(lossNoShowPeriod.historico.perdidos, 3)
 assert.equal(lossNoShowPeriod.hunters.find(row => row.userId === 'julia')?.noShows, 1)
 assert.equal(lossNoShowPeriod.closers.find(row => row.userId === 'closer')?.noShows, 1)
 
-console.log('Smoke tests passed: access, IDs, commercial event dates and loss no-shows.')
+const lostContactPayload = {
+  raw: {
+    cards: [
+      {
+        id: 'lost-contact-no-interest',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data da primeira ligacao', '18/08/2026'),
+          field('Data de entrada na fase perdidos', '18/08/2026'),
+          field('Motivo comercial da perda', 'Sem interesse'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+        ],
+      },
+      {
+        id: 'lost-contact-unqualified-fallback',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data de entrada na fase perdidos', '19/08/2026'),
+          field('Motivo comercial da perda', 'Não qualificado'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+        ],
+      },
+      {
+        id: 'lost-contact-price-outside-range',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data da primeira ligacao', '15/08/2026'),
+          field('Data de entrada na fase perdidos', '19/08/2026'),
+          field('Motivo comercial da perda', 'Preço'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+        ],
+      },
+      {
+        id: 'lost-without-contact-no-answer',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data da primeira ligacao', '18/08/2026'),
+          field('Data de entrada na fase perdidos', '18/08/2026'),
+          field('Motivo comercial da perda', 'Não atendeu'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+        ],
+      },
+      {
+        id: 'lost-without-contact-invalid-number',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data de entrada na fase perdidos', '18/08/2026'),
+          field('Motivo comercial da perda', 'Número incorreto / não existe'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+        ],
+      },
+      {
+        id: 'lost-ambiguous-other',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data de entrada na fase perdidos', '18/08/2026'),
+          field('Motivo comercial da perda', 'Outro'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+        ],
+      },
+      {
+        id: 'lost-contact-funnel-and-reason-once',
+        current_phase: { name: 'Perdidos' },
+        fields: [
+          field('Data da primeira ligacao', '17/08/2026'),
+          field('Data de entrada na fase perdidos', '20/08/2026'),
+          field('Motivo comercial da perda', 'Sem interesse'),
+          field('Responsavel pela perda', 'Julia Franco Dantas'),
+          field('Responsavel', 'Julia Franco Dantas'),
+        ],
+        phases_history: [phase('Diagnostica Agendada', '2026-08-17T10:00:00Z')],
+      },
+    ],
+  },
+}
+const lostContactPeriod = comercialMapper.mapComercialSnapshot(lostContactPayload, {
+  members: lossNoShowMembers,
+  commercial: lossNoShowCommercial,
+  range: dateRange,
+})
+assert.equal(lostContactPeriod.historico.leadsContatados, 3)
+assert.equal(lostContactPeriod.hunters.find(row => row.userId === 'julia')?.leadsContatados, 3)
+
+console.log('Smoke tests passed: access, IDs, commercial event dates, loss no-shows and lost contacts.')
 await vite.close()

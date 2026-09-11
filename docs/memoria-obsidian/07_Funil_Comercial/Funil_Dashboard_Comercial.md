@@ -990,3 +990,25 @@ Verificacao:
 - `npm run test:smoke` concluido com sucesso.
 - O novo servico passou no ESLint isolado.
 - O lint completo ainda possui erros preexistentes em outros modulos, sem relacao com esta alteracao.
+
+## Correcao 2026-09-11 - Leads contatados enviados para Perdidos
+
+Regra:
+
+- `Leads contatados` representa cards unicos em que houve contato real com o tomador de decisao, independentemente do desfecho posterior.
+- Cards em `Perdidos` com `Motivo comercial da perda` igual a `Sem interesse`, `Nao qualificado` ou `Preco` passam a contar como contato bem-sucedido.
+- `Nao atendeu`, `Numero incorreto / nao existe`, `Sem resposta no follow up` e `Outro` nao comprovam contato por si mesmos.
+- Um card com evidencia anterior de avancar para interesse futuro, diagnostica ou etapa posterior continua contando como contato mesmo que termine em `Perdidos`.
+- As evidencias sao combinadas como uma condicao booleana por card; o mesmo lead nunca e somado duas vezes por ter avancado no funil e tambem possuir um motivo de perda que indica contato.
+
+Periodo e atribuicao:
+
+- Em filtros semanal, mensal ou personalizado, a data de ligacao/contato e priorizada para posicionar a ocorrencia no periodo.
+- A data de entrada em `Perdidos` e usada como fallback somente quando nao existe uma data de contato valida.
+- Quando o motivo da perda e a unica evidencia do contato, o resultado e atribuido ao campo `Responsavel pela perda`; caso exista evidencia anterior do funil, permanece a atribuicao normal do Hunter do card.
+- A regra foi implementada em `src/services/comercialSnapshotMapper.js`, compartilhada por Dashboard, Meu Desempenho e Gerencia de Hunters.
+
+Verificacao:
+
+- O smoke test cobre motivos positivos e negativos, `Outro`, contato fora do periodo e deduplicacao quando o card possui simultaneamente historico de funil e motivo de perda positivo.
+- `npm run test:smoke`, `npm run build` e o ESLint isolado dos arquivos alterados foram concluidos com sucesso.
