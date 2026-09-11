@@ -139,10 +139,6 @@ export default function Layout({ children }) {
     window.dispatchEvent(new CustomEvent('projep:refresh-data', {
       detail: { source: 'global-refresh', result },
     }))
-
-    window.setTimeout(() => {
-      window.location.reload()
-    }, 800)
   }
 
   const notificationBaseline = user?.notificacoesDesde || user?.createdAt || user?.dataCadastro

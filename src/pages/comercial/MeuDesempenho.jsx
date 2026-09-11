@@ -11,12 +11,7 @@ import {
 import { Calendar, ChevronDown, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
-import {
-  COMERCIAL_SNAPSHOT_REFRESH_MS,
-  fetchLatestComercialSnapshot,
-  getCachedComercialSnapshot,
-  isoDate,
-} from '../../services/comercialDashboardData'
+import { fetchLatestComercialSnapshot, getCachedComercialSnapshot, isoDate } from '../../services/comercialDashboardData'
 import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 
 const CYAN = '#00D4D4'
@@ -470,18 +465,11 @@ export default function MeuDesempenho() {
 
   useEffect(() => {
     const initialLoadId = window.setTimeout(loadSnapshot, 0)
-    const intervalId = window.setInterval(
-      () => loadSnapshot({ silent: true }),
-      COMERCIAL_SNAPSHOT_REFRESH_MS,
-    )
-    return () => {
-      window.clearTimeout(initialLoadId)
-      window.clearInterval(intervalId)
-    }
+    return () => window.clearTimeout(initialLoadId)
   }, [loadSnapshot])
 
   useEffect(() => {
-    const handler = () => loadSnapshot({ force: true })
+    const handler = () => loadSnapshot()
     window.addEventListener('projep:refresh-data', handler)
     return () => window.removeEventListener('projep:refresh-data', handler)
   }, [loadSnapshot])

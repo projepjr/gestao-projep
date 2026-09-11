@@ -13,7 +13,6 @@ import {
 import { useData } from '../../contexts/DataContext'
 import {
   buildRemoteDashboardData as buildCachedRemoteDashboardData,
-  COMERCIAL_SNAPSHOT_REFRESH_MS,
   fetchLatestComercialSnapshot,
   getCachedComercialSnapshot,
 } from '../../services/comercialDashboardData'
@@ -1058,16 +1057,7 @@ export default function ComercialDashboard() {
   }, [])
 
   useEffect(() => {
-    let cancelled = false
     fetchLatestSnapshot()
-    const intervalId = window.setInterval(
-      () => { if (!cancelled) fetchLatestSnapshot({ silent: true }) },
-      COMERCIAL_SNAPSHOT_REFRESH_MS,
-    )
-    return () => {
-      cancelled = true
-      window.clearInterval(intervalId)
-    }
   }, [fetchLatestSnapshot])
 
   const handleCustomStartChange = useCallback((value) => {
@@ -1099,7 +1089,7 @@ export default function ComercialDashboard() {
   }, [commercial, customEnd, customRange, customStart, members, remoteSnapshot])
 
   useEffect(() => {
-    const handleRefresh = () => fetchLatestSnapshot({ force: true })
+    const handleRefresh = () => fetchLatestSnapshot()
     window.addEventListener('projep:refresh-data', handleRefresh)
     return () => window.removeEventListener('projep:refresh-data', handleRefresh)
   }, [fetchLatestSnapshot])
@@ -1144,7 +1134,7 @@ export default function ComercialDashboard() {
                   : 'text-gray-500 bg-[#111111] border-[#1E1E1E]'
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${remotePeriod ? 'bg-green-400' : remoteStatus.loading ? 'bg-yellow-400 animate-pulse' : 'bg-gray-600'}`} />
-              {remotePeriod ? remoteStatus.message || 'Snapshot Pipefy carregado' : remoteStatus.loading ? 'Carregando Supabase' : 'Sem snapshot remoto'}
+              {remotePeriod ? remoteStatus.message || 'Snapshot Pipefy carregado' : remoteStatus.loading ? 'Carregando dados salvos' : 'Sem snapshot remoto'}
             </span>
             {remoteSnapshot?.synced_at && (
               <span className="text-[10px] text-gray-600">

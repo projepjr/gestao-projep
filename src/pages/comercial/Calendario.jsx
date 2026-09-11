@@ -7,11 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
-import {
-  COMERCIAL_SNAPSHOT_REFRESH_MS,
-  fetchLatestComercialSnapshot,
-  getCachedComercialSnapshot,
-} from '../../services/comercialDashboardData'
+import { fetchLatestComercialSnapshot, getCachedComercialSnapshot } from '../../services/comercialDashboardData'
 import { resolvePipefyMeetingResponsibles } from '../../services/comercialSnapshotMapper'
 
 const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -502,15 +498,11 @@ export default function CalendarioComercial() {
 
   useEffect(() => {
     const initialLoadId = window.setTimeout(loadPipefySnapshot, 0)
-    const intervalId = window.setInterval(loadPipefySnapshot, COMERCIAL_SNAPSHOT_REFRESH_MS)
-    return () => {
-      window.clearTimeout(initialLoadId)
-      window.clearInterval(intervalId)
-    }
+    return () => window.clearTimeout(initialLoadId)
   }, [loadPipefySnapshot])
 
   useEffect(() => {
-    const handleRefresh = () => loadPipefySnapshot({ force: true })
+    const handleRefresh = () => loadPipefySnapshot()
     window.addEventListener('projep:refresh-data', handleRefresh)
     return () => window.removeEventListener('projep:refresh-data', handleRefresh)
   }, [loadPipefySnapshot])

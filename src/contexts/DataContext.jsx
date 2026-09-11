@@ -28,6 +28,7 @@ import {
   syncUsersToSupabase,
 } from '../services/supabaseBridge'
 import { triggerN8nRefresh } from '../services/n8nRefresh'
+import { fetchLatestComercialSnapshot } from '../services/comercialDashboardData'
 
 const DataContext = createContext(null)
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')
@@ -404,7 +405,8 @@ export function DataProvider({ children }) {
         await pullRemoteState(db)
         await pullCommunicationState(db)
         await loadMondayProjects()
-        return { success: true, n8n: n8nResult, n8nError }
+        const commercialSnapshot = await fetchLatestComercialSnapshot({ force: true })
+        return { success: true, n8n: n8nResult, n8nError, commercialSnapshot }
       } catch (error) {
         console.warn('[Atualizacao global] Falha ao atualizar dados:', error.message || error)
         return { success: false, n8n: n8nResult, n8nError, error }

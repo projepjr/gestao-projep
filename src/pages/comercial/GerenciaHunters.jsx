@@ -11,12 +11,7 @@ import {
 } from 'recharts'
 import { ChevronDown, Search, Target, Users } from 'lucide-react'
 import { useData } from '../../contexts/DataContext'
-import {
-  COMERCIAL_SNAPSHOT_REFRESH_MS,
-  fetchLatestComercialSnapshot,
-  getCachedComercialSnapshot,
-  isoDate,
-} from '../../services/comercialDashboardData'
+import { fetchLatestComercialSnapshot, getCachedComercialSnapshot, isoDate } from '../../services/comercialDashboardData'
 import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
 import LeadsInsights from './Leads'
 
@@ -326,18 +321,11 @@ function HunterAnalysis() {
 
   useEffect(() => {
     const initialLoadId = window.setTimeout(loadSnapshot, 0)
-    const intervalId = window.setInterval(
-      () => loadSnapshot({ silent: true }),
-      COMERCIAL_SNAPSHOT_REFRESH_MS,
-    )
-    return () => {
-      window.clearTimeout(initialLoadId)
-      window.clearInterval(intervalId)
-    }
+    return () => window.clearTimeout(initialLoadId)
   }, [loadSnapshot])
 
   useEffect(() => {
-    const handler = () => loadSnapshot({ force: true })
+    const handler = () => loadSnapshot()
     window.addEventListener('projep:refresh-data', handler)
     return () => window.removeEventListener('projep:refresh-data', handler)
   }, [loadSnapshot])

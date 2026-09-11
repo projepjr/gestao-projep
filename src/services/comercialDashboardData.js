@@ -4,17 +4,101 @@ import { mapComercialSnapshot } from './comercialSnapshotMapper'
 export const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
 export const COMERCIAL_SNAPSHOT_LOOKBACK = 5
 export const COMERCIAL_SNAPSHOT_TIMEOUT_MS = 15000
-export const COMERCIAL_SNAPSHOT_REFRESH_MS = 15 * 60 * 1000
-const COMERCIAL_SNAPSHOT_CACHE_TTL_MS = COMERCIAL_SNAPSHOT_REFRESH_MS
 const DASHBOARD_DATA_CACHE_LIMIT = 6
+const SNAPSHOT_CACHE_DB_NAME = 'gestao-projep-cache'
+const SNAPSHOT_CACHE_DB_VERSION = 1
+const SNAPSHOT_CACHE_STORE_NAME = 'commercial-snapshots'
+const SNAPSHOT_CACHE_RECORD_KEY = `pipefy-${PIPEFY_COMERCIAL_PIPE_ID}`
 
 let snapshotCache = null
-let snapshotCacheAt = 0
 let snapshotFetchPromise = null
+let snapshotHydrationPromise = null
 const dashboardDataCache = new Map()
 
 export function getCachedComercialSnapshot() {
   return snapshotCache
+}
+
+function openSnapshotCacheDatabase() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null)
+
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(SNAPSHOT_CACHE_DB_NAME, SNAPSHOT_CACHE_DB_VERSION)
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve(request.result)
+    request.onupgradeneeded = () => {
+      const database = request.result
+      if (!database.objectStoreNames.contains(SNAPSHOT_CACHE_STORE_NAME)) {
+        database.createObjectStore(SNAPSHOT_CACHE_STORE_NAME, { keyPath: 'key' })
+      }
+    }
+  })
+}
+
+async function readPersistedSnapshotCache() {
+  const database = await openSnapshotCacheDatabase()
+  if (!database) return null
+
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(SNAPSHOT_CACHE_STORE_NAME, 'readonly')
+      const request = transaction.objectStore(SNAPSHOT_CACHE_STORE_NAME).get(SNAPSHOT_CACHE_RECORD_KEY)
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve(request.result || null)
+    })
+  } finally {
+    database.close()
+  }
+}
+
+async function persistSnapshotCache(result) {
+  const database = await openSnapshotCacheDatabase()
+  if (!database) return
+
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(SNAPSHOT_CACHE_STORE_NAME, 'readwrite')
+      transaction.onerror = () => reject(transaction.error)
+      transaction.oncomplete = () => resolve()
+      transaction.objectStore(SNAPSHOT_CACHE_STORE_NAME).put({
+        key: SNAPSHOT_CACHE_RECORD_KEY,
+        version: SNAPSHOT_CACHE_DB_VERSION,
+        cachedAt: Date.now(),
+        result,
+      })
+    })
+  } finally {
+    database.close()
+  }
+}
+
+async function hydrateSnapshotCache() {
+  if (snapshotCache?.snapshot) return snapshotCache
+  if (snapshotHydrationPromise) return snapshotHydrationPromise
+
+  snapshotHydrationPromise = (async () => {
+    try {
+      const persisted = await readPersistedSnapshotCache()
+      if (persisted?.version !== SNAPSHOT_CACHE_DB_VERSION || !persisted?.result?.snapshot) return null
+
+      const selected = selectComercialSnapshot([persisted.result.snapshot])
+      if (!selected.snapshot) return null
+
+      snapshotCache = {
+        ...selected,
+        statusMessage: 'Snapshot Pipefy carregado do cache',
+        error: '',
+      }
+      return snapshotCache
+    } catch (error) {
+      console.warn('[Comercial] Nao foi possivel ler o cache persistente:', error)
+      return null
+    } finally {
+      snapshotHydrationPromise = null
+    }
+  })()
+
+  return snapshotHydrationPromise
 }
 
 async function executeSupabaseQuery(query, timeoutMs) {
@@ -26,7 +110,7 @@ async function executeSupabaseQuery(query, timeoutMs) {
     if (controller.signal.aborted) throw new Error('timeout')
     return result
   } catch (error) {
-    if (controller.signal.aborted) throw new Error('timeout')
+    if (controller.signal.aborted) throw new Error('timeout', { cause: error })
     throw error
   } finally {
     clearTimeout(timeoutId)
@@ -154,17 +238,17 @@ export async function fetchLatestComercialSnapshot({
   timeoutMs = COMERCIAL_SNAPSHOT_TIMEOUT_MS,
   force = false,
 } = {}) {
-  if (!isSupabaseConfigured || !supabase) {
-    return {
-      snapshot: null,
-      statusMessage: '',
-      error: 'Supabase nao configurado. Dados comerciais remotos indisponiveis.',
-    }
+  if (!force) {
+    const cached = snapshotCache?.snapshot ? snapshotCache : await hydrateSnapshotCache()
+    if (cached?.snapshot) return cached
   }
 
-  const now = Date.now()
-  if (!force && snapshotCache && now - snapshotCacheAt < COMERCIAL_SNAPSHOT_CACHE_TTL_MS) {
-    return snapshotCache
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      snapshot: snapshotCache?.snapshot || null,
+      statusMessage: snapshotCache?.statusMessage || '',
+      error: 'Supabase nao configurado. Dados comerciais remotos indisponiveis.',
+    }
   }
 
   if (snapshotFetchPromise) {
@@ -225,7 +309,12 @@ export async function fetchLatestComercialSnapshot({
         if (!selected.snapshot) continue
 
         snapshotCache = { ...selected, error: '' }
-        snapshotCacheAt = Date.now()
+        dashboardDataCache.clear()
+        try {
+          await persistSnapshotCache(snapshotCache)
+        } catch (error) {
+          console.warn('[Comercial] Nao foi possivel salvar o cache persistente:', error)
+        }
         return snapshotCache
       }
 

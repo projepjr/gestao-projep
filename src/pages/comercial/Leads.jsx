@@ -3,11 +3,7 @@ import {
   AlertCircle, ArrowUpDown, BarChart2, Calendar, CalendarRange, ChevronLeft, ChevronRight,
   FileCheck, PhoneCall, Radio, Search, Target, Users,
 } from 'lucide-react'
-import {
-  COMERCIAL_SNAPSHOT_REFRESH_MS,
-  fetchLatestComercialSnapshot,
-  getCachedComercialSnapshot,
-} from '../../services/comercialDashboardData'
+import { fetchLatestComercialSnapshot, getCachedComercialSnapshot } from '../../services/comercialDashboardData'
 import { mapLeadSegmentInsights } from '../../services/comercialSnapshotMapper'
 
 const MONTHS_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -262,18 +258,13 @@ export default function LeadsInsights() {
     }
 
     load()
-    const intervalId = window.setInterval(
-      () => load({ silent: true }),
-      COMERCIAL_SNAPSHOT_REFRESH_MS,
-    )
     return () => {
       cancelled = true
-      window.clearInterval(intervalId)
     }
   }, [refreshLatestSnapshot])
 
   useEffect(() => {
-    const handleRefresh = () => refreshLatestSnapshot({ force: true })
+    const handleRefresh = () => refreshLatestSnapshot()
     window.addEventListener('projep:refresh-data', handleRefresh)
     return () => window.removeEventListener('projep:refresh-data', handleRefresh)
   }, [refreshLatestSnapshot])
