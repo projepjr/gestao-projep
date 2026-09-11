@@ -943,3 +943,50 @@ Verificacao:
 - A classificacao exige evidencia de uma reuniao agendada. Quando o tipo nao estiver explicitamente informado, uma proposta agendada classifica o no-show como proposta; caso contrario, uma diagnostica agendada o classifica como diagnostica.
 - A ocorrencia continua contando como perda e entra apenas uma vez no no-show. Outros motivos de perda nao sao reclassificados.
 - A regra foi implementada no mapper comercial compartilhado, sem alteracoes no banco, no Pipefy ou no n8n.
+
+## Atualizacao 2026-09-10 - Migracao de leads do pipeline 2026.1
+
+Operacao executada via API GraphQL do Pipefy:
+
+- Pipeline de origem usado somente para leitura: `306997527` (`Pipeline - Funil de Vendas 2026.1`), fase `Cadastro`.
+- Pipeline de destino: `307256948` (`Pipeline Comercial 2026.2`), fase `Leads Cadastrados`.
+- Total encontrado na origem: `232` cards.
+- Foram ignorados `44` cards sem CNPJ.
+- Foram ignorados `24` cards cujo CNPJ ja existia no pipeline de destino.
+- Total criado no pipeline 2026.2: `164` cards.
+- O pipeline de origem nao foi alterado.
+
+Regras aplicadas:
+
+- Os responsaveis antigos nao foram copiados.
+- Todos os cards criados receberam `Origem comercial do lead = Casa dos dados`.
+- Dados cadastrais existentes foram preservados; campos opcionais ausentes permaneceram vazios.
+- Quando existentes, `Data de ligacao/contato` e `Canal de Prospeccao` foram mapeados para os campos equivalentes da fase `Leads Cadastrados`.
+- A distribuicao foi feita em rodizio: Rafael Gomes Ribeiro `33`, Rafael Fernandes `33`, Julia Franco Dantas `33`, Caue Perrotta Segato `33` e Ana Clara de Almeida Lourenco `32`.
+- A verificacao posterior confirmou os `164` cards na fase correta, todos com CNPJ, origem e responsavel preenchidos, sem falhas de criacao ou de atualizacao dos campos mapeados.
+- Nenhuma credencial foi registrada no repositorio.
+
+## Atualizacao 2026-09-11 - Cache persistente do snapshot comercial
+
+Problema:
+
+- O cache do snapshot Pipefy existia apenas na memoria do modulo e expirava em 15 minutos.
+- Um recarregamento completo do navegador apagava esse cache e fazia a Dashboard baixar novamente do Supabase o payload comercial de varios megabytes.
+- Dashboard, Calendario, Equipe, Gerencia de Hunters, Leads e Meu Desempenho tambem mantinham temporizadores proprios de atualizacao.
+
+Solucao:
+
+- `src/services/comercialDashboardData.js` passou a persistir somente o ultimo snapshot comercial valido no IndexedDB do navegador.
+- O registro e versionado e vinculado ao pipeline oficial `307256948`; o Supabase continua sendo a fonte oficial, e o IndexedDB funciona apenas como cache local.
+- Na primeira execucao sem cache, a aplicacao busca o snapshot remoto uma vez e o salva. Nos acessos e recarregamentos seguintes, reutiliza o cache sem consultar novamente a tabela de snapshots.
+- Os temporizadores automaticos de 15 minutos foram removidos das seis telas comerciais.
+- O botao global de atualizar passou a ser o unico fluxo que força uma nova leitura do snapshot: aciona o n8n, sincroniza os dados remotos, busca uma vez o snapshot mais recente, substitui o cache e notifica a pagina aberta.
+- O recarregamento completo da pagina apos clicar no botao foi removido. As telas atualizam seu estado sem novo carregamento do aplicativo.
+- Autenticacao, permissoes e os dados colaborativos menores mantiveram a sincronizacao segura existente; a alteracao foi limitada ao snapshot comercial pesado para nao tornar controles de acesso obsoletos.
+
+Verificacao:
+
+- `npm run build` concluido com sucesso.
+- `npm run test:smoke` concluido com sucesso.
+- O novo servico passou no ESLint isolado.
+- O lint completo ainda possui erros preexistentes em outros modulos, sem relacao com esta alteracao.
