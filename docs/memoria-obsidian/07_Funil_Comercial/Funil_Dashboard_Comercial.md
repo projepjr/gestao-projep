@@ -1050,3 +1050,12 @@ Diagnostico adicional:
 - O filtro foi desativado no workflow. Todas as linhas extraidas passam a seguir para a tentativa de cadastro no Pipefy.
 - O no JavaScript agora remove pontuacao invalida no final de e-mails e limita `Nome do cliente` a 255 caracteres para respeitar as validacoes do Pipefy.
 - A versao foi validada sintaticamente, publicada e confirmada como ativa.
+
+## Ajuste 2026-09-18 - Filtro comercial restrito
+
+- Apos revisao, o filtro do no `If` foi reativado com escopo minimo.
+- A regra consulta somente `Razao Social`, `Nome Fantasia` e `Descricao da Atividade Principal` (CNAE principal).
+- O lead e bloqueado apenas quando esses campos contiverem as palavras completas `holding`, `holdings` ou `consultoria`.
+- Atividades secundarias, natureza juridica e os demais termos da lista antiga nao participam mais da decisao.
+- Na simulacao com a planilha de 200 leads, 197 passariam e somente 3 seriam bloqueados pela nova regra, contra 90 na regra anterior.
+- A versao foi publicada e confirmada como ativa no n8n.
