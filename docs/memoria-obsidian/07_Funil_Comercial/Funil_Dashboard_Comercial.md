@@ -1059,3 +1059,11 @@ Diagnostico adicional:
 - Atividades secundarias, natureza juridica e os demais termos da lista antiga nao participam mais da decisao.
 - Na simulacao com a planilha de 200 leads, 197 passariam e somente 3 seriam bloqueados pela nova regra, contra 90 na regra anterior.
 - A versao foi publicada e confirmada como ativa no n8n.
+
+## Operacao 2026-09-18 - Redistribuicao de leads para Maria Eduarda
+
+- No pipeline `Pipeline Comercial 2026.2` (`307256948`), foram selecionados aleatoriamente 22 cards da fase `Leads Cadastrados` que estavam atribuidos a Gustavo Massaro Barbosa.
+- O campo `Responsavel` desses 22 cards foi substituido por Maria Eduarda Ferreira da Silva.
+- Antes da operacao, a fase continha 73 cards de Gustavo e nenhum de Maria Eduarda; apos a operacao, Gustavo ficou com 51 cards.
+- A verificacao direta confirmou os 22 cards com Maria Eduarda como responsavel, sem Gustavo e ainda na fase `Leads Cadastrados`.
+- Nenhuma credencial foi registrada no repositorio.
