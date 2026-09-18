@@ -1012,3 +1012,11 @@ Verificacao:
 
 - O smoke test cobre motivos positivos e negativos, `Outro`, contato fora do periodo e deduplicacao quando o card possui simultaneamente historico de funil e motivo de perda positivo.
 - `npm run test:smoke`, `npm run build` e o ESLint isolado dos arquivos alterados foram concluidos com sucesso.
+
+## Atualizacao 2026-09-18 - Membros da automacao Pipefy
+
+- O workflow n8n `Automacao Pipefy Site Projep` recebeu 17 novos membros no mapa de responsaveis do no `Code in JavaScript`.
+- Os 14 membros existentes foram preservados e nenhum ID foi duplicado.
+- Para `Maria Clara Bertoloto Rodrigues`, foi mantida somente a conta Pipefy de ID `308295513`; o ID duplicado `308293279` foi descartado conforme confirmacao do usuario.
+- A verificacao posterior confirmou todos os 17 novos IDs, ausencia do ID descartado e workflow ainda ativo.
+- E-mails, tokens e demais credenciais nao foram registrados no repositorio.
