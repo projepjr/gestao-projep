@@ -966,6 +966,13 @@ Regras aplicadas:
 - A verificacao posterior confirmou os `164` cards na fase correta, todos com CNPJ, origem e responsavel preenchidos, sem falhas de criacao ou de atualizacao dos campos mapeados.
 - Nenhuma credencial foi registrada no repositorio.
 
+## Operacao 2026-09-18 - Redistribuicao de leads para Vitoria Padula
+
+- No pipeline `Pipeline Comercial 2026.2` (`307256948`), foram selecionados aleatoriamente 23 cards da fase `Leads Cadastrados` atribuidos a Clara Casteli Pisani.
+- O campo `Responsavel` desses cards foi substituido por Vitoria Barbosa Padula de Souza.
+- Clara passou de 83 para 60 cards na fase e Vitoria passou de 36 para 59.
+- A verificacao direta confirmou os 23 cards com Vitoria como responsavel, sem Clara e ainda na fase `Leads Cadastrados`.
+
 ## Atualizacao 2026-09-11 - Cache persistente do snapshot comercial
 
 Problema:
