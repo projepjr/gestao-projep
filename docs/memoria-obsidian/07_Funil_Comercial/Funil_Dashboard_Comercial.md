@@ -1015,8 +1015,9 @@ Verificacao:
 
 ## Atualizacao 2026-09-18 - Membros da automacao Pipefy
 
-- O workflow n8n `Automacao Pipefy Site Projep` recebeu 17 novos membros no mapa de responsaveis do no `Code in JavaScript`.
-- Os 14 membros existentes foram preservados e nenhum ID foi duplicado.
+- O workflow n8n `Automacao Pipefy Site Projep` teve o mapa de responsaveis do no `Code in JavaScript` sincronizado com a lista confirmada pelo usuario.
+- Os 14 membros originais foram preservados e nenhum ID foi duplicado.
 - Para `Maria Clara Bertoloto Rodrigues`, foi mantida somente a conta Pipefy de ID `308295513`; o ID duplicado `308293279` foi descartado conforme confirmacao do usuario.
-- A verificacao posterior confirmou todos os 17 novos IDs, ausencia do ID descartado e workflow ainda ativo.
+- Os membros tecnicos `d202411097` (`308293282`) e `d202310280` (`308295492`) foram removidos do mapa apos confirmacao explicita.
+- O estado final possui 29 membros. A verificacao posterior confirmou a ausencia dos IDs descartados e workflow ainda ativo.
 - E-mails, tokens e demais credenciais nao foram registrados no repositorio.
