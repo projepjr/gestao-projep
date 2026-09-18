@@ -1041,3 +1041,12 @@ Diagnostico adicional:
 
 - A ultima execucao automatica anterior processou 10 linhas: 5 foram filtradas pelo segmento, 3 cards foram criados e 2 foram recusados pelo Pipefy por CNPJ duplicado.
 - Respostas GraphQL do Pipefy podem conter erro mesmo com HTTP 200; portanto, o status geral `success` do n8n nao garante que todos os cards foram criados.
+
+## Correcao 2026-09-18 - Remocao do filtro indevido de segmentos
+
+- O no `If` descartava linhas quando qualquer atividade principal ou secundaria, razao social, nome fantasia ou natureza juridica continha palavras como administracao, escritorio, consultoria, intermediacao ou treinamento.
+- Na planilha de Clara, a regra excluiu 90 empresas, incluindo construtoras validas cuja atividade secundaria continha um dos termos bloqueados.
+- Os 90 registros foram recuperados diretamente da execucao: 78 novos cards foram criados e atribuidos a Clara; 12 CNPJs ja existiam no Pipefy e nao foram duplicados.
+- O filtro foi desativado no workflow. Todas as linhas extraidas passam a seguir para a tentativa de cadastro no Pipefy.
+- O no JavaScript agora remove pontuacao invalida no final de e-mails e limita `Nome do cliente` a 255 caracteres para respeitar as validacoes do Pipefy.
+- A versao foi validada sintaticamente, publicada e confirmada como ativa.
