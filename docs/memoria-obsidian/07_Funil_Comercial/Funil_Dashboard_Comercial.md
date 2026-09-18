@@ -1021,3 +1021,23 @@ Verificacao:
 - Os membros tecnicos `d202411097` (`308293282`) e `d202310280` (`308295492`) foram removidos do mapa apos confirmacao explicita.
 - O estado final possui 29 membros. A verificacao posterior confirmou a ausencia dos IDs descartados e workflow ainda ativo.
 - E-mails, tokens e demais credenciais nao foram registrados no repositorio.
+
+## Correcao 2026-09-18 - Disparo de planilhas para novos membros
+
+Problema:
+
+- O mapa de responsaveis do workflow `Automacao Pipefy Site Projep` havia sido atualizado, mas o filtro de assunto do `Gmail Trigger` continuava limitado aos nomes antigos.
+- Testes manuais sem um novo evento do Gmail terminavam como sucesso sem executar qualquer no, dando a impressao de que a planilha havia sido processada.
+- Uma remocao anterior de membros tambem deixou um marcador de quebra de linha literal no fim do mapa JavaScript, causando `Unexpected end of input` quando o primeiro e-mail de um membro novo foi finalmente capturado.
+
+Solucao:
+
+- O filtro do Gmail passou a ser gerado com os 29 nomes atuais do mapa de responsaveis.
+- O marcador literal foi removido e a sintaxe do no `Code in JavaScript` foi validada com o parser do Node.js.
+- A versao corrigida foi confirmada como ativa e publicada no n8n.
+- Execucoes antigas nao devem ser reprocessadas pelo retry do n8n, pois o retry preserva a versao antiga do workflow; o e-mail deve ser reenviado para entrar pela versao atual.
+
+Diagnostico adicional:
+
+- A ultima execucao automatica anterior processou 10 linhas: 5 foram filtradas pelo segmento, 3 cards foram criados e 2 foram recusados pelo Pipefy por CNPJ duplicado.
+- Respostas GraphQL do Pipefy podem conter erro mesmo com HTTP 200; portanto, o status geral `success` do n8n nao garante que todos os cards foram criados.
