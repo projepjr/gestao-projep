@@ -1074,3 +1074,19 @@ Diagnostico adicional:
 - Antes da operacao, a fase continha 73 cards de Gustavo e nenhum de Maria Eduarda; apos a operacao, Gustavo ficou com 51 cards.
 - A verificacao direta confirmou os 22 cards com Maria Eduarda como responsavel, sem Gustavo e ainda na fase `Leads Cadastrados`.
 - Nenhuma credencial foi registrada no repositorio.
+
+## Correcao 2026-09-21 - Limite de paginacao do snapshot comercial
+
+Problema:
+
+- O pipeline comercial chegou a 3.087 cards, mas os nos `Buscar cards FV paginado` e `Buscar cards reunioes` estavam limitados a 40 requisicoes de 50 cards.
+- Cada execucao encerrava em exatamente 2.000 cards e ainda era marcada como sucesso.
+- O snapshot resultante continha somente `Leads Cadastrados` e parte de `Tentativa de Contato`, deixando diagnosticas, propostas, no-shows, negociacoes e perdidos fora do dashboard.
+
+Solucao e verificacao:
+
+- O limite dos dois nos foi ampliado de 40 para 100 paginas, mantendo a condicao de parada baseada em `hasNextPage`.
+- A versao atualizada ficou ativa no workflow `Site Projep`.
+- A execucao de verificacao `74185` concluiu com sucesso e buscou 62 paginas nos dois ramos, totalizando os 3.087 cards.
+- O novo snapshot passou a conter todas as fases, incluindo 22 cards em `Diagnostica Agendada`, e voltou a incluir os cards de reuniao dos novos trainees.
+- Nenhuma credencial foi registrada no repositorio.
