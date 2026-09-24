@@ -15,6 +15,15 @@ let snapshotFetchPromise = null
 let snapshotHydrationPromise = null
 const dashboardDataCache = new Map()
 
+function sameSnapshotVersion(first, second) {
+  return Boolean(
+    first?.id
+    && second?.id
+    && String(first.id) === String(second.id)
+    && String(first.synced_at || '') === String(second.synced_at || ''),
+  )
+}
+
 export function getCachedComercialSnapshot() {
   return snapshotCache
 }
@@ -338,6 +347,79 @@ export async function fetchLatestComercialSnapshot({
   })()
 
   return snapshotFetchPromise
+}
+
+export async function refreshComercialSnapshotIfChanged({
+  timeoutMs = COMERCIAL_SNAPSHOT_TIMEOUT_MS,
+} = {}) {
+  const cached = snapshotCache?.snapshot ? snapshotCache : await hydrateSnapshotCache()
+
+  if (!isSupabaseConfigured || !supabase) {
+    return cached || {
+      snapshot: null,
+      statusMessage: '',
+      error: 'Supabase nao configurado. Dados comerciais remotos indisponiveis.',
+    }
+  }
+
+  try {
+    const result = await executeSupabaseQuery(
+      supabase
+        .from('comercial_dashboard_snapshots')
+        .select('id, synced_at')
+        .eq('source', 'pipefy')
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      timeoutMs,
+    )
+
+    if (result.error || !result.data) {
+      return cached || {
+        snapshot: null,
+        statusMessage: '',
+        error: result.error?.message || 'Nenhum snapshot comercial encontrado.',
+      }
+    }
+
+    if (sameSnapshotVersion(cached?.snapshot, result.data)) {
+      return { ...cached, changed: false }
+    }
+
+    const latest = await fetchLatestComercialSnapshot({ timeoutMs, force: true })
+    return { ...latest, changed: Boolean(latest.snapshot) }
+  } catch (error) {
+    return cached || {
+      snapshot: null,
+      statusMessage: '',
+      error: error?.message === 'timeout'
+        ? 'Tempo esgotado ao verificar a atualizacao comercial.'
+        : (error?.message || 'Erro ao verificar a atualizacao comercial.'),
+    }
+  }
+}
+
+export function subscribeToComercialSnapshotUpdates(handler) {
+  if (!isSupabaseConfigured || !supabase || typeof handler !== 'function') return () => {}
+
+  let debounceId = null
+  const channel = supabase
+    .channel(`comercial-snapshot-${Math.random().toString(36).slice(2)}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'comercial_dashboard_snapshots',
+      filter: 'source=eq.pipefy',
+    }, () => {
+      clearTimeout(debounceId)
+      debounceId = setTimeout(handler, 500)
+    })
+    .subscribe()
+
+  return () => {
+    clearTimeout(debounceId)
+    supabase.removeChannel(channel)
+  }
 }
 
 function memberSignature(members = []) {

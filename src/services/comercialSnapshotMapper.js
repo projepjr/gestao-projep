@@ -46,11 +46,17 @@ const EMPTY_PIPELINE = {
   ganhos: 0,
 }
 
-const normalize = value => String(value || '')
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .toLowerCase()
-  .trim()
+// Labels and phase names recur thousands of times across cards and periods.
+// Cache only the pure string conversion, never mutable card data.
+const normalizedStrings = new Map()
+const normalize = value => {
+  const text = String(value || '')
+  if (normalizedStrings.has(text)) return normalizedStrings.get(text)
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  if (normalizedStrings.size >= 20000) normalizedStrings.clear()
+  normalizedStrings.set(text, normalized)
+  return normalized
+}
 
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
 const idsEqual = (a, b) => String(a ?? '') === String(b ?? '')

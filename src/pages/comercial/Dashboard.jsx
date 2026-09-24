@@ -12,11 +12,12 @@ import {
 } from 'lucide-react'
 import { useData } from '../../contexts/DataContext'
 import {
-  buildRemoteDashboardData as buildCachedRemoteDashboardData,
   fetchLatestComercialSnapshot,
   getCachedComercialSnapshot,
+  refreshComercialSnapshotIfChanged,
+  subscribeToComercialSnapshotUpdates,
 } from '../../services/comercialDashboardData'
-import { mapComercialSnapshot } from '../../services/comercialSnapshotMapper'
+import { dashboardCalculator, dashboardContext } from '../../services/comercialDashboardPeriods'
 
 // ── Helpers ───────────────────────────────────────────────────
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -454,38 +455,6 @@ const EMPTY_PIPELINE = PIPELINE_STAGES.reduce((acc, stage) => {
   acc[stage.key] = 0
   return acc
 }, {})
-
-function PipelineGrid({ pipeline }) {
-  const total = Object.values(pipeline).reduce((s, v) => s + v, 0) || 1
-  return (
-    <div className="grid grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-2">
-      {PIPELINE_STAGES.map((s) => {
-        const v       = pipeline[s.key] ?? 0
-        const p       = pct(v, total)
-        const isRed   = s.key === 'perdidos'
-        const isGreen = s.key === 'ganhos'
-        return (
-          <div
-            key={s.key}
-            className="bg-[#0D0D0D] border border-[#1E1E1E] rounded-md p-3 text-center hover:border-[#2A2A2A] transition-colors"
-          >
-            <div className="w-6 h-0.5 mx-auto mb-2 rounded-full" style={{ background: s.color }} />
-            <p className={`text-xl font-bold ${isRed ? 'text-red-400' : isGreen ? 'text-green-400' : 'text-white'}`}>
-              {v}
-            </p>
-            <p className="text-[9px] text-gray-600 mt-1 leading-tight flex items-center justify-center gap-0.5">
-              {s.label}
-              <InfoTooltip text={s.tip} />
-            </p>
-            <p className={`text-[10px] font-semibold mt-1 ${isRed ? 'text-red-500' : isGreen ? 'text-green-500' : 'text-gray-600'}`}>
-              {p}%
-            </p>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 function formatRate(value, total) {
   if (!total) return '0%'
@@ -984,32 +953,19 @@ export default function ComercialDashboard() {
     error: initialSnapshotResult?.error || '',
     message: initialSnapshotResult?.statusMessage || '',
   }))
-  const remoteDashboardData = useMemo(
-    () => buildCachedRemoteDashboardData(remoteSnapshot, members, commercial),
-    [commercial, members, remoteSnapshot],
-  )
-  const remotePeriod = remoteDashboardData?.aovivo || null
-  const dashboardData = remoteDashboardData || commercial
+  const remotePeriod = Boolean(remoteSnapshot?.payload)
   const referenceDate = remoteSnapshot?.synced_at || new Date().toISOString()
-  const semanas = useMemo(() => {
-    const source = Array.isArray(dashboardData.semanas) ? dashboardData.semanas : []
-    const periods = source.length ? source : buildWeekRanges(referenceDate, 10).map(emptyPeriodFromRange)
-    return periods.map(period => normalizeDashboardPeriod(period))
-  }, [dashboardData.semanas, referenceDate])
-  const meses = useMemo(() => {
-    const source = Array.isArray(dashboardData.meses) ? dashboardData.meses : []
-    const periods = source.length ? source : buildMonthRanges(referenceDate, 8).map(emptyPeriodFromRange)
-    return periods.map(period => normalizeDashboardPeriod(period))
-  }, [dashboardData.meses, referenceDate])
+  const semanas = useMemo(() => buildWeekRanges(referenceDate, 10), [referenceDate])
+  const meses = useMemo(() => buildMonthRanges(referenceDate, 8), [referenceDate])
   const aovivo = useMemo(
-    () => normalizeDashboardPeriod(dashboardData.aovivo, {
+    () => ({
       id: 'aovivo',
       label: 'Ao Vivo',
       inicio: isoDate(new Date(referenceDate)),
       fim: isoDate(new Date(referenceDate)),
       ultimaAtualizacao: referenceDate,
     }),
-    [dashboardData.aovivo, referenceDate],
+    [referenceDate],
   )
   const [viewMode, setViewMode] = useState('semanal')
   const [semaIdx,  setSemaIdx]  = useState(() => findCurrentWeekIndex(semanas))
@@ -1024,7 +980,7 @@ export default function ComercialDashboard() {
     remoteSnapshotRef.current = remoteSnapshot
   }, [remoteSnapshot])
 
-  const fetchLatestSnapshot = useCallback(async ({ silent = false, force = false } = {}) => {
+  const fetchLatestSnapshot = useCallback(async ({ silent = false, force = false, checkForUpdate = false } = {}) => {
     if (fetchingSnapshotRef.current) return
     fetchingSnapshotRef.current = true
 
@@ -1033,7 +989,9 @@ export default function ComercialDashboard() {
     }
 
     try {
-      const result = await fetchLatestComercialSnapshot({ force })
+      const result = checkForUpdate
+        ? await refreshComercialSnapshotIfChanged()
+        : await fetchLatestComercialSnapshot({ force })
       const selectedSnapshot = result.snapshot
 
       setRemoteSnapshot(selectedSnapshot)
@@ -1051,13 +1009,34 @@ export default function ComercialDashboard() {
         setSemaIdx(findCurrentWeekIndex(buildWeekRanges(referenceDate, 10)))
         setMesIdx(findCurrentMonthIndex(buildMonthRanges(referenceDate, 8)))
       }
+
+      return result
     } finally {
       fetchingSnapshotRef.current = false
     }
   }, [])
 
   useEffect(() => {
-    fetchLatestSnapshot()
+    let active = true
+
+    const loadSnapshot = async () => {
+      await fetchLatestSnapshot()
+      if (active) await fetchLatestSnapshot({ silent: true, checkForUpdate: true })
+    }
+
+    loadSnapshot()
+    const intervalId = window.setInterval(() => {
+      fetchLatestSnapshot({ silent: true, checkForUpdate: true })
+    }, 60_000)
+    const unsubscribe = subscribeToComercialSnapshotUpdates(() => {
+      fetchLatestSnapshot({ silent: true, force: true })
+    })
+
+    return () => {
+      active = false
+      window.clearInterval(intervalId)
+      unsubscribe()
+    }
   }, [fetchLatestSnapshot])
 
   const handleCustomStartChange = useCallback((value) => {
@@ -1079,36 +1058,46 @@ export default function ComercialDashboard() {
     fim: customEnd,
   }), [customEnd, customStart])
 
-  const customPeriod = useMemo(() => {
-    if (!customStart || !customEnd) return emptyPeriodFromRange(customRange)
-    if (!remoteSnapshot?.payload) return emptyPeriodFromRange(customRange)
-    return normalizeDashboardPeriod(
-      mapComercialSnapshot(remoteSnapshot.payload, { members, commercial, range: customRange }),
-      customRange,
-    )
-  }, [commercial, customEnd, customRange, customStart, members, remoteSnapshot])
-
   useEffect(() => {
-    const handleRefresh = () => fetchLatestSnapshot()
+    const handleRefresh = () => fetchLatestSnapshot({ silent: true, force: true })
     window.addEventListener('projep:refresh-data', handleRefresh)
     return () => window.removeEventListener('projep:refresh-data', handleRefresh)
   }, [fetchLatestSnapshot])
 
-  // TODO: [Supabase] substituir por: supabase.from('comercial_semanas').select('*').order('inicio')
-  const currentPeriod = useMemo(() => {
-    if (viewMode === 'aovivo')  return aovivo
-    if (viewMode === 'semanal') return semanas[semaIdx] || emptyPeriodFromRange(buildWeekRanges(referenceDate, 1)[0])
-    if (viewMode === 'personalizado') return customPeriod
-    return meses[mesIdx] || emptyPeriodFromRange(buildMonthRanges(referenceDate, 1)[0])
-  }, [aovivo, customPeriod, meses, mesIdx, referenceDate, semaIdx, semanas, viewMode])
+  const currentRange = viewMode === 'aovivo' ? null
+    : viewMode === 'semanal' ? semanas[semaIdx] || semanas.at(-1)
+      : viewMode === 'personalizado' ? customRange : meses[mesIdx] || meses.at(-1)
 
   // TODO: [Supabase] carregar período anterior para delta comparativo
-  const prevPeriod = useMemo(() => {
+  const previousRange = useMemo(() => {
     if (viewMode === 'aovivo')  return semanas[findCurrentWeekIndex(semanas)]
     if (viewMode === 'semanal') return semaIdx > 0 ? semanas[semaIdx - 1] : null
     if (viewMode === 'personalizado') return null
     return mesIdx > 0 ? meses[mesIdx - 1] : null
   }, [meses, mesIdx, semaIdx, semanas, viewMode])
+
+  const context = dashboardContext(remoteSnapshot, members, commercial)
+  const ranges = useMemo(() => previousRange ? [currentRange, previousRange] : [currentRange], [currentRange, previousRange])
+  const [calculation, setCalculation] = useState(null)
+  const [retry, setRetry] = useState(0)
+  useEffect(() => {
+    if (!context) return
+    let cancelled = false
+    // Coalesce date edits before submitting CPU work. Stale replies never replace a newer filter.
+    const timer = setTimeout(() => {
+      dashboardCalculator.calculate(context, ranges).then(periods => {
+        if (!cancelled) setCalculation({ context, ranges, periods, retry })
+      }).catch(error => {
+        if (!cancelled) setCalculation({ context, ranges, error: error.message, retry })
+      })
+    }, 150)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [context, ranges, retry])
+  const calculationMatches = calculation?.context === context && calculation?.ranges === ranges && calculation?.retry === retry
+  const calculationError = calculationMatches ? calculation?.error : null
+  const ready = calculationMatches && Boolean(calculation?.periods)
+  const currentPeriod = ready ? normalizeDashboardPeriod(calculation.periods[0]) : emptyPeriodFromRange(currentRange || aovivo)
+  const prevPeriod = ready && calculation.periods[1] ? normalizeDashboardPeriod(calculation.periods[1]) : null
 
   const prevLabel = useMemo(() => {
     if (!prevPeriod) return null
@@ -1168,6 +1157,12 @@ export default function ComercialDashboard() {
         </div>
       </div>
 
+      {!ready ? (
+        <div className="rounded-md border border-[#1E1E1E] bg-[#111111] p-8 text-sm text-gray-400" role="status" aria-live="polite">
+          {calculationError || (remoteStatus.error && !remotePeriod) || 'Preparando os indicadores do período…'}
+          {calculationError && <button className="ml-3 text-[#FF882D]" onClick={() => setRetry(value => value + 1)}>Tentar novamente</button>}
+        </div>
+      ) : <>
       {/* ── Seção 1: KPIs (topo) ── */}
       {/* TODO: [Supabase] supabase.from('kpis_comercial').select('*').eq('periodo_id', periodoId) */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1242,6 +1237,7 @@ export default function ComercialDashboard() {
         prevClosers={prevPeriod?.closers ?? null}
         prevLabel={prevLabel}
       />
+      </>}
 
     </div>
   )

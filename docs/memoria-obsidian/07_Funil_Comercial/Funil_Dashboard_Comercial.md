@@ -1075,6 +1075,41 @@ Diagnostico adicional:
 - A verificacao direta confirmou os 22 cards com Maria Eduarda como responsavel, sem Gustavo e ainda na fase `Leads Cadastrados`.
 - Nenhuma credencial foi registrada no repositorio.
 
+## Correcao 2026-09-24 - Travamento da dashboard comercial
+
+- Diagnostico: a abertura calculava sincronamente 10 semanas, 8 meses, ao vivo e ainda o periodo personalizado oculto. O benchmark com 3.236 cards levou 78,9 segundos para os 19 primeiros periodos; a busca remota levou 1,5 segundo.
+- Dashboard.jsx agora solicita apenas o periodo visivel e a comparacao anterior. Datas personalizadas so sao calculadas quando selecionadas.
+- comercialDashboardPeriods.js mantem worker compartilhado, cache de resultados e requisicoes em andamento. A identidade considera snapshot e valores relevantes de equipe/membros, preservando o cache em sincronizacoes com dados identicos.
+- comercialDashboardWorker.js executa o mapper fora da thread da interface. Cards brutos nao sao devolvidos ao React. Respostas de filtros antigos sao ignoradas e filtros enfileirados sao substituidos pelo mais recente.
+- Estados de carregamento/erro evitam apresentar zeros ou resultados de outro periodo como dados atuais. Timeout encerra o worker e permite nova tentativa.
+- O mapper ganhou cache limitado apenas da normalizacao pura de strings; formulas, datas e atribuicoes permanecem iguais.
+- Comparacao real antes/depois: dois periodos levaram 9.318 ms no mapper anterior e 1.726 ms no novo; todos os resultados agregados foram identicos. Reuso em cache: 0,065 ms.
+- Teste em Edge headless com 3.236 cards sinteticos: 1.457 ms, 71 atualizacoes do temporizador da interface, maior intervalo 36 ms, contagens esperadas preservadas.
+- Verificacao: build, smoke e scripts/test-dashboard-performance.mjs aprovados. O teste novo cobre worker real, paridade, cache, deduplicacao e invalidacao de snapshot. ESLint dos servicos/teste aprovado; Dashboard.jsx possui aviso de erro preexistente por PipelineGrid nao utilizado.
+- A fonte oficial continua sendo o snapshot do Supabase. O cache persistente existente e a atualizacao manual foram preservados. Outras paginas nao foram migradas para worker nesta etapa.
+
+## Correcao 2026-09-24 - Snapshot semanal desatualizado
+
+Problema:
+
+- A dashboard exibia o snapshot `2026-09-23-11`, sincronizado em 23/09 as 08:46, embora o Pipefy ja tivesse dados novos.
+- O workflow n8n `Site Projep` concluia a paginacao do Pipefy, mas falhava no no `Salvar metricas no Supabase` com `Expression timed out`.
+- O corpo HTTP fazia `JSON.stringify` de mais de 5 MB dentro de uma expressao do n8n e o no anterior ainda carregava junto toda a entrada bruta, ampliando uso de memoria.
+- Mesmo depois de uma nova gravacao, o IndexedDB do navegador podia continuar entregando indefinidamente o snapshot antigo porque nao havia verificacao de versao remota.
+
+Solucao:
+
+- O no de transformacao agora produz antecipadamente o corpo JSON do Supabase e retorna somente `snapshotId` e `supabaseBody`; o no HTTP envia essa string pronta.
+- As execucoes de verificacao `76380` e `76382` terminaram com sucesso. O snapshot `2026-09-24-19`, com 3.739 cards, foi salvo em 24/09 as 16:52 (America/Sao_Paulo).
+- A abertura da dashboard continua instantanea pelo IndexedDB, mas em seguida consulta apenas `id` e `synced_at` do registro remoto. O payload pesado so e baixado se a versao mudou.
+- A dashboard verifica metadados a cada minuto e tambem escuta alteracoes da tabela pelo Realtime. Assim, uma publicacao do n8n invalida o cache sem exigir recarregamento manual.
+- O botao global de atualizar passou a forcar a leitura remota na dashboard.
+
+Verificacao:
+
+- O snapshot novo foi lido diretamente do Supabase e comparado com o snapshot antigo da captura.
+- `npm run test:smoke`, `node scripts/test-dashboard-performance.mjs`, `npm run build` e o ESLint dos servicos alterados foram concluidos com sucesso.
+
 ## Correcao 2026-09-21 - Limite de paginacao do snapshot comercial
 
 Problema:
