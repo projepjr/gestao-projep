@@ -215,6 +215,7 @@ function syncTaskDeadlineNotifications(projectData) {
 
 export function DataProvider({ children }) {
   const { user } = useAuth()
+  const activeUserId = user?.supabaseId || user?.id
   const [members, setMembers] = useState(() => publicUsers(db.get('usuarios')))
   const [commercial, setCommercial] = useState(() => db.get('comercial'))
   const [people, setPeople] = useState(() => db.get('gestaoPessoas'))
@@ -293,20 +294,22 @@ export function DataProvider({ children }) {
   }, [projectData])
 
   useEffect(() => {
+    if (!activeUserId) return
     let mounted = true
-    const run = async () => { if (mounted) await loadMondayProjects() }
+    const run = async () => { if (mounted && document.visibilityState === 'visible') await loadMondayProjects() }
     run()
     const id = window.setInterval(run, REMOTE_SYNC_INTERVAL_MS)
     return () => { mounted = false; window.clearInterval(id) }
-  }, [loadMondayProjects])
+  }, [loadMondayProjects, activeUserId])
 
   useEffect(() => {
+    if (!activeUserId) return
     let mounted = true
     let realtimeCleanup = () => {}
     let syncInFlight = false
     let communicationSyncInFlight = false
     const syncRemote = async () => {
-      if (syncInFlight) return
+      if (!mounted || syncInFlight || document.visibilityState !== 'visible') return
       syncInFlight = true
       try {
         await pullRemoteState(db)
@@ -317,7 +320,7 @@ export function DataProvider({ children }) {
       }
     }
     const syncCommunicationRemote = async () => {
-      if (communicationSyncInFlight) return
+      if (!mounted || communicationSyncInFlight || document.visibilityState !== 'visible') return
       communicationSyncInFlight = true
       try {
         await pullCommunicationState(db)
@@ -356,7 +359,7 @@ export function DataProvider({ children }) {
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [])
+  }, [activeUserId])
 
   const resolvedCommercial = useMemo(
     () => resolveCommercialUsers(commercial, members),

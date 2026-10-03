@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { loginErrorMessage } from '../lib/supabaseTransport'
 import { ACCESS_MODULES, normalizePermissions } from '../config/accessControl'
 import { SETORES, resolveSetor } from '../data/setores'
 
@@ -433,12 +434,16 @@ export async function createSupabaseAuthAccount(email, password, metadata = {}) 
 
 export async function signInWithSupabaseAuth(email, password) {
   if (!isSupabaseConfigured || !supabase) return { success: false, enabled: false }
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: normalizeEmail(email),
-    password,
-  })
-  if (error) return { success: false, error: error.message }
-  return { success: true, user: data?.user || null }
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizeEmail(email),
+      password,
+    })
+    if (error) return { success: false, error: loginErrorMessage(error), code: error.code, status: error.status }
+    return { success: true, user: data?.user || null }
+  } catch (error) {
+    return { success: false, error: loginErrorMessage(error) }
+  }
 }
 
 export async function sendSupabasePasswordReset(email) {

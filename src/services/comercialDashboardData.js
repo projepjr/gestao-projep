@@ -4,6 +4,7 @@ import { mapComercialSnapshot } from './comercialSnapshotMapper'
 export const PIPEFY_COMERCIAL_PIPE_ID = '307256948'
 export const COMERCIAL_SNAPSHOT_LOOKBACK = 5
 export const COMERCIAL_SNAPSHOT_TIMEOUT_MS = 15000
+export const COMERCIAL_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 const DASHBOARD_DATA_CACHE_LIMIT = 6
 const SNAPSHOT_CACHE_DB_NAME = 'gestao-projep-cache'
 const SNAPSHOT_CACHE_DB_VERSION = 1
@@ -247,10 +248,8 @@ export async function fetchLatestComercialSnapshot({
   timeoutMs = COMERCIAL_SNAPSHOT_TIMEOUT_MS,
   force = false,
 } = {}) {
-  if (!force) {
-    const cached = snapshotCache?.snapshot ? snapshotCache : await hydrateSnapshotCache()
-    if (cached?.snapshot) return cached
-  }
+  const cached = snapshotCache?.snapshot ? snapshotCache : await hydrateSnapshotCache()
+  if (!force && cached?.snapshot) return cached
 
   if (!isSupabaseConfigured || !supabase) {
     return {
@@ -270,12 +269,7 @@ export async function fetchLatestComercialSnapshot({
       // cards and can be several megabytes each, so downloading the whole
       // lookback multiplies transfer time and can freeze slower clients.
       const metadataResult = await executeSupabaseQuery(
-        supabase
-          .from('comercial_dashboard_snapshots')
-          .select('id, synced_at')
-          .eq('source', 'pipefy')
-          .order('synced_at', { ascending: false })
-          .limit(lookback),
+        supabase.rpc('comercial_snapshot_versions', { p_limit: lookback }),
         timeoutMs,
       )
 
@@ -296,6 +290,20 @@ export async function fetchLatestComercialSnapshot({
       // Usually the first row is accepted. Older payloads are loaded only when
       // an explicit pipe id proves that a newer row belongs to another pipe.
       for (const item of metadata) {
+        if (sameSnapshotVersion(snapshotCache?.snapshot, item)
+          || (item.content_hash && item.content_hash === snapshotCache?.snapshot?.content_hash)) {
+          const payload = snapshotCache.snapshot.payload
+          snapshotCache = {
+            ...snapshotCache,
+            snapshot: { ...snapshotCache.snapshot, ...item, payload: {
+              ...payload,
+              periodo: { ...payload.periodo, atualizadoEm: item.synced_at },
+              raw: { ...payload.raw, syncedAt: item.synced_at },
+            } },
+          }
+          try { await persistSnapshotCache(snapshotCache) } catch { /* Memory cache remains valid. */ }
+          return snapshotCache
+        }
         const payloadResult = await executeSupabaseQuery(
           supabase
             .from('comercial_dashboard_snapshots')
@@ -317,7 +325,7 @@ export async function fetchLatestComercialSnapshot({
         const selected = selectComercialSnapshot(payloadResult.data ? [payloadResult.data] : [])
         if (!selected.snapshot) continue
 
-        snapshotCache = { ...selected, error: '' }
+        snapshotCache = { ...selected, snapshot: { ...selected.snapshot, content_hash: item.content_hash }, error: '' }
         dashboardDataCache.clear()
         try {
           await persistSnapshotCache(snapshotCache)
@@ -364,13 +372,7 @@ export async function refreshComercialSnapshotIfChanged({
 
   try {
     const result = await executeSupabaseQuery(
-      supabase
-        .from('comercial_dashboard_snapshots')
-        .select('id, synced_at')
-        .eq('source', 'pipefy')
-        .order('synced_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      supabase.rpc('comercial_snapshot_versions', { p_limit: 1 }).maybeSingle(),
       timeoutMs,
     )
 
@@ -400,26 +402,12 @@ export async function refreshComercialSnapshotIfChanged({
 }
 
 export function subscribeToComercialSnapshotUpdates(handler) {
-  if (!isSupabaseConfigured || !supabase || typeof handler !== 'function') return () => {}
-
-  let debounceId = null
-  const channel = supabase
-    .channel(`comercial-snapshot-${Math.random().toString(36).slice(2)}`)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'comercial_dashboard_snapshots',
-      filter: 'source=eq.pipefy',
-    }, () => {
-      clearTimeout(debounceId)
-      debounceId = setTimeout(handler, 500)
-    })
-    .subscribe()
-
-  return () => {
-    clearTimeout(debounceId)
-    supabase.removeChannel(channel)
-  }
+  // A postgres_changes event includes the entire multi-megabyte row.
+  // Dashboard polling checks small version metadata instead.
+  if (typeof window === 'undefined' || typeof handler !== 'function') return () => {}
+  const onVisible = () => { if (document.visibilityState === 'visible') handler() }
+  document.addEventListener('visibilitychange', onVisible)
+  return () => document.removeEventListener('visibilitychange', onVisible)
 }
 
 function memberSignature(members = []) {

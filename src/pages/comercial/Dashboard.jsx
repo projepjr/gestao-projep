@@ -16,6 +16,7 @@ import {
   getCachedComercialSnapshot,
   refreshComercialSnapshotIfChanged,
   subscribeToComercialSnapshotUpdates,
+  COMERCIAL_REFRESH_INTERVAL_MS,
 } from '../../services/comercialDashboardData'
 import { dashboardCalculator, dashboardContext } from '../../services/comercialDashboardPeriods'
 
@@ -1026,10 +1027,10 @@ export default function ComercialDashboard() {
 
     loadSnapshot()
     const intervalId = window.setInterval(() => {
-      fetchLatestSnapshot({ silent: true, checkForUpdate: true })
-    }, 60_000)
+      if (document.visibilityState === 'visible') fetchLatestSnapshot({ silent: true, checkForUpdate: true })
+    }, COMERCIAL_REFRESH_INTERVAL_MS)
     const unsubscribe = subscribeToComercialSnapshotUpdates(() => {
-      fetchLatestSnapshot({ silent: true, force: true })
+      fetchLatestSnapshot({ silent: true, checkForUpdate: true })
     })
 
     return () => {

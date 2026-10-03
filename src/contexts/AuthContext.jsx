@@ -141,16 +141,11 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const normalizedEmail = normalizeEmail(email)
     let currentUsers = db.get('usuarios')
-    try {
-      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-      currentUsers = await Promise.race([pullUsersFromSupabase(db), timeout])
-    } catch (error) {
-      console.warn('[Supabase] Nao foi possivel sincronizar usuarios antes do login:', error.message || error)
-    }
 
     let found = null
     const localMatch = validateLogin(currentUsers, normalizedEmail, password)
     const remoteLogin = await signInWithSupabaseAuth(normalizedEmail, password)
+    if (!remoteLogin.success && remoteLogin.enabled !== false) return remoteLogin
     if (remoteLogin.success) {
       try {
         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
@@ -190,30 +185,9 @@ export function AuthProvider({ children }) {
       found = localMatch
     }
 
-    if (!found && remoteLogin.enabled !== false && localMatch) {
-      const migration = await createSupabaseAuthAccount(normalizedEmail, password, {
-        name: localMatch.nome,
-        status: localMatch.status === 'ativo' ? 'active' : localMatch.status,
-        source: 'projep-legacy-login-migration',
-      })
-      if (migration.success && migration.user?.id) {
-        const migrated = {
-          ...localMatch,
-          supabaseId: migration.user.id,
-          senha: null,
-        }
-        const syncResult = await syncUsersToSupabase([migrated])
-        if (syncResult?.success !== false) {
-          db.update('usuarios', null, localMatch.id, {
-            supabaseId: migrated.supabaseId,
-            senha: null,
-          })
-          found = migrated
-        }
-      }
-    }
-
-    if (!found) return { success: false, error: 'Email ou senha invalidos' }
+    if (!found) return { success: false, error: remoteLogin.success
+      ? 'Login validado, mas não foi possível carregar seu perfil. Tente novamente ou contate a administração.'
+      : 'Email ou senha inválidos.' }
     if (found.status === 'pendente') return { success: false, status: 'pendente', user: found }
     if (found.status === 'rejeitado') return { success: false, error: 'Cadastro reprovado pela diretoria. Contate o RH.' }
     if (found.status !== 'ativo') return { success: false, error: 'Conta inativa. Contate o administrador.' }
