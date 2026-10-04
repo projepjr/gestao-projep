@@ -93,3 +93,6 @@ O arquivo `vercel.json` ainda pode existir como configuracao legada, mas nao dev
 - A aba Reunioes passou a usar calendario semanal em cinco colunas, com varias semanas empilhadas na visao mensal.
 - Os cards de reuniao abrem uma janela compacta de edicao; a exclusao saiu do card e ficou dentro dessa janela.
 - O agendamento diferencia AP e DIAG, e os cards usam verde, vermelho ou amarelo claro para Aconteceu, No show e Reagendando.
+- O refinamento visual seguinte passou a usar a altura disponivel do celular no calendario, reduziu o CTA de disponibilidade e compactou a selecao de pessoas.
+- O campo Encontrar inicia sem participante selecionado; estados vazios nao usam mais texto sobreposto ao calendario.
+- As lixeiras de edicao agora usam icone vetorial preto, e as cores finais sao verde claro para Aconteceu, vermelho escuro para No show e laranja para Reagendando.
