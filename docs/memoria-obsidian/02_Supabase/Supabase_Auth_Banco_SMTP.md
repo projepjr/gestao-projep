@@ -96,3 +96,20 @@ Casos tratados:
 - redirect URL nao permitida;
 - usuario nao encontrado;
 - erro vazio `{}` retornado pelo Supabase.
+
+## Agenda em comum - 2026-10-02
+
+- O aplicativo `agenda-em-comum` foi migrado do D1 para o projeto Supabase `gestaoprojep.com`.
+- Foram criadas as tabelas isoladas `agenda_users`, `agenda_availability` e `agenda_meetings`, todas com RLS habilitado e indices para as consultas por usuario/data.
+- Quatro usuarios demonstrativos e 66 intervalos existentes foram migrados e conferidos.
+- Como o prototipo ainda nao usa Supabase Auth real, as politicas permitem acesso anonimo apenas nas tabelas prefixadas com `agenda_`. Essa permissao deve ser substituida por politicas baseadas em `auth.uid()` antes do uso produtivo.
+- A migracao versionada e o guia de handoff estao no repositorio separado `https://github.com/projepjr/agenda-em-comum`.
+- O Security Advisor continua apontando problemas preexistentes fora do escopo da agenda: nove tabelas publicas sem RLS e a view `comercial_dashboard_snapshot` como security definer. Nao foram alterados automaticamente para evitar quebrar o sistema principal.
+
+## Agenda em comum - edicao e reunioes - 2026-10-04
+
+- `agenda_meetings` recebeu as colunas `title` e `meeting_group_id`; um mesmo agendamento com varias pessoas compartilha o mesmo grupo.
+- A API passou a aceitar atualizacao de disponibilidade e cancelamento de reuniao, com politicas RLS correspondentes para o prototipo anonimo.
+- A leitura de reunioes passou a retornar todos os agendamentos para suportar os filtros `Minhas` e `Todas`.
+- A restricao continua a mesma: as politicas anonimas existem apenas para a demonstracao e precisam ser substituidas por Supabase Auth e `auth.uid()` antes de dados reais.
+- O Security Advisor foi executado apos a migracao. Nao surgiu alerta novo nas tabelas `agenda_`; permanecem os alertas preexistentes das tabelas antigas e da view `comercial_dashboard_snapshot`.

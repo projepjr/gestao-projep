@@ -75,3 +75,18 @@ O arquivo `public/_redirects` deve existir com:
 ```
 
 O arquivo `vercel.json` ainda pode existir como configuracao legada, mas nao deve ser tratado como deploy oficial enquanto Cloudflare Pages for a hospedagem ativa.
+## Agenda em comum - 2026-10-02
+
+- O codigo foi publicado em um repositorio separado: `https://github.com/projepjr/agenda-em-comum`.
+- O repositorio contem a aplicacao, a migracao Supabase, `.env.example` e `HANDOFF.md` para continuidade por outro desenvolvedor ou assistente.
+- A publicacao no Cloudflare depende de concluir a autorizacao OAuth do Wrangler na conta correta.
+- A autorizacao foi concluida na conta `presidencia@projepjr.com` e o Worker `agenda-em-comum-projep` foi publicado em `https://agenda-em-comum-projep.presidencia-1d5.workers.dev`.
+- A rota `/api/agenda` foi validada em producao lendo os quatro usuarios e as 66 disponibilidades migradas do Supabase.
+
+## Agenda em comum - interface e reunioes - 2026-10-04
+
+- A interface mobile foi simplificada e o CTA grande de cruzar agendas foi removido da tela inicial.
+- Tocar numa disponibilidade agora abre a edicao de data e horario; a exclusao fica somente no botao de lixeira da janela.
+- A selecao de pessoas ficou compacta e ganhou filtros por funcao.
+- O agendamento agora pede apenas o nome da reuniao, e a aba Reunioes ganhou filtros por semana/mes e Minhas/Todas.
+- O deploy continua no Worker `agenda-em-comum-projep`; nao usar Vercel para este aplicativo.
