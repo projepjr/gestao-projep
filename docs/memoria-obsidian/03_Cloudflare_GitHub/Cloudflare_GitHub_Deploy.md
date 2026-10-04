@@ -90,3 +90,6 @@ O arquivo `vercel.json` ainda pode existir como configuracao legada, mas nao dev
 - A selecao de pessoas ficou compacta e ganhou filtros por funcao.
 - O agendamento agora pede apenas o nome da reuniao, e a aba Reunioes ganhou filtros por semana/mes e Minhas/Todas.
 - O deploy continua no Worker `agenda-em-comum-projep`; nao usar Vercel para este aplicativo.
+- A aba Reunioes passou a usar calendario semanal em cinco colunas, com varias semanas empilhadas na visao mensal.
+- Os cards de reuniao abrem uma janela compacta de edicao; a exclusao saiu do card e ficou dentro dessa janela.
+- O agendamento diferencia AP e DIAG, e os cards usam verde, vermelho ou amarelo claro para Aconteceu, No show e Reagendando.

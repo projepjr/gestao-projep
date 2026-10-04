@@ -113,3 +113,6 @@ Casos tratados:
 - A leitura de reunioes passou a retornar todos os agendamentos para suportar os filtros `Minhas` e `Todas`.
 - A restricao continua a mesma: as politicas anonimas existem apenas para a demonstracao e precisam ser substituidas por Supabase Auth e `auth.uid()` antes de dados reais.
 - O Security Advisor foi executado apos a migracao. Nao surgiu alerta novo nas tabelas `agenda_`; permanecem os alertas preexistentes das tabelas antigas e da view `comercial_dashboard_snapshot`.
+- `agenda_meetings` recebeu `meeting_type` (`AP` ou `DIAG`) e `status` (`scheduled`, `happened`, `no_show` ou `rescheduling`) com constraints no banco.
+- A atualizacao de reuniao grava nome, tipo, status, data, horario e duracao em todas as linhas do mesmo `meeting_group_id`.
+- O cancelamento agora valida se o usuario demonstrativo participa do encontro antes de remover o grupo completo.
