@@ -119,3 +119,10 @@ Casos tratados:
 - O agendamento passou a usar a funcao transacional `agenda_book_meeting`, com locks por participante. Ela impede sobreposicao para organizador e participantes mesmo quando duas requisicoes chegam quase ao mesmo tempo.
 - Reunioes com status `discarded` liberam novamente o horario; os demais status continuam bloqueando conflito.
 - O constraint de status passou a aceitar tambem `interest_future` e `discarded`; `rescheduling` permanece como chave tecnica e aparece como "Remarcando" na interface.
+
+## Portal de Agendas - recorrencia e conflitos - 2026-10-04
+
+- `agenda_availability` passou a registrar `recurrence_group_id` e `recurrence_type` (`once`, `daily` ou `weekly`).
+- As RPCs `agenda_add_availability` e `agenda_update_availability` usam lock transacional por usuario e rejeitam qualquer sobreposicao no mesmo dia.
+- Intervalos adjacentes continuam validos: `07:00-08:00` pode coexistir com `08:00-09:00`; `07:30-09:00` conflita com o primeiro.
+- A exclusao de recorrencia pode remover apenas a ocorrencia selecionada ou a ocorrencia atual e todas as seguintes do mesmo grupo.

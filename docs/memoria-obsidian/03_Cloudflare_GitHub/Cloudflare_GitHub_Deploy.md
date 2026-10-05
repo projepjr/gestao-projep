@@ -99,3 +99,4 @@ O arquivo `vercel.json` ainda pode existir como configuracao legada, mas nao dev
 - Horarios ocupados por reunioes deixaram de aparecer em Encontrar, e a API tambem recusa conflitos para evitar reserva dupla.
 - Os status visuais finais sao: Aconteceu em verde, No-show em roxo, Interesse futuro em amarelo, Remarcando em laranja e Descartado em vermelho vibrante.
 - O deploy do aplicativo deve sempre usar explicitamente o Worker `agenda-em-comum-projep`. O `vite.config.ts` nao emite valores vazios para `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY`; ambos ficam configurados como secrets no Worker para que um build sem `.env` nao apague os bindings de producao.
+- O nome exibido e os metadados do aplicativo passaram a ser `Portal de Agendas Projep Jr.`; o endereco do Worker permanece o mesmo para nao quebrar links existentes.
