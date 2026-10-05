@@ -96,3 +96,6 @@ O arquivo `vercel.json` ainda pode existir como configuracao legada, mas nao dev
 - O refinamento visual seguinte passou a usar a altura disponivel do celular no calendario, reduziu o CTA de disponibilidade e compactou a selecao de pessoas.
 - O campo Encontrar inicia sem participante selecionado; estados vazios nao usam mais texto sobreposto ao calendario.
 - As lixeiras de edicao agora usam icone vetorial preto, e as cores finais sao verde claro para Aconteceu, vermelho escuro para No show e laranja para Reagendando.
+- Horarios ocupados por reunioes deixaram de aparecer em Encontrar, e a API tambem recusa conflitos para evitar reserva dupla.
+- Os status visuais finais sao: Aconteceu em verde, No-show em roxo, Interesse futuro em amarelo, Remarcando em laranja e Descartado em vermelho vibrante.
+- O deploy do aplicativo deve sempre usar explicitamente o Worker `agenda-em-comum-projep`. O `vite.config.ts` nao emite valores vazios para `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY`; ambos ficam configurados como secrets no Worker para que um build sem `.env` nao apague os bindings de producao.

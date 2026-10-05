@@ -116,3 +116,6 @@ Casos tratados:
 - `agenda_meetings` recebeu `meeting_type` (`AP` ou `DIAG`) e `status` (`scheduled`, `happened`, `no_show` ou `rescheduling`) com constraints no banco.
 - A atualizacao de reuniao grava nome, tipo, status, data, horario e duracao em todas as linhas do mesmo `meeting_group_id`.
 - O cancelamento agora valida se o usuario demonstrativo participa do encontro antes de remover o grupo completo.
+- O agendamento passou a usar a funcao transacional `agenda_book_meeting`, com locks por participante. Ela impede sobreposicao para organizador e participantes mesmo quando duas requisicoes chegam quase ao mesmo tempo.
+- Reunioes com status `discarded` liberam novamente o horario; os demais status continuam bloqueando conflito.
+- O constraint de status passou a aceitar tambem `interest_future` e `discarded`; `rescheduling` permanece como chave tecnica e aparece como "Remarcando" na interface.
