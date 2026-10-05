@@ -61,3 +61,14 @@ Este arquivo resume problemas ja corrigidos ou investigados no projeto, com base
 
 - Status `Conclu?do` aparecia nos cards da Base de Conhecimento.
   - Correcao: registros em `src/data/projetos.js` ajustados para `Concluído`.
+
+## Portal de Agendas
+
+- Erros de conflito de disponibilidade apareciam atras da janela de criacao.
+  - Correcao: a mensagem passou a ser exibida dentro da propria janela ativa.
+- A edicao de reuniao permitia alterar data, horario e duracao, com risco de desalinhar as agendas.
+  - Correcao: somente nome, AP/DIAG e status permanecem editaveis; participantes e horario aparecem como informacao, e a API nao aceita mais alteracoes de agenda nessa rota.
+- A exclusao de reuniao era imediata.
+  - Correcao: foi adicionada confirmacao explicita antes da remocao. A exclusao remove somente o bloqueio da reuniao e preserva as disponibilidades originais, liberando o intervalo para os dois participantes.
+- A navegacao inferior descia para o fim do conteudo na visualizacao mensal.
+  - Correcao: a barra passou a ficar fixa na tela durante a rolagem.

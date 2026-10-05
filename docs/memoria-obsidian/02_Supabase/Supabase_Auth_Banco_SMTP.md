@@ -126,3 +126,5 @@ Casos tratados:
 - As RPCs `agenda_add_availability` e `agenda_update_availability` usam lock transacional por usuario e rejeitam qualquer sobreposicao no mesmo dia.
 - Intervalos adjacentes continuam validos: `07:00-08:00` pode coexistir com `08:00-09:00`; `07:30-09:00` conflita com o primeiro.
 - A exclusao de recorrencia pode remover apenas a ocorrencia selecionada ou a ocorrencia atual e todas as seguintes do mesmo grupo.
+- Reunioes nao removem as linhas de `agenda_availability`: elas bloqueiam o intervalo enquanto existem em `agenda_meetings`. Ao excluir o `meeting_group_id`, as disponibilidades originais dos dois participantes voltam automaticamente a gerar horarios em comum.
+- A rota `updateMeeting` nao altera mais data, horario ou duracao; somente titulo, tipo e status podem ser atualizados.
