@@ -27,3 +27,10 @@
 - Lint global e smoke existentes apresentam falhas fora desta correcao (smoke: scripts/smoke-test.mjs:52, autorizacao do diretor GP).
 - Advisors detectaram problemas preexistentes de RLS em outras tabelas e uma view SECURITY DEFINER. Exigem auditoria propria; nao foram ampliadas permissoes para contorna-los.
 - A correcao reduz desperdicio, mas nao garante consumo abaixo de uma cota fixa para qualquer volume de usuarios. Nao remove restricao ja aplicada nem reduz consumo passado. Acompanhar Usage > Egress no painel apos liberacao.
+
+## Correcao complementar — 2026-10-08
+
+- O bloqueio de cinco minutos era global para todo o cliente Supabase. Um HTTP 402 recebido pelo REST da dashboard fazia o navegador devolver um 402 sintetico para `auth/v1/token`, mesmo quando o Supabase Auth estava operacional.
+- Os cooldowns passaram a ser isolados por servico (`auth`, `rest`, `storage`, `realtime` e `functions`). Uma restricao da API de dados nao impede mais a validacao real da senha pelo Auth.
+- O teste de regressao agora simula REST bloqueado e Auth disponivel, garantindo que o login continue chegando ao endpoint de autenticacao.
+- Os logs do Supabase mostraram que o maior consumidor continua externo ao site: o n8n enviou mais de 500 MB em requisicoes bloqueadas para `comercial_dashboard_snapshots` em 24 horas, com corpos de aproximadamente 7,5 MB. O workflow precisa parar de consultar e reenviar o snapshot completo em ciclos curtos e deve gravar sem `return=representation`.

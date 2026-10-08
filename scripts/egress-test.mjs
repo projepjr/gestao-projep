@@ -3,17 +3,21 @@ import { readFile } from 'node:fs/promises'
 import { createSupabaseFetch, loginErrorMessage } from '../src/lib/supabaseTransport.js'
 
 let clock = 0
-let requests = 0
-const guardedFetch = createSupabaseFetch(async () => {
-  requests++
-  return new Response('{}', { status: requests === 1 ? 402 : 200 })
+const requests = { rest: 0, auth: 0 }
+const guardedFetch = createSupabaseFetch(async input => {
+  const isAuth = new URL(String(input)).pathname.startsWith('/auth/v1')
+  const scope = isAuth ? 'auth' : 'rest'
+  requests[scope]++
+  return new Response('{}', { status: scope === 'rest' && requests.rest === 1 ? 402 : 200 })
 }, () => clock)
-assert.equal((await guardedFetch('https://example.test')).status, 402)
-assert.equal((await guardedFetch('https://example.test')).status, 402)
-assert.equal(requests, 1, 'restriction must suppress repeated network calls')
+assert.equal((await guardedFetch('https://example.test/rest/v1/profiles')).status, 402)
+assert.equal((await guardedFetch('https://example.test/rest/v1/sectors')).status, 402)
+assert.equal(requests.rest, 1, 'restriction must suppress repeated calls to the same service')
+assert.equal((await guardedFetch('https://example.test/auth/v1/token')).status, 200)
+assert.equal(requests.auth, 1, 'a REST restriction must not block password validation in Auth')
 clock = 300001
-assert.equal((await guardedFetch('https://example.test')).status, 200)
-assert.equal(requests, 2, 'service must be probed again after cooldown')
+assert.equal((await guardedFetch('https://example.test/rest/v1/profiles')).status, 200)
+assert.equal(requests.rest, 2, 'service must be probed again after cooldown')
 assert.match(loginErrorMessage({ status: 402 }), /limite de uso/)
 assert.match(loginErrorMessage({ code: 'invalid_credentials' }), /senha inválidos/)
 assert.doesNotMatch(loginErrorMessage({ status: 500 }), /senha inválidos/)
