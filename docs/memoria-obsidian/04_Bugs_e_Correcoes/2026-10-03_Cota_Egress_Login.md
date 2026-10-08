@@ -34,3 +34,11 @@
 - Os cooldowns passaram a ser isolados por servico (`auth`, `rest`, `storage`, `realtime` e `functions`). Uma restricao da API de dados nao impede mais a validacao real da senha pelo Auth.
 - O teste de regressao agora simula REST bloqueado e Auth disponivel, garantindo que o login continue chegando ao endpoint de autenticacao.
 - Os logs do Supabase mostraram que o maior consumidor continua externo ao site: o n8n enviou mais de 500 MB em requisicoes bloqueadas para `comercial_dashboard_snapshots` em 24 horas, com corpos de aproximadamente 7,5 MB. O workflow precisa parar de consultar e reenviar o snapshot completo em ciclos curtos e deve gravar sem `return=representation`.
+
+## Correcao do workflow n8n — 2026-10-08
+
+- No workflow publicado `Site Projep`, o no `Salvar metricas no Supabase` enviava o header `Prefer: resolution=merge-duplicates,return=representation`.
+- O Supabase recebia o snapshot comercial e devolvia a linha completa de aproximadamente 7,5 MB ao n8n em cada atualizacao, consumindo egress sem necessidade.
+- O header foi alterado para `Prefer: resolution=merge-duplicates,return=minimal` e a versao `Reduzir egress do snapshot comercial` foi publicada.
+- O no de transformacao ja armazenava apenas uma copia compactada dos cards em `payload.raw.cards`; nenhuma formula, card, responsavel ou metrica comercial foi removida.
+- A configuracao publicada foi reaberta e confirmou `return=minimal`. Nao foi disparada uma execucao manual enquanto o Supabase ainda apresentava restricao de cota.
