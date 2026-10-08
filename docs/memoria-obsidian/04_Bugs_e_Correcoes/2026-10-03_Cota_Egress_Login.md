@@ -42,3 +42,10 @@
 - O header foi alterado para `Prefer: resolution=merge-duplicates,return=minimal` e a versao `Reduzir egress do snapshot comercial` foi publicada.
 - O no de transformacao ja armazenava apenas uma copia compactada dos cards em `payload.raw.cards`; nenhuma formula, card, responsavel ou metrica comercial foi removida.
 - A configuracao publicada foi reaberta e confirmou `return=minimal`. Nao foi disparada uma execucao manual enquanto o Supabase ainda apresentava restricao de cota.
+
+## Correcao da leitura recorrente do n8n — 2026-10-08
+
+- O workflow `Monday - Taxas e Saude Automaticos` executa a cada cinco minutos e consultava `comercial_dashboard_snapshots` com `select=payload`, baixando o snapshot comercial inteiro para usar apenas os mapas `weeklyBolosHunters` e `weeklyBolosClosers`.
+- A consulta publicada passou a selecionar somente esses dois caminhos JSON do snapshot mais recente. O codigo de calculo aceita tanto a resposta reduzida quanto o formato antigo para preservar compatibilidade.
+- A versao `Reduzir leitura de bolos no Supabase` foi publicada e o workflow permaneceu ativo. A configuracao e o calculo publicados foram reabertos e verificados.
+- Nenhuma execucao manual foi disparada durante a restricao de cota. A reducao passa a valer nas proximas execucoes agendadas e evita a transferencia recorrente de aproximadamente 7,5 MB por ciclo.
